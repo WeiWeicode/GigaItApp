@@ -1,0 +1,31 @@
+{
+  "name": "@giganexus/itapp-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IT 管理系統後端(itapp-api):自有登入(不共用單一入口)、職級 × 部門按鈕權限、串接 Gateway BFF 管理資料",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/src/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "fastify": "5.12.5",
+    "fastify-plugin": "^6.0.0",
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "prettier": "3.9.9",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}

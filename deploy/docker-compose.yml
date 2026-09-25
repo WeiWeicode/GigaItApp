@@ -1,0 +1,70 @@
+# IT 管理系統部署到本機 Gateway(視同測試區):
+#
+#   sh deploy/gen-secrets.sh                                                          # 第一次:產生 secrets/(不入版控)
+#   docker compose -f deploy/docker-compose.yml up -d --build --wait itapp-api        # 後端(Nginx /it/api/ → itapp-api:51291)
+#   docker compose -f deploy/docker-compose.yml run --rm --build spa-it               # 前端:發佈到 gw_www 的 it-admin(取代範例 IT 頁面)
+#   docker compose -f deploy/docker-compose.yml run --rm spa-it rollback it-admin     # 前端回滾到上一版
+#
+# 與 Gateway 同一台主機:加入 Gateway 的 Docker 網路,Nginx 以容器名稱 itapp-api:51291 轉入(ITAPP_API_UPSTREAM)。
+# 登入不經 Gateway 單一入口;讀取 BFF 管理資料時以服務帳號登入 BFF(BFF_MODE=live)。
+name: giganexus-itapp
+
+services:
+  itapp-api:
+    image: giganexus/itapp-api:${IMAGE_TAG:-dev}
+    build:
+      context: ../backend
+    restart: unless-stopped
+    environment:
+      IT_ENV: ${IT_ENV:-test}
+      PORT: "51291"
+      DATA_DIR: /app/data
+      ITAPP_JWT_SECRET_FILE: /run/secrets/itapp_jwt_secret
+      ITAPP_SEED_PASSWORD_FILE: /run/secrets/itapp_seed_password
+      # 經 Nginx 呼叫 BFF;開發用自簽憑證以 NODE_EXTRA_CA_CERTS 信任
+      BFF_MODE: ${BFF_MODE:-live}
+      BFF_BASE_URL: https://nginx
+      BFF_SERVICE_USER: ${BFF_SERVICE_USER:-S100001}
+      BFF_SERVICE_PASSWORD_FILE: /run/secrets/bff_service_password
+      NODE_EXTRA_CA_CERTS: /run/gw-ca.crt
+    secrets:
+      - itapp_jwt_secret
+      - itapp_seed_password
+      - bff_service_password
+    volumes:
+      - itapp_data:/app/data
+      - ${GW_CA_CERT:-../../giga-api-gateway-bff/deploy/dev/secrets/pki/ca.crt}:/run/gw-ca.crt:ro
+    networks:
+      gateway:
+        aliases: [itapp-api]
+
+  spa-it:
+    image: giganexus/spa-it-admin:${IMAGE_TAG:-dev}
+    build:
+      context: ../frontend
+      args:
+        RELEASE_SHA: ${RELEASE_SHA:-dev}
+    profiles: ["publish"]
+    restart: "no"
+    volumes:
+      - gw_www:/srv/www
+    command: ["publish", "it-admin"]
+
+secrets:
+  itapp_jwt_secret:
+    file: ../secrets/itapp_jwt_secret
+  itapp_seed_password:
+    file: ../secrets/itapp_seed_password
+  bff_service_password:
+    file: ../secrets/bff_service_password
+
+volumes:
+  itapp_data:
+  gw_www:
+    external: true
+    name: ${GW_WWW_VOLUME:-giganexus-gw-dev_gw_www}
+
+networks:
+  gateway:
+    external: true
+    name: ${GW_NETWORK:-giganexus-gw-dev_default}

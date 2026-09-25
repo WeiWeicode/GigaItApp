@@ -1,0 +1,1303 @@
+{
+ "upstreams": [
+  {
+   "code": "endpoint-api",
+   "name": "Endpoint Server(模擬)",
+   "systemCode": "endpoint",
+   "timeoutMs": 10000,
+   "targets": [
+    {
+     "baseUrl": "http://mock-endpoint:51240",
+     "environment": "test"
+    }
+   ],
+   "routes": {}
+  },
+  {
+   "code": "go-mes",
+   "name": "go-mes",
+   "systemCode": "mes",
+   "timeoutMs": 10000,
+   "targets": [
+    {
+     "baseUrl": "http://mock-mes:51210",
+     "environment": "test"
+    }
+   ],
+   "routes": {
+    "published": 13
+   }
+  },
+  {
+   "code": "core-hrm",
+   "name": "core-hrm",
+   "systemCode": "hrm",
+   "timeoutMs": 10000,
+   "targets": [
+    {
+     "baseUrl": "http://mock-hrm:51220",
+     "environment": "test"
+    }
+   ],
+   "routes": {
+    "published": 2
+   }
+  },
+  {
+   "code": "bpm-adapter",
+   "name": "bpm-adapter",
+   "systemCode": "bpm",
+   "timeoutMs": 10000,
+   "targets": [
+    {
+     "baseUrl": "http://mock-bpm:51250",
+     "environment": "test"
+    }
+   ],
+   "routes": {
+    "published": 1
+   }
+  },
+  {
+   "code": "portal-svc",
+   "name": "portal-svc",
+   "systemCode": "portal",
+   "timeoutMs": 10000,
+   "targets": [
+    {
+     "baseUrl": "http://mock-portal:51270",
+     "environment": "test"
+    }
+   ],
+   "routes": {
+    "published": 2
+   }
+  },
+  {
+   "code": "dms-api",
+   "name": "dms-api",
+   "systemCode": "dms",
+   "timeoutMs": 10000,
+   "targets": [
+    {
+     "baseUrl": "http://dms-api:51290",
+     "environment": "test"
+    }
+   ],
+   "routes": {
+    "published": 6
+   }
+  }
+ ],
+ "routes": [
+  {
+   "routeCode": "bpm.approval.list",
+   "name": "待簽核",
+   "systemCode": "bpm",
+   "method": "GET",
+   "publicPath": "/api/bpm/approvals",
+   "routeType": "proxy",
+   "upstream": "bpm-adapter",
+   "upstreamPath": "/v1/approvals",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "列出目前使用者在 BPM 的待簽核表單(表單號、名稱、申請人);入口網儀表板聚合路由的非必要步驟 approvals(逾時 2 秒)。"
+  },
+  {
+   "routeCode": "dms.category.list",
+   "name": "文件分類清單",
+   "systemCode": "dms",
+   "method": "GET",
+   "publicPath": "/api/dms/categories",
+   "routeType": "proxy",
+   "upstream": "dms-api",
+   "upstreamPath": "/v1/categories",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": "公司文件",
+   "description": "回傳文件系統可用的分類(固定清單),供前端下拉選單使用;所有登入者皆可呼叫,內容不含個資,Gateway 共用快取 5 分鐘。"
+  },
+  {
+   "routeCode": "dms.document.create",
+   "name": "新增文件",
+   "systemCode": "dms",
+   "method": "POST",
+   "publicPath": "/api/dms/documents",
+   "routeType": "proxy",
+   "upstream": "dms-api",
+   "upstreamPath": "/v1/documents",
+   "authMode": "permission",
+   "permissionCode": "dms.document.write",
+   "status": "published",
+   "tags": "公司文件",
+   "description": "新增一份文件;所屬部門、公司與建立者取自 Token 的 dept、cos(第一個)與 emp。visibility 為 dept(部門限定)或 company(全公司)。"
+  },
+  {
+   "routeCode": "dms.document.delete",
+   "name": "刪除文件",
+   "systemCode": "dms",
+   "method": "DELETE",
+   "publicPath": "/api/dms/documents/:id",
+   "routeType": "proxy",
+   "upstream": "dms-api",
+   "upstreamPath": "/v1/documents/:id",
+   "authMode": "permission",
+   "permissionCode": "dms.document.write",
+   "status": "published",
+   "tags": "公司文件",
+   "description": "刪除文件;只限文件所屬部門刪除,否則 403 DATA_ACCESS_DENIED。文件已不存在時同樣回 204(冪等,Gateway 可安全重試)。"
+  },
+  {
+   "routeCode": "dms.document.get",
+   "name": "查詢文件",
+   "systemCode": "dms",
+   "method": "GET",
+   "publicPath": "/api/dms/documents/:id",
+   "routeType": "proxy",
+   "upstream": "dms-api",
+   "upstreamPath": "/v1/documents/:id",
+   "authMode": "permission",
+   "permissionCode": "dms.document.read",
+   "status": "published",
+   "tags": "公司文件",
+   "description": "依 ID 取得文件完整內容;不存在回 404 DMS_DOCUMENT_NOT_FOUND,部門限定文件非同部門、或非所屬公司回 403 DATA_ACCESS_DENIED。"
+  },
+  {
+   "routeCode": "dms.document.list",
+   "name": "文件清單",
+   "systemCode": "dms",
+   "method": "GET",
+   "publicPath": "/api/dms/documents",
+   "routeType": "proxy",
+   "upstream": "dms-api",
+   "upstreamPath": "/v1/documents",
+   "authMode": "permission",
+   "permissionCode": "dms.document.read",
+   "status": "published",
+   "tags": "公司文件",
+   "description": "列出目前使用者可閱讀的公司文件(同部門的文件,以及所屬公司公開的文件),依更新時間新到舊排序;可依關鍵字(標題、摘要、內文)與分類篩選,支援分頁。清單不含內文。"
+  },
+  {
+   "routeCode": "dms.document.update",
+   "name": "修改文件",
+   "systemCode": "dms",
+   "method": "PUT",
+   "publicPath": "/api/dms/documents/:id",
+   "routeType": "proxy",
+   "upstream": "dms-api",
+   "upstreamPath": "/v1/documents/:id",
+   "authMode": "permission",
+   "permissionCode": "dms.document.write",
+   "status": "published",
+   "tags": "公司文件",
+   "description": "修改文件內容(整份取代),需帶目前的 version;版本不符回 409 VERSION_CONFLICT(已被他人修改)。只限文件所屬部門修改,否則 403 DATA_ACCESS_DENIED。內容與目前相同時直接回傳(冪等)。"
+  },
+  {
+   "routeCode": "hrm.profile.get",
+   "name": "個人資料",
+   "systemCode": "hrm",
+   "method": "GET",
+   "publicPath": "/api/hrm/profile",
+   "routeType": "proxy",
+   "upstream": "core-hrm",
+   "upstreamPath": "/v1/profile",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "回傳目前使用者的工號、姓名、部門與所屬公司(取自內部 Token);含個資,稽核等級 meta。"
+  },
+  {
+   "routeCode": "hrm.todo.list",
+   "name": "我的待辦",
+   "systemCode": "hrm",
+   "method": "GET",
+   "publicPath": "/api/hrm/todos",
+   "routeType": "proxy",
+   "upstream": "core-hrm",
+   "upstreamPath": "/v1/todos",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "列出目前使用者的人事待辦(請假單、教育訓練等);入口網儀表板聚合路由的必要步驟 todos。"
+  },
+  {
+   "routeCode": "mes.catchall.echo",
+   "name": "MES 萬用路由(測試明確路徑優先)",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/*",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/echo",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用萬用路由:/api/mes/ 底下沒有明確路由的路徑都轉到 echo,用來驗證「明確路徑優先於萬用字元」。"
+  },
+  {
+   "routeCode": "mes.dashboard.rate",
+   "name": "今日達成率",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/dashboard/rate",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/dashboard/rate",
+   "authMode": "permission",
+   "permissionCode": "mes.dashboard.read",
+   "status": "published",
+   "tags": null,
+   "description": "回傳今日日期與生產達成率(0–1);入口網儀表板聚合路由的 mesRate 步驟也呼叫此 API。"
+  },
+  {
+   "routeCode": "mes.debug.echo",
+   "name": "回傳收到的請求(測試用)",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/debug/echo",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/echo",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:原樣回傳上游收到的方法、路徑、查詢參數、標頭與內部 Token 身分;並故意回 Set-Cookie、X-Powered-By、CORS 標頭,驗證 Gateway 會清除。"
+  },
+  {
+   "routeCode": "mes.debug.echo-post",
+   "name": "回傳收到的請求(測試用)",
+   "systemCode": "mes",
+   "method": "POST",
+   "publicPath": "/api/mes/debug/echo",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/echo",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:POST 版的 echo,原樣回傳請求內容,用於驗證請求本文與 CSRF 檢查。"
+  },
+  {
+   "routeCode": "mes.debug.fail",
+   "name": "回 500(測試用)",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/debug/fail",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/fail",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:一律回 500;Gateway 轉為 502 UPSTREAM_ERROR,連續失敗達閾值(10)後斷路器開啟。"
+  },
+  {
+   "routeCode": "mes.debug.flaky",
+   "name": "第一次連線錯誤(測試用)",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/debug/flaky",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/flaky",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:同一個 key 的第一次請求直接中斷連線,之後正常回應 attempt 次數;用來驗證 GET(冪等)自動重試。"
+  },
+  {
+   "routeCode": "mes.debug.flaky-post",
+   "name": "第一次連線錯誤(測試用)",
+   "systemCode": "mes",
+   "method": "POST",
+   "publicPath": "/api/mes/debug/flaky",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/flaky",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:POST 版的 flaky;非冪等方法 Gateway 不重試,第一次即回 502。"
+  },
+  {
+   "routeCode": "mes.debug.limited",
+   "name": "限流(測試用)",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/debug/limited",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/limited",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:套用限流政策 test-tight(每位使用者 60 秒 3 次),超過回 429 RATE_LIMITED。"
+  },
+  {
+   "routeCode": "mes.debug.slow",
+   "name": "延遲回應(測試用)",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/debug/slow",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/slow",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:延遲 ms 毫秒(預設 3000)才回應;路由逾時設為 1000 毫秒,用來驗證 504 UPSTREAM_TIMEOUT。"
+  },
+  {
+   "routeCode": "mes.debug.unauthorized",
+   "name": "回 401(測試用)",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/debug/unauthorized",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/debug/unauthorized",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "測試用:模擬後端驗證內部 Token 失敗(aud 不符)回 401;Gateway 視為設定錯誤並告警,對使用者回 502。"
+  },
+  {
+   "routeCode": "mes.workorder.get",
+   "name": "查詢工單",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/work-orders/:id",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/work-orders/:id",
+   "authMode": "permission",
+   "permissionCode": "mes.workorder.read",
+   "status": "published",
+   "tags": "工單",
+   "description": "依工單號查詢品號、數量、狀態(open / closed)與部門;回應由 Gateway 共用快取 30 秒。工單不存在回 404 MES_WORK_ORDER_NOT_FOUND。"
+  },
+  {
+   "routeCode": "mes.workorder.list",
+   "name": "工單列表",
+   "systemCode": "mes",
+   "method": "GET",
+   "publicPath": "/api/mes/work-orders",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/work-orders",
+   "authMode": "permission",
+   "permissionCode": "mes.workorder.read",
+   "status": "published",
+   "tags": "工單",
+   "description": "分頁列出工單(page 從 1 開始、pageSize 上限 100),回應附目前使用者工號 viewer。不做回應快取。"
+  },
+  {
+   "routeCode": "mes.workorder.report",
+   "name": "報工",
+   "systemCode": "mes",
+   "method": "POST",
+   "publicPath": "/api/mes/work-orders/:id/reports",
+   "routeType": "proxy",
+   "upstream": "go-mes",
+   "upstreamPath": "/v1/work-orders/:id/reports",
+   "authMode": "permission",
+   "permissionCode": "mes.workorder.report",
+   "status": "published",
+   "tags": "工單",
+   "description": "對開立中的工單回報完成數量 qty(必須大於 0),報工人與部門取自內部 Token;已結案工單回 422 MES_WORK_ORDER_CLOSED。稽核等級 meta。"
+  },
+  {
+   "routeCode": "portal.banner.mock",
+   "name": "首頁橫幅(mock,前端先行開發用)",
+   "systemCode": "portal",
+   "method": "GET",
+   "publicPath": "/api/portal/banner",
+   "routeType": "mock",
+   "upstream": null,
+   "upstreamPath": null,
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "首頁橫幅的假資料,後端尚未完成時供前端先行開發;不呼叫任何上游,只在 dev / test 生效。"
+  },
+  {
+   "routeCode": "portal.dashboard.get",
+   "name": "入口網儀表板(聚合)",
+   "systemCode": "portal",
+   "method": "GET",
+   "publicPath": "/api/portal/dashboard",
+   "routeType": "aggregate",
+   "upstream": null,
+   "upstreamPath": null,
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "入口網首頁一次取得三個系統的資料:HRM 待辦(必要)、BPM 待簽核(非必要,逾時 2 秒)、MES 今日達成率(非必要,需 mes.dashboard.read);同順序步驟並行執行後合併。"
+  },
+  {
+   "routeCode": "portal.news.list",
+   "name": "公告",
+   "systemCode": "portal",
+   "method": "GET",
+   "publicPath": "/api/portal/news",
+   "routeType": "proxy",
+   "upstream": "portal-svc",
+   "upstreamPath": "/v1/news",
+   "authMode": "public",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "入口網公告列表;公開 API,未登入也可呼叫(x-permission: public,需 IT 核准)。"
+  },
+  {
+   "routeCode": "portal.profile.get",
+   "name": "我的資料",
+   "systemCode": "portal",
+   "method": "GET",
+   "publicPath": "/api/portal/profile",
+   "routeType": "proxy",
+   "upstream": "portal-svc",
+   "upstreamPath": "/v1/profile",
+   "authMode": "authenticated",
+   "permissionCode": null,
+   "status": "published",
+   "tags": null,
+   "description": "回傳 Gateway 傳下來的完整身分(內部 Token 內容:工號、姓名、部門、公司、角色),前端可用來確認登入者。"
+  }
+ ],
+ "permissions": [
+  {
+   "code": "dms.document.write",
+   "name": "公司文件:新增 / 編輯 / 刪除",
+   "systemCode": "dms",
+   "description": null
+  },
+  {
+   "code": "dms.document.read",
+   "name": "公司文件:查詢",
+   "systemCode": "dms",
+   "description": null
+  },
+  {
+   "code": "gw.admin.route.register",
+   "name": "API 自動註冊(後端服務 API Key 專用)",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "hrm.todo.read",
+   "name": "待辦查詢",
+   "systemCode": "hrm",
+   "description": null
+  },
+  {
+   "code": "mes.debug.read",
+   "name": "測試用端點",
+   "systemCode": "mes",
+   "description": null
+  },
+  {
+   "code": "mes.dashboard.read",
+   "name": "MES 看板",
+   "systemCode": "mes",
+   "description": null
+  },
+  {
+   "code": "mes.workorder.report",
+   "name": "報工",
+   "systemCode": "mes",
+   "description": null
+  },
+  {
+   "code": "mes.workorder.read",
+   "name": "工單查詢",
+   "systemCode": "mes",
+   "description": null
+  },
+  {
+   "code": "endpoint.remote.operate",
+   "name": "端點遠端操作",
+   "systemCode": "endpoint",
+   "description": null
+  },
+  {
+   "code": "gw.admin.audit.read",
+   "name": "稽核紀錄查詢",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.notify.write",
+   "name": "通知:範本編輯",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.notify.read",
+   "name": "通知:範本與紀錄檢視",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.client.write",
+   "name": "API Key:建立、停用",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.client.read",
+   "name": "API Key:檢視",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.local.write",
+   "name": "本機帳號:代建、審核、重設、解鎖、停用",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.local.read",
+   "name": "本機帳號:檢視(含待審核)",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.company.write",
+   "name": "公司:網域與預設角色",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.company.read",
+   "name": "公司:檢視",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.user.sync",
+   "name": "人員同步:紀錄與手動觸發",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.user.write",
+   "name": "使用者:停用、個別角色、強制登出",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.user.read",
+   "name": "使用者:檢視",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.rbac.write",
+   "name": "權限 / 角色:編輯",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.rbac.read",
+   "name": "權限 / 角色:檢視、反查",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.release",
+   "name": "發佈 / 回滾",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.route.import",
+   "name": "API 匯入",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.route.write",
+   "name": "API 路由、聚合步驟、限流政策:編輯",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.route.read",
+   "name": "API 路由:檢視",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.upstream.write",
+   "name": "上游服務:編輯",
+   "systemCode": "gw",
+   "description": null
+  },
+  {
+   "code": "gw.admin.upstream.read",
+   "name": "上游服務:檢視",
+   "systemCode": "gw",
+   "description": null
+  }
+ ],
+ "roles": [
+  {
+   "code": "gw-super-admin",
+   "name": "Gateway 超級管理員",
+   "description": "僅限 IT 主管群組",
+   "isSystem": true
+  },
+  {
+   "code": "gw-it-admin",
+   "name": "Gateway IT 管理員",
+   "description": "IT 管理介面日常維護",
+   "isSystem": true
+  },
+  {
+   "code": "employee",
+   "name": "員工",
+   "description": "所有登入者預設角色",
+   "isSystem": true
+  },
+  {
+   "code": "mes-operator",
+   "name": "MES 作業員",
+   "description": null,
+   "isSystem": false
+  },
+  {
+   "code": "it-endpoint",
+   "name": "端點遠端操作",
+   "description": null,
+   "isSystem": false
+  },
+  {
+   "code": "hv-employee",
+   "name": "禾迅員工",
+   "description": null,
+   "isSystem": false
+  },
+  {
+   "code": "gs-employee",
+   "name": "碩禾員工",
+   "description": null,
+   "isSystem": false
+  },
+  {
+   "code": "dms-reader",
+   "name": "公司文件:閱讀",
+   "description": "碩禾員工皆可閱讀公司文件(實際可見範圍再由後端依部門 / 公司過濾)",
+   "isSystem": false
+  },
+  {
+   "code": "dms-editor",
+   "name": "公司文件:編輯",
+   "description": "可新增、編輯、刪除所屬部門的文件",
+   "isSystem": false
+  }
+ ],
+ "rolePermissions": [
+  {
+   "role": "dms-editor",
+   "permission": "dms.document.write"
+  },
+  {
+   "role": "dms-reader",
+   "permission": "dms.document.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.audit.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.client.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.company.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.local.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.local.write"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.notify.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.notify.write"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.rbac.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.release"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.route.import"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.route.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.route.register"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.route.write"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.upstream.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.upstream.write"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.user.read"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.user.sync"
+  },
+  {
+   "role": "gw-it-admin",
+   "permission": "gw.admin.user.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.audit.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.client.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.client.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.company.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.company.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.local.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.local.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.notify.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.notify.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.rbac.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.rbac.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.release"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.route.import"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.route.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.route.register"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.route.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.upstream.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.upstream.write"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.user.read"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.user.sync"
+  },
+  {
+   "role": "gw-super-admin",
+   "permission": "gw.admin.user.write"
+  },
+  {
+   "role": "hv-employee",
+   "permission": "mes.workorder.read"
+  },
+  {
+   "role": "it-endpoint",
+   "permission": "endpoint.remote.operate"
+  },
+  {
+   "role": "mes-operator",
+   "permission": "mes.dashboard.read"
+  },
+  {
+   "role": "mes-operator",
+   "permission": "mes.workorder.read"
+  },
+  {
+   "role": "mes-operator",
+   "permission": "mes.workorder.report"
+  }
+ ],
+ "roleAdGroups": [
+  {
+   "role": "dms-editor",
+   "adGroupDn": "CN=GN-IT-Admins,OU=Groups,DC=gsc,DC=com,DC=tw"
+  },
+  {
+   "role": "it-endpoint",
+   "adGroupDn": "CN=GN-IT-Admins,OU=Groups,DC=gsc,DC=com,DC=tw"
+  },
+  {
+   "role": "mes-operator",
+   "adGroupDn": "CN=GN-MES-Operators,OU=Groups,DC=gsmc,DC=com,DC=tw"
+  },
+  {
+   "role": "mes-operator",
+   "adGroupDn": "CN=GN-MES-Operators,OU=Groups,DC=gsc,DC=com,DC=tw"
+  },
+  {
+   "role": "gw-it-admin",
+   "adGroupDn": "CN=GN-IT-Admins,OU=Groups,DC=gsc,DC=com,DC=tw"
+  }
+ ],
+ "roleCompanies": [
+  {
+   "role": "dms-reader",
+   "company": "碩禾"
+  },
+  {
+   "role": "gs-employee",
+   "company": "碩禾"
+  },
+  {
+   "role": "hv-employee",
+   "company": "禾迅"
+  }
+ ],
+ "policies": [
+  {
+   "code": "default",
+   "limitCount": 300,
+   "windowSec": 60,
+   "keyBy": "user"
+  },
+  {
+   "code": "report-heavy",
+   "limitCount": 30,
+   "windowSec": 60,
+   "keyBy": "user"
+  },
+  {
+   "code": "mes-high-freq",
+   "limitCount": 1200,
+   "windowSec": 60,
+   "keyBy": "user"
+  },
+  {
+   "code": "test-tight",
+   "limitCount": 3,
+   "windowSec": 60,
+   "keyBy": "user"
+  }
+ ],
+ "release": {
+  "liveVersion": 33,
+  "redisVersion": 33,
+  "draftRoutes": 0
+ },
+ "releases": [
+  {
+   "releaseId": 33,
+   "note": "dms-api:行為規格對齊測試資料",
+   "publishedBy": "it-admin",
+   "publishedAt": "2026-09-25T04:11:46.175Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 32,
+   "note": "上架公司文件系統 dms-api(6 路由、2 權限、2 角色)",
+   "publishedBy": "it-admin",
+   "publishedAt": "2026-09-25T04:09:53.121Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [
+     "dms.category.list",
+     "dms.document.create",
+     "dms.document.delete",
+     "dms.document.get",
+     "dms.document.list",
+     "dms.document.update"
+    ],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": true,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 31,
+   "note": "e2e cleanup",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:39:20.946Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [
+     "e2e.hijack",
+     "e2e.release.mock"
+    ],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 30,
+   "note": "e2e hijack",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:39:20.181Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [
+     "e2e.hijack"
+    ],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 29,
+   "note": "rollback to 27",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:39:12.765Z",
+   "rolledBackFrom": 27,
+   "diff": {
+    "added": [],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 28,
+   "note": "e2e v2",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:39:12.142Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 27,
+   "note": "e2e",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:39:10.036Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [
+     "e2e.release.mock"
+    ],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 26,
+   "note": "dev setup",
+   "publishedBy": "dev-setup",
+   "publishedAt": "2026-09-25T02:38:41.500Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 25,
+   "note": "移除 node-sample 驗證路由",
+   "publishedBy": "e2e-manual",
+   "publishedAt": "2026-09-25T02:26:11.305Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [
+     "sample.item.create",
+     "sample.item.get",
+     "sample.item.list",
+     "sample.me.get"
+    ],
+    "upstreamsChanged": true,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 24,
+   "note": "移除 node-sample 驗證路由",
+   "publishedBy": "e2e-manual",
+   "publishedAt": "2026-09-25T02:26:01.040Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 23,
+   "note": "node-sample 端到端驗證",
+   "publishedBy": "e2e-manual",
+   "publishedAt": "2026-09-25T02:25:32.186Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [
+     "sample.item.create",
+     "sample.item.get",
+     "sample.item.list",
+     "sample.me.get"
+    ],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": true,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 22,
+   "note": "e2e cleanup",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:19:14.658Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [
+     "e2e.hijack",
+     "e2e.release.mock"
+    ],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 21,
+   "note": "e2e hijack",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:19:13.892Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [
+     "e2e.hijack"
+    ],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 20,
+   "note": "rollback to 18",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:19:02.940Z",
+   "rolledBackFrom": 18,
+   "diff": {
+    "added": [],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 19,
+   "note": "e2e v2",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:19:02.316Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 18,
+   "note": "e2e",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-25T02:19:00.212Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [
+     "e2e.release.mock"
+    ],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 17,
+   "note": "dev setup",
+   "publishedBy": "dev-setup",
+   "publishedAt": "2026-09-25T02:18:24.797Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 16,
+   "note": "e2e cleanup",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-24T16:36:24.270Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [],
+    "modified": [],
+    "removed": [
+     "e2e.hijack",
+     "e2e.release.mock"
+    ],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 15,
+   "note": "e2e hijack",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-24T16:36:23.530Z",
+   "rolledBackFrom": null,
+   "diff": {
+    "added": [
+     "e2e.hijack"
+    ],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  },
+  {
+   "releaseId": 14,
+   "note": "rollback to 12",
+   "publishedBy": "e2e",
+   "publishedAt": "2026-09-24T16:36:17.654Z",
+   "rolledBackFrom": 12,
+   "diff": {
+    "added": [],
+    "modified": [
+     "e2e.release.mock"
+    ],
+    "removed": [],
+    "upstreamsChanged": false,
+    "policiesChanged": false
+   }
+  }
+ ]
+}

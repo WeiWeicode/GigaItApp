@@ -1,0 +1,40 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "itapp-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "backend",
+        "run",
+        "dev"
+      ],
+      "port": 51291
+    },
+    {
+      "name": "itapp-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
+      "port": 5177,
+      "url": "http://localhost:5177"
+    },
+    {
+      "name": "itapp-web-gw",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev:gw"
+      ],
+      "port": 5178,
+      "url": "http://localhost:5178"
+    }
+  ]
+}

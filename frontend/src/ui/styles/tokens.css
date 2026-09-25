@@ -1,0 +1,142 @@
+/*
+ * 設計 Token(全域):所有元件只使用這裡的變數,不在元件內寫死顏色。
+ * 主題:<html data-theme="light|dark">,由 composables/theme.ts 切換。
+ * 風格:玻璃擬態(半透明毛玻璃 + 細緻線性邊框 + 漸層光暈)。
+ */
+:root {
+  --font-sans: 'Inter', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 32px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 220ms;
+
+  --sidebar-w: 260px;
+  --sidebar-w-collapsed: 76px;
+  --topbar-h: 64px;
+
+  /* 品牌漸層 */
+  --brand-1: #6366f1;
+  --brand-2: #22d3ee;
+  --brand-3: #a855f7;
+  --grad-brand: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-3) 50%, var(--brand-2) 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgb(99 102 241 / 0.18), rgb(34 211 238 / 0.14));
+
+  /* 語意色 */
+  --c-primary: #6366f1;
+  --c-info: #3b82f6;
+  --c-success: #10b981;
+  --c-warning: #f59e0b;
+  --c-danger: #ef4444;
+  --c-cyan: #06b6d4;
+  --c-violet: #a855f7;
+  --c-pink: #ec4899;
+
+  /* 圖表色盤(依序使用) */
+  --chart-1: #6366f1;
+  --chart-2: #22d3ee;
+  --chart-3: #a855f7;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+  --chart-6: #ec4899;
+  --chart-7: #3b82f6;
+  --chart-8: #84cc16;
+}
+
+/* ---------------- 明亮 ---------------- */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #eef1fa;
+  --bg-glow-1: rgb(99 102 241 / 0.28);
+  --bg-glow-2: rgb(34 211 238 / 0.24);
+  --bg-glow-3: rgb(168 85 247 / 0.2);
+  --bg-grid: rgb(15 23 42 / 0.035);
+
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+  --text-invert: #ffffff;
+
+  --glass: rgb(255 255 255 / 0.58);
+  --glass-strong: rgb(255 255 255 / 0.78);
+  --glass-soft: rgb(255 255 255 / 0.38);
+  --glass-hover: rgb(255 255 255 / 0.72);
+  --glass-border: rgb(255 255 255 / 0.75);
+  --glass-border-2: rgb(15 23 42 / 0.08);
+  --glass-highlight: linear-gradient(135deg, rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.2) 40%, rgb(99 102 241 / 0.25));
+  --glass-blur: blur(20px) saturate(170%);
+
+  --line: rgb(15 23 42 / 0.08);
+  --line-strong: rgb(15 23 42 / 0.14);
+  --field: rgb(255 255 255 / 0.7);
+  --field-border: rgb(15 23 42 / 0.12);
+  --field-focus: rgb(99 102 241 / 0.55);
+
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 8px 28px rgb(30 41 99 / 0.1), 0 2px 6px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 24px 60px rgb(30 41 99 / 0.18);
+  --shadow-glow: 0 10px 30px rgb(99 102 241 / 0.35);
+
+  --tone-bg-alpha: 0.12;
+  --overlay: rgb(15 23 42 / 0.35);
+}
+
+/* ---------------- 黑暗 ---------------- */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #070b18;
+  --bg-glow-1: rgb(99 102 241 / 0.32);
+  --bg-glow-2: rgb(34 211 238 / 0.18);
+  --bg-glow-3: rgb(168 85 247 / 0.24);
+  --bg-grid: rgb(255 255 255 / 0.03);
+
+  --text: #e6e9f5;
+  --text-2: #a3aac4;
+  --text-3: #636b8a;
+  --text-invert: #0b1020;
+
+  --glass: rgb(20 26 48 / 0.55);
+  --glass-strong: rgb(24 31 58 / 0.82);
+  --glass-soft: rgb(20 26 48 / 0.32);
+  --glass-hover: rgb(34 42 76 / 0.66);
+  --glass-border: rgb(255 255 255 / 0.08);
+  --glass-border-2: rgb(255 255 255 / 0.06);
+  --glass-highlight: linear-gradient(135deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0.02) 40%, rgb(34 211 238 / 0.28));
+  --glass-blur: blur(22px) saturate(150%);
+
+  --line: rgb(255 255 255 / 0.07);
+  --line-strong: rgb(255 255 255 / 0.13);
+  --field: rgb(10 14 30 / 0.55);
+  --field-border: rgb(255 255 255 / 0.1);
+  --field-focus: rgb(129 140 248 / 0.7);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 10px 30px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 30px 70px rgb(0 0 0 / 0.5);
+  --shadow-glow: 0 10px 34px rgb(99 102 241 / 0.45);
+
+  --tone-bg-alpha: 0.18;
+  --overlay: rgb(2 6 23 / 0.6);
+}

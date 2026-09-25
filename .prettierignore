@@ -1,0 +1,7 @@
+node_modules
+dist
+data
+secrets
+*.md
+backend/src/bff/mock-data.json
+package-lock.json

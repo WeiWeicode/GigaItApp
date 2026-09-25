@@ -1,0 +1,25 @@
+{
+  "name": "@giganexus/itapp-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IT 管理系統前端:子路徑 /it/(取代 Gateway 範例 IT 頁面),自有登入頁,API 為 /it/api/*(itapp-api)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:gw": "ITAPP_API_TARGET=https://localhost PORT=5178 vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "lucide-vue-next": "1.0.0",
+    "vue": "3.5.43",
+    "vue-router": "5.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.9",
+    "typescript": "6.0.3",
+    "vite": "8.3.1",
+    "vue-tsc": "3.3.11"
+  }
+}

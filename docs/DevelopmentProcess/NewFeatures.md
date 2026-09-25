@@ -1,0 +1,18 @@
+# 新增功能紀錄
+
+> 新紀錄加在最上方;格式見 `AGENT.md` §11。
+
+## 2026-09-25 懶加載:清單後端分頁、儀表板依區塊按需載入
+- 內容:檢查後確認頁面程式碼原本已依路由延遲載入(19 個 `import()`),但**資料**是一次取回:路由、人員、發佈版本整份下載後在前端分頁,儀表板一次呼叫就算完三個 Tab(含 BFF)的資料。改為:① `/bff/routes`、`/users` 後端篩選 + 分頁(`routes/paging.ts`),路由清單回傳 facets 供下拉選項;`/bff/releases` 分頁(live 直接向 BFF 取該頁),前端「載入更多」;② 儀表板拆成 `/dashboard/overview|work|gateway|team`,Tab 切換才載入,「近期工單 / 最近操作」以新全域元件 `GLazy` 捲動到才載入,BFF 無法連線只影響 gateway 區塊;③ 新增 `usePaged`(分頁、300 ms 防抖、丟棄過期回應);權限反查只查該權限的路由、關係圖只查需權限路由(超過 500 支提示)、部門主管候選人在打開對話框時才查、匯出 CSV 按下才逐頁取回;④ `GTable` 在 server 分頁時忽略前端排序(只排一頁會誤導)。舊的 `GET /dashboard` 已移除。
+- 檔案:`backend/src/routes/{paging,bff,users,dashboard}.ts`、`backend/src/bff/*`、`frontend/src/composables/usePaged.ts`、`frontend/src/ui/components/{GLazy,GTable}.vue`、`frontend/src/pages/**`、`docs/`
+- 驗證:`npm test` 44 項通過(新增路由分頁 / 篩選 / facets、發佈版本分頁、人員分頁;BFF 無法連線時 gateway 502、其他三區塊 200);前端 `vue-tsc`、`vite build` 通過;`deploy/e2e-smoke.sh` 通過,經 Gateway 以 live BFF 驗證 releases page 2 回 v28–v24、routes `system=dms` 6 筆。瀏覽器(以 Performance API 檢查實際請求):儀表板進頁只有 `/dashboard/overview`,捲動到底才出現 `/dashboard/work`;Gateway 概況 Tab 只打 `/dashboard/gateway`;API 路由第一次 `page=1&pageSize=12`、輸入關鍵字後只送一次 `q=work-orders`(3 筆);發佈歷程 10 → 載入更多 → 20;人員 `page=1&pageSize=10`;權限反查 `permission=mes.workorder.read&pageSize=100`;關係圖 `authMode=permission&pageSize=500`。注意:瀏覽器面板隱藏時 IntersectionObserver 不會觸發(第一次測試誤判未載入),面板顯示後確認正常
+
+## 2026-09-25 BDD PRD、技術文件與 Gherkin 驗收場景
+- 內容:新增 `docs/PRD.md`(BDD:使用者故事、需求編號 FR-x.y 對應 Gherkin 場景、權限表、錯誤代碼總表、非功能需求、里程碑、風險與待決事項 Q1–Q7)、`docs/ARCHITECTURE.md`(設計決策 D1–D10、請求流程、權限 / 資料模型、BFF 串接、技術棧、部署、安全清單)、`docs/API.md`、`docs/UI-GUIDE.md`、`docs/Gherkin/`(12 個 feature,標籤 `@auto` / `@manual` / `@e2e` / `@wip`)。為讓 `@auto` 場景可驗證,新增 `backend/test/scenarios.test.ts`(26 項,以「feature 檔 / 場景」命名)與 `test/helpers.ts`;新增 `deploy/e2e-smoke.sh` 驗證 `@e2e` 場景。AGENT.md 加入「行為變更時同步 PRD → Gherkin → 測試」規則。程式行為未變更。
+- 檔案:`docs/`、`backend/test/scenarios.test.ts`、`backend/test/helpers.ts`、`deploy/e2e-smoke.sh`、`AGENT.md`、`README.md`
+- 驗證:`npm test` 41 項全部通過(原 15 + 新 26)、`npm run typecheck` 通過;`sh deploy/e2e-smoke.sh` 11 項通過,`STOP_API=1` 時 itapp-api 停止回 502 `UPSTREAM_ERROR` 通過(第一次執行時發現腳本本身的 shell 引號錯誤導致登入 body 被拆開、檢查誤判通過,已修正後重跑)
+
+## 2026-09-25 IT 管理系統基本框架(取代 Gateway 範例 IT 頁面)
+- 內容:建立 GigaItApp。後端 itapp-api(Fastify,port 51291):自有登入(工號 + 密碼、JWT Session Cookie、CSRF、5 次失敗鎖 15 分)、職級(系統管理員 / 主管 / 高級工程師 / 一般工程師)× 部門(網管 / 系統 / 程式開發 / 資安)按鈕權限、兩層選單、資料範圍(只能管理同部門且職級較低者)、稽核紀錄、BFF 串接(mock 快照 / live 服務帳號)。前端 Vue 3 + Vite:全域 UI 套件(G* 元件、圖表、玻璃擬態 tokens、明亮 / 黑暗)、兩層選單 + 頁內 Tab、儀表板(部分模擬資料)、BFF 服務 / 路由 / 發佈版本、BFF 角色權限矩陣 / 反查 / 關係圖、人員與部門、職級權限 / 部門限制 / 權限試算、稽核紀錄。部署:Nginx `/it/api/` 直接轉給 itapp-api,前端發佈到 `it-admin` 取代範例頁。
+- 檔案:`backend/`、`frontend/`、`deploy/`、`AGENT.md`、`README.md`;Gateway:`nginx/conf.d/portal.conf`、`nginx/templates/00-env.conf.template`、`nginx/Dockerfile`、`deploy/docker-compose.yml`、`deploy/*.env.example`、`deploy/docker-compose.dev.yml`
+- 驗證:後端 `npm test` 15 項通過、`typecheck`、`build` 通過;前端 `vue-tsc`、`vite build` 通過。live 模式對本機 BFF 讀取 overview / routes / releases / rbac / who-can-access 成功,寫入回 501 `ITAPP_BFF_NOT_SUPPORTED`。部署到本機 Gateway 後,經 Nginx `/it/api/healthz` 200、Cookie 為 Secure / HttpOnly、路徑 `/it/api`。瀏覽器(1440 / 375 寬,明亮 / 黑暗):登入 → 儀表板三個 Tab → 服務與路由 → BFF 權限矩陣 / 關係圖 → 人員 → 職級權限(itadmin 調整一般工程師權限 → 確認 → 儲存成功)→ 以一般工程師進入稽核紀錄被導向 403;經 Gateway 以資安課高級工程師登入,發佈版本頁無「發佈草稿」按鈕、資料來源顯示「BFF 即時」
