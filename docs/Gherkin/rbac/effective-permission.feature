@@ -14,7 +14,7 @@
     @auto
     場景: 系統管理員固定擁有全部權限
       當 "itadmin" 登入
-      那麼 me 的 permissions 包含全部 17 項權限代碼
+      那麼 me 的 permissions 包含全部 18 項權限代碼
       而且 dataScope 為 "all"
 
     @auto

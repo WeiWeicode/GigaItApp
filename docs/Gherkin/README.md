@@ -17,6 +17,7 @@
 | `bff/bff-read.feature` | BFF 上游 / 路由 / 發佈版本 / 角色權限的讀取與視覺化、mock / live、BFF 無法連線 | §6.4 |
 | `bff/bff-write.feature` | BFF 角色權限設定與發佈:mock 寫入、live 明確拒絕 | §6.4 |
 | `dashboard/dashboard.feature` | 首頁儀表板、模擬資料標示 | §6.5 |
+| `endpoint/devices.feature` | 端點管理:經 Gateway BFF 取得 Agent 清單、Gateway 登入與同一工號檢查 | §6.8 |
 | `ui/navigation.feature` | 兩層選單、頁內 Tab、403 / 404、明亮 / 黑暗、手機寬度 | §6.6 |
 | `gateway/nginx-entry.feature` | 經 Gateway Nginx 的 `/it/`、`/it/api/`、登入限流、502 | §6.7 |
 

@@ -38,6 +38,7 @@ flowchart LR
 | D9 | 資料先存單一 JSON 檔(暫存檔 + rename 原子寫入、寫入排隊) | 基本框架階段不引入資料庫 | 只能單一實例;v0.2 改資料庫(PRD Q1) |
 | D10 | 前端全域 UI 套件(`src/ui/`)+ 設計 token,不引入 UI 框架 | 玻璃擬態客製度高;全站一致;CSP 禁止外部資源 | 元件需自行維護 |
 | D11 | **懶加載**:路由層程式碼分割;清單後端分頁;儀表板依區塊拆 API,依 Tab / 捲動按需呼叫 | 資料成長時不因一次取回全部而變慢;BFF 異常只影響讀 BFF 的區塊 | BFF 路由查詢本身不分頁(上限 200),itapp-api 快取整份後分頁;前端排序只在非分頁表格提供 |
+| D12 | **端點管理經 Gateway BFF**:前端以使用者的 Gateway 登入直接呼叫 `/api/endpoint/*`(`src/api/gateway.ts`),權限以 BFF 為準;`itapp-api` 只決定選單 / 按鈕是否顯示;進頁先比對 Gateway 工號與本系統登入者 | 遠端管理使用者電腦需綁定 AD 身分與 Gateway 的權限、稽核(Gateway PRD Q27、ARCHITECTURE D9) | 經 `itapp-api` 以服務帳號轉送:只需登入一次,但 Go 看不到真正的操作人 |
 
 ## 3. 請求流程
 

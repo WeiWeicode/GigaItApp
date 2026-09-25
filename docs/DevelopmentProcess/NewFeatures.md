@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-09-25 端點管理:電腦清單(經 Gateway BFF);多專案工作區
+- 內容:依 Gateway PRD Q27(端點管理以 BFF 為準),新增選單「端點管理 → 電腦清單」與權限 `endpoint.device.read`(只控制顯示,預設主管 / 高級 / 一般工程師;共 18 項)。前端 `src/api/gateway.ts` 以使用者的 Gateway 登入呼叫 `/api/auth/me` 與 `/api/endpoint/devices`(唯讀 GET,暫不接 web-kit,PRD Q8);頁面處理未登入 Gateway、工號與本系統登入者不同、Gateway 無權限、BFF 404 / 5xx。`itapp-api` 不轉送端點 API。AGENT.md 加入端點管理規則與多專案工作區(同層目錄、`../giga-api-gateway-bff/` 相對路徑、用 BFF 路由表找 API,Gateway `AGENT.md` §10),修正查詢路由表的指令;PRD v0.1.2 §6.8、ARCHITECTURE D12、Gherkin `endpoint/devices.feature`。
+- 檔案:`backend/src/rbac/catalog.ts`、`backend/test/scenarios.test.ts`、`frontend/src/api/gateway.ts`、`frontend/src/pages/endpoint/Devices.vue`、`frontend/src/router.ts`、`frontend/src/ui/components/GIcon.vue`(`monitor`)、`frontend/vite.config.ts`(`/api` proxy 到本機 Gateway)、`AGENT.md`、`README.md`、`docs/`
+- 驗證:`npm test` 45 項通過(新增「預設職級看得到電腦清單選單」);前端 `vue-tsc`、`vite build` 通過。Gateway 端以 E2E 驗證 `/api/endpoint/devices`(S100001 可取得經 :9443 連線的 PC-001,S112009 403)。**瀏覽器操作尚未完成**:需要使用者自行登入 IT 管理系統與 Gateway(不代為輸入密碼)。既有資料檔不會自動加入新權限,本機已補上;其他環境需在「職級權限」頁勾選
+
 ## 2026-09-25 懶加載:清單後端分頁、儀表板依區塊按需載入
 - 內容:檢查後確認頁面程式碼原本已依路由延遲載入(19 個 `import()`),但**資料**是一次取回:路由、人員、發佈版本整份下載後在前端分頁,儀表板一次呼叫就算完三個 Tab(含 BFF)的資料。改為:① `/bff/routes`、`/users` 後端篩選 + 分頁(`routes/paging.ts`),路由清單回傳 facets 供下拉選項;`/bff/releases` 分頁(live 直接向 BFF 取該頁),前端「載入更多」;② 儀表板拆成 `/dashboard/overview|work|gateway|team`,Tab 切換才載入,「近期工單 / 最近操作」以新全域元件 `GLazy` 捲動到才載入,BFF 無法連線只影響 gateway 區塊;③ 新增 `usePaged`(分頁、300 ms 防抖、丟棄過期回應);權限反查只查該權限的路由、關係圖只查需權限路由(超過 500 支提示)、部門主管候選人在打開對話框時才查、匯出 CSV 按下才逐頁取回;④ `GTable` 在 server 分頁時忽略前端排序(只排一頁會誤導)。舊的 `GET /dashboard` 已移除。
 - 檔案:`backend/src/routes/{paging,bff,users,dashboard}.ts`、`backend/src/bff/*`、`frontend/src/composables/usePaged.ts`、`frontend/src/ui/components/{GLazy,GTable}.vue`、`frontend/src/pages/**`、`docs/`

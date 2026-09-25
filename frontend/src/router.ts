@@ -1,6 +1,6 @@
 /**
  * 路由(History 模式,base = /it/):
- *   第一層:選單群組(總覽 / Gateway 管理 / 系統管理),對應後端 MENUS
+ *   第一層:選單群組(總覽 / Gateway 管理 / 端點管理 / 系統管理),對應後端 MENUS
  *   第二層:功能頁(TabbedPage),meta 定義標題與 Tab
  *   第三層:Tab = 子路由(重新整理停在同一個 Tab)
  * meta.permission:缺少權限時導向 /403(前端體驗;後端 API 仍會檢查)。
@@ -92,6 +92,19 @@ const routes: RouteRecordRaw[] = [
           { path: 'who-can-access', component: () => import('./pages/gateway/WhoCanAccess.vue'), meta: { tab: '權限反查' } },
           { path: 'graph', component: () => import('./pages/gateway/RbacGraph.vue'), meta: { tab: '關係圖' } },
         ],
+      },
+      {
+        path: 'endpoint/devices',
+        component: TabbedPage,
+        meta: {
+          permission: 'endpoint.device.read',
+          title: '電腦清單',
+          eyebrow: 'Endpoint',
+          description: '經 Gateway BFF 取得的 Agent 基本資料;資料權限以 Gateway 為準',
+          icon: 'monitor',
+          tabs: [{ label: '電腦清單', to: '/endpoint/devices', icon: 'monitor' }],
+        },
+        children: [{ path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單' } }],
       },
       {
         path: 'system/users',

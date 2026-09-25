@@ -34,6 +34,7 @@ AI 協作準則見 [AGENT.md](AGENT.md)(由 Gateway 根目錄 AGENT.md 與後端
 | 總覽 | 儀表板 | 營運總覽 / Gateway 概況 / 團隊工作 | `dashboard.view` |
 | Gateway 管理 | 服務與路由 | 上游服務 / API 路由 / 發佈版本 | `bff.route.read` |
 | | BFF 權限 | 角色權限矩陣 / 權限反查 / 關係圖 | `bff.rbac.read` |
+| 端點管理 | 電腦清單 | 電腦清單(經 Gateway BFF,需同一工號登入 Gateway) | `endpoint.device.read`(資料另需 Gateway 同名權限) |
 | 系統管理 | 人員與部門 | 人員 / 部門 | `sys.user.read`(部門 Tab `sys.dept.read`) |
 | | 角色與按鈕權限 | 職級權限 / 部門限制 / 權限試算 | `sys.perm.read` |
 | | 稽核紀錄 | 操作紀錄 / 登入紀錄 | `sys.audit.read` |

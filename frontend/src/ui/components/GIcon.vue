@@ -70,6 +70,7 @@ const ICONS: Record<string, Component> = {
   undo: L.Undo2,
   globe: L.Globe,
   cpu: L.Cpu,
+  monitor: L.Monitor,
   wifi: L.Wifi,
   code: L.Code,
   minus: L.Minus,

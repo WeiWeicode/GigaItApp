@@ -31,7 +31,7 @@ export type PermissionType = 'page' | 'button';
 export interface PermissionDef {
   code: string;
   name: string;
-  module: 'dashboard' | 'bff' | 'sys';
+  module: 'dashboard' | 'bff' | 'endpoint' | 'sys';
   type: PermissionType;
   description: string;
 }
@@ -39,6 +39,7 @@ export interface PermissionDef {
 export const MODULES = [
   { code: 'dashboard', name: '總覽' },
   { code: 'bff', name: 'Gateway 管理' },
+  { code: 'endpoint', name: '端點管理' },
   { code: 'sys', name: '系統管理' },
 ] as const;
 
@@ -51,6 +52,9 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'bff.upstream.edit', name: '編輯上游服務', module: 'bff', type: 'button', description: '調整上游逾時、目標位址' },
   { code: 'bff.rbac.read', name: '檢視 BFF 權限', module: 'bff', type: 'page', description: '角色權限矩陣、權限反查、關係圖' },
   { code: 'bff.rbac.edit', name: '設定 BFF 角色權限', module: 'bff', type: 'button', description: '調整 Gateway 角色擁有的權限' },
+
+  // 端點管理:本系統只決定選單 / 按鈕是否顯示;資料經 Gateway BFF 取得,能否取得以 BFF 同名權限為準(Gateway PRD Q27)
+  { code: 'endpoint.device.read', name: '檢視電腦清單', module: 'endpoint', type: 'page', description: '端點管理選單;另需 Gateway 的 endpoint.device.read' },
 
   { code: 'sys.user.read', name: '檢視人員', module: 'sys', type: 'page', description: '非系統管理員只看得到自己部門' },
   { code: 'sys.user.create', name: '新增人員', module: 'sys', type: 'button', description: '建立 IT 管理系統帳號' },
@@ -75,6 +79,7 @@ export const DEFAULT_LEVEL_PERMISSIONS: Record<Exclude<LevelCode, 'admin'>, stri
     'bff.route.publish',
     'bff.rbac.read',
     'bff.rbac.edit',
+    'endpoint.device.read',
     'sys.user.read',
     'sys.user.create',
     'sys.user.edit',
@@ -91,11 +96,12 @@ export const DEFAULT_LEVEL_PERMISSIONS: Record<Exclude<LevelCode, 'admin'>, stri
     'bff.route.publish',
     'bff.upstream.edit',
     'bff.rbac.read',
+    'endpoint.device.read',
     'sys.user.read',
     'sys.dept.read',
     'sys.perm.read',
   ],
-  engineer: ['dashboard.view', 'bff.route.read', 'bff.rbac.read', 'sys.user.read', 'sys.dept.read'],
+  engineer: ['dashboard.view', 'bff.route.read', 'bff.rbac.read', 'endpoint.device.read', 'sys.user.read', 'sys.dept.read'],
 };
 
 /** 預設部門限制:權限 → 允許的部門(未列出 = 不限部門) */
@@ -134,6 +140,12 @@ export const MENUS: MenuGroup[] = [
       { key: 'gw-services', title: '服務與路由', path: '/gateway/services', permission: 'bff.route.read' },
       { key: 'gw-rbac', title: 'BFF 權限', path: '/gateway/rbac', permission: 'bff.rbac.read' },
     ],
+  },
+  {
+    key: 'endpoint',
+    title: '端點管理',
+    icon: 'monitor',
+    children: [{ key: 'ep-devices', title: '電腦清單', path: '/endpoint/devices', permission: 'endpoint.device.read' }],
   },
   {
     key: 'system',

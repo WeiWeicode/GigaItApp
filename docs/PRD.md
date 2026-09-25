@@ -10,7 +10,7 @@
 | 項目 | 內容 |
 | --- | --- |
 | 產品名稱 | GigaNexus IT 管理系統(GigaItApp) |
-| 文件版本 | **v0.1.1** |
+| 文件版本 | **v0.1.2** |
 | 建立日期 | 2026-09-25 |
 | 技術棧 | Vue 3 + Vite(前端)/ Node.js 22 + Fastify 5 + TypeScript(後端 itapp-api)/ 經 Gateway Nginx 對外(詳見 [ARCHITECTURE.md](ARCHITECTURE.md)) |
 | 相關文件 | [ARCHITECTURE.md](ARCHITECTURE.md)(架構與技術)、[API.md](API.md)(API 規格)、[UI-GUIDE.md](UI-GUIDE.md)(前端 UI 規範)、[Gherkin/](Gherkin/README.md)(驗收場景)、[../AGENT.md](../AGENT.md)(AI 協作準則)、Gateway 專案 `giga-api-gateway-bff/docs/`(上位規範) |
@@ -21,6 +21,7 @@
 
 | 版本 | 日期 | 變更內容 |
 | --- | --- | --- |
+| v0.1.2 | 2026-09-25 | **端點管理**(§6.8):選單「端點管理 → 電腦清單」,經 Gateway BFF 取得 Agent 基本資料,**權限以 BFF 為準**、本系統只決定顯示(Gateway PRD Q27);新增權限 `endpoint.device.read`(共 18 項);與 Gateway、Go Endpoint Server 等專案同層放置(Gateway `AGENT.md` §10) |
 | v0.1.1 | 2026-09-25 | ① 側欄收合時滑鼠移上浮出功能清單(FR-6.1);② **懶加載**(FR-6.7):清單改後端篩選 + 分頁(路由、人員、發佈版本)、儀表板依區塊拆 API(Tab 切換 / 捲動到才載入)、對話框選項按需查詢 |
 | v0.1 | 2026-09-25 | 初稿。① `/it/` 由本系統取代 Gateway 範例 IT 頁面;② **自有登入、不共用單一入口**(需求方明確要求,為 Gateway FRONTEND-GUIDE §7.1 的例外);③ 職級(系統管理員 / 主管 / 高級工程師 / 一般工程師)× 部門(網管 / 系統 / 程式開發 / 資安)按鈕權限;④ BFF 讀取以服務帳號串接,寫入待 BFF 管理 API;⑤ 儀表板先以模擬資料呈現 |
 
@@ -123,6 +124,7 @@
 | `bff.upstream.edit` | 編輯上游服務 | button | 高級 | NET、SYS |
 | `bff.rbac.read` | 檢視 BFF 權限 | page | 主管、高級、一般 | — |
 | `bff.rbac.edit` | 設定 BFF 角色權限 | button | 主管 | SYS、SEC |
+| `endpoint.device.read` | 檢視電腦清單(只控制顯示;資料另需 Gateway 同名權限) | page | 主管、高級、一般 | — |
 | `sys.user.read` | 檢視人員 | page | 主管、高級、一般 | — |
 | `sys.user.create` / `edit` / `disable` / `reset-password` | 人員寫入 | button | 主管 | — |
 | `sys.dept.read` | 檢視部門 | page | 主管、高級、一般 | — |
@@ -200,6 +202,20 @@
 | FR-7.2 | Nginx `/it/api/` 直接轉給 `itapp-api`(`ITAPP_API_UPSTREAM`,變數上游:未部署時 Nginx 仍可啟動、請求回 502);`/it/api/auth/login` 套用 `gw_auth` 登入限流 | `gateway/nginx-entry.feature` |
 | FR-7.3 | 機密(JWT 金鑰、種子密碼、BFF 服務帳號密碼)以 Docker secret `*_FILE` 提供,prod 只接受 `_FILE` | 程式審查(`config.ts`) |
 
+### 6.8 端點管理(經 Gateway BFF)
+
+> **作為** IT 人員,**我要**在 IT 管理系統查看使用者電腦上 Agent 的連線狀況,**以便**知道哪些電腦在線、用的是哪張裝置憑證。
+
+端點資料由 Go Endpoint Server 提供,經 Gateway BFF 轉送;**能否取得、能否下指令以 BFF 權限為準**,身分是使用者的 Gateway 登入。本系統的 `endpoint.device.read` 只決定選單與頁面是否顯示,`itapp-api` 不轉送端點 API(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8)。
+
+| 編號 | 需求 | 驗收 |
+| --- | --- | --- |
+| FR-8.1 | 選單「端點管理 → 電腦清單」(`/endpoint/devices`),依本系統的 `endpoint.device.read` 顯示 | `endpoint/devices.feature`:預設職級看得到選單 |
+| FR-8.2 | 進頁呼叫 Gateway `GET /api/auth/me`:未登入 → 引導登入 Gateway(`/login?redirect=`);Gateway 工號與本系統登入者不同 → 提示重新登入,不取資料;Gateway 沒有 `endpoint.device.read` → 提示權限不足 | 同上(`@manual @e2e`) |
+| FR-8.3 | 電腦清單經 `GET /api/endpoint/devices` 取得:電腦名稱、在線 / 離線、憑證 DN、指紋、最後回報、首次連線;頁首顯示目前的 Gateway 身分;BFF 回 404 / 5xx 時分別提示「Gateway 尚未提供端點 API」「Endpoint Server 無法連線」 | 同上(`@manual @e2e`) |
+| FR-8.4 | Gateway 呼叫集中在 `src/api/gateway.ts`,目前只有唯讀 GET;加入下指令等寫入功能時改用 `@giganexus/web-kit`(CSRF、Token 自動更新) | 程式審查 |
+| FR-8.5 | 對電腦下指令、查詢指令結果(ENDPOINT-AGENT-GUIDE §8.3–§8.4) | `@wip`,待 Go Endpoint Server(W6) |
+
 ---
 
 ## 7. 錯誤代碼總表
@@ -267,3 +283,4 @@
 | Q5 | `sys.dept.edit`、`sys.perm.edit` 預設只有系統管理員;是否開放給 IT 經理? | 維持,由系統管理員依需要在「職級權限」開放 | 待決 |
 | Q6 | 儀表板真實資料來源(監控、工單系統) | Nginx JSON 日誌 / Prometheus;工單待確認系統 | 待決 |
 | Q7 | 稽核保存期限 | 至少 1 年,改資料庫後實作 | 待決 |
+| Q8 | 何時改用 `@giganexus/web-kit` 呼叫 Gateway(目前 web-kit 只在 Gateway repo 內,尚未發佈) | 加入端點寫入功能(FR-8.5)前:複製一份到本 repo 或等公司 Package Registry | 待決 |

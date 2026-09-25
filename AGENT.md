@@ -2,7 +2,8 @@
 
 > 本文件是 AI 程式助手(Claude、Gemini 等)在本專案中的行為準則,所有 AI 協作開發必須遵守。
 > 由 Gateway 專案(`giga-api-gateway-bff`)根目錄 `AGENT.md` 與下游後端樣本 `samples/node-backend/AGENT.md` 整理合併,並依本專案調整。
-> Gateway 的規格(`giga-api-gateway-bff/docs/`)仍是上位規範;本文件與之不一致時,**先指出差異,不要自行決定以哪一邊為準**。
+> Gateway 的規格(`../giga-api-gateway-bff/docs/`)仍是上位規範;本文件與之不一致時,**先指出差異,不要自行決定以哪一邊為準**。
+> 本專案與 Gateway、Go Endpoint Server 等專案放在**同一層目錄**、彼此相依;跨專案規則(相對路徑、用 BFF 路由表找 API、跨 repo 修改)見 `../giga-api-gateway-bff/AGENT.md` **§10 多專案工作區**。
 
 ---
 
@@ -15,6 +16,8 @@
 | API | `/it/api/*`,Nginx **直接**轉給 `itapp-api:51291`,**不經 BFF 路由表** |
 | 登入 | **自有帳號與登入頁,不共用 Gateway 單一入口**(FRONTEND-GUIDE §7.1 的例外,需求方明確要求) |
 | 與 BFF 的關係 | `itapp-api` 以 **BFF 服務帳號** 呼叫 BFF 管理 API 取得資料(`BFF_MODE=live`),或使用內建快照(`BFF_MODE=mock`) |
+| 端點管理 | 前端直接呼叫 `/api/endpoint/*`,經 BFF 到 Go Endpoint Server,**權限以 BFF 為準**、身分是使用者的 Gateway 登入(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8);`itapp-api` **只負責選單、Tab、按鈕是否顯示**,不轉送端點 API、不持有能呼叫 Endpoint Server 的帳號 |
+| 工作區 | 與 `../giga-api-gateway-bff/`(上位規範、本機 Gateway 環境、開發用憑證)、Go Endpoint Server(W6,repo 名稱待定)同層;規則見 Gateway `AGENT.md` §10 |
 | 目錄 | `backend/`(Fastify,itapp-api)、`frontend/`(Vue 3 + Vite)、`deploy/`(compose)、`docs/DevelopmentProcess/`(修正紀錄) |
 
 因為不經 Gateway 單一入口,下游樣本中「只信任 `X-Internal-Token`」「自動註冊為 Gateway 草稿」**不適用**本專案;其餘原則(錯誤格式、機密、部署區、port 登記)照舊。
@@ -107,7 +110,7 @@
 - 不回傳堆疊、密碼雜湊;不在日誌記錄 Cookie / CSRF / 密碼。機密不入版控、不寫進映像檔。
 
 ### 7.4 串接 BFF(`src/bff/`)
-- **新增 BFF 資料前,先查 BFF 既有 API**(`GET /api/admin/routes/catalog`,或 Gateway 專案 `npm run -s gw:lookup -- <關鍵字>`);查到就用,查不到先回報,不要自己連 BFF 資料庫或重寫 BFF 邏輯。查不到(沒設定、連不到)時明確說明「未查詢」。
+- **新增 BFF 資料前,先查 BFF 既有 API**(`GET /api/admin/routes/catalog`,或 `node ../giga-api-gateway-bff/sdk/node/dist/lookup-cli.js <關鍵字>`,見 Gateway `AGENT.md` §10.4);查到就用,查不到先回報,不要自己連 BFF 資料庫或重寫 BFF 邏輯。查不到(沒設定、連不到)時明確說明「未查詢」。
 - mock 與 live 必須實作同一個 `BffSource` 介面、回傳相同形狀;`mock-data.json` 取自本機 Gateway dev 快照(虛構資料)。
 - 唯讀資料經 `BffService` 快取(預設 30 秒),寫入後清除快取。
 
@@ -126,7 +129,7 @@
 | 玻璃擬態 | 面板用 `.glass` / `.glass-edge`(或 `GCard`),圖表色取 `ui/charts/palette.ts` |
 | 圖示 | `<GIcon name="...">`,新圖示在 `GIcon.vue` 的 `ICONS` 登記,頁面不直接 import `lucide-vue-next` |
 | 權限 | 按鈕 `v-can="'權限代碼'"`,頁面 `meta.permission`,Tab `permission`;這些只是體驗,**後端一定要再檢查** |
-| HTTP | 一律 `src/api/http.ts`(同網域 `/it/api`、CSRF、401 導回登入頁、錯誤含 `requestId`);頁面不直接呼叫 `fetch` |
+| HTTP | 本系統 API 一律 `src/api/http.ts`(同網域 `/it/api`、CSRF、401 導回登入頁、錯誤含 `requestId`);Gateway BFF(`/api/*`,端點管理)一律 `src/api/gateway.ts`(目前只有唯讀 GET;加入寫入時改用 `@giganexus/web-kit`);頁面不直接呼叫 `fetch` |
 | 回饋 | `toast.*` / `await confirm({...})`(`@/ui`),錯誤顯示 `describeError(e)`(含 requestId) |
 | 頁面結構 | 兩層選單 → `TabbedPage`(路由 meta:`title`、`tabs`)→ Tab 子路由;頁面動作按鈕 `<Teleport to="#page-actions" defer>` |
 | 版面 | 手機寬度(375px)不可出現整頁水平捲動;表格在卡片內捲動 |
@@ -166,16 +169,17 @@
 | 文件 | 路徑 | 說明 |
 | --- | --- | --- |
 | 產品需求(BDD) | `docs/PRD.md` | 需求編號 FR-x.y、權限表、錯誤代碼總表(§7)、待決事項 |
-| 架構與技術 | `docs/ARCHITECTURE.md` | 設計決策 D1–D10、請求流程、權限模型、資料模型、BFF 串接、技術棧、部署 |
+| 架構與技術 | `docs/ARCHITECTURE.md` | 設計決策 D1–D12、請求流程、權限模型、資料模型、BFF 串接、技術棧、部署 |
 | API 規格 | `docs/API.md` | 端點、權限、請求 / 回應、錯誤 |
 | 前端 UI 規範 | `docs/UI-GUIDE.md` | 設計 token、全域元件、新增頁面步驟 |
 | 驗收場景 | `docs/Gherkin/*.feature` | 各功能的驗收行為(標籤慣例見 `docs/Gherkin/README.md`) |
-| Gateway 開發手冊 | `giga-api-gateway-bff/AGENT.md` | 通用準則來源 |
-| 下游後端準則 | `giga-api-gateway-bff/samples/node-backend/AGENT.md` | 部署區、錯誤格式、新增 API 前先查 |
-| 產品需求 | `giga-api-gateway-bff/docs/PRD.md` | §7.2 SPA 子路徑、§8.3 RBAC、§8.7 管理 API、§8.1.1 錯誤代碼 |
-| 前端規範 | `giga-api-gateway-bff/docs/FRONTEND-GUIDE.md` | 子路徑、資源路徑、禁止事項(登入頁為本專案例外) |
-| 後端規範 | `giga-api-gateway-bff/docs/BACKEND-GUIDE.md` | §3 port 登記、§5 錯誤與日誌 |
-| 部署 | `giga-api-gateway-bff/docs/DEPLOYMENT.md` | SPA 發佈 / 回滾、機密 |
+| Gateway 開發手冊 | `../giga-api-gateway-bff/AGENT.md` | 通用準則來源;§10 多專案工作區 |
+| 下游後端準則 | `../giga-api-gateway-bff/samples/node-backend/AGENT.md` | 部署區、錯誤格式、新增 API 前先查 |
+| 產品需求 | `../giga-api-gateway-bff/docs/PRD.md` | §7.2 SPA 子路徑、§8.3 RBAC、§8.7 管理 API、§8.1.1 錯誤代碼、Q27 端點管理以 BFF 為準 |
+| 前端規範 | `../giga-api-gateway-bff/docs/FRONTEND-GUIDE.md` | 子路徑、資源路徑、禁止事項(登入頁為本專案例外) |
+| 後端規範 | `../giga-api-gateway-bff/docs/BACKEND-GUIDE.md` | §3 port 登記、§5 錯誤與日誌 |
+| 部署 | `../giga-api-gateway-bff/docs/DEPLOYMENT.md` | SPA 發佈 / 回滾、機密 |
+| 端點管理 | `../giga-api-gateway-bff/docs/ENDPOINT-AGENT-GUIDE.md` | §8:端點 API、權限代碼、指令派送、本系統前端規則(§8.6) |
 | 本專案說明 | `README.md` | 架構、帳號、權限矩陣、部署步驟 |
 
 ---

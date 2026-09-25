@@ -65,10 +65,10 @@ describe('auth/session.feature', () => {
 });
 
 describe('rbac/effective-permission.feature', () => {
-  it('系統管理員固定擁有全部 17 項權限', async () => {
+  it('系統管理員固定擁有全部 18 項權限', async () => {
     const s = await t.login('itadmin');
     const me = (await t.call(s, 'GET', '/it/api/auth/me')).json();
-    assert.equal(me.permissions.length, 17);
+    assert.equal(me.permissions.length, 18);
     assert.equal(me.dataScope, 'all');
   });
 
@@ -293,5 +293,15 @@ describe('dashboard/dashboard.feature', () => {
     const a = (await t.call(s, 'GET', '/it/api/dashboard/overview')).json();
     const b = (await t.call(s, 'GET', '/it/api/dashboard/overview')).json();
     assert.deepEqual(a.kpis, b.kpis);
+  });
+});
+
+describe('endpoint/devices.feature', () => {
+  it('預設職級看得到「端點管理 → 電腦清單」選單', async () => {
+    const s = await t.login('S100032');
+    const me = (await t.call(s, 'GET', '/it/api/auth/me')).json();
+    const keys = me.menus.flatMap((g: { children: { key: string }[] }) => g.children.map((c) => c.key));
+    assert.ok(keys.includes('ep-devices'));
+    assert.ok(me.permissions.includes('endpoint.device.read'));
   });
 });
