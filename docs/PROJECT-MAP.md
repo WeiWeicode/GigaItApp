@@ -1,6 +1,6 @@
 # 專案地圖 — GigaItApp(IT 管理系統)
 
-> **最後更新:2026-09-26**(頂列應用切換 GAppSwitcher、`composables/apps.ts`)。
+> **最後更新:2026-09-26**(頂列應用切換 GAppSwitcher、`composables/apps.ts`;公司環境 env 範本 `deploy/test.env.example`)。
 > 開發新功能後,在同一個變更內更新本文件(`AGENT.md` §9.1、Gateway `AGENT.md` §10.7)。只寫結構與職責,細節連到 `docs/` 對應章節。
 
 IT 部門的管理系統:`/it/`(Vue 前端)+ `/it/api/*`(itapp-api,Fastify,port 51291)。自有登入;Gateway BFF 資料由後端以服務帳號取得;端點管理由前端經 BFF(`/api/endpoint/*`)。
@@ -35,7 +35,7 @@ GigaItApp/
 │  │  ├─ api/                     HTTP:http.ts(/it/api)、gateway.ts(/api/endpoint/*)、auth、型別、顯示格式
 │  │  └─ components.d.ts          全域元件型別(新增 G* 元件時更新)
 │  └─ public/                     靜態資源
-├─ deploy/                        docker-compose(itapp-api、spa-it 發佈)、gen-secrets、e2e-smoke
+├─ deploy/                        docker-compose(itapp-api、spa-it 發佈)、gen-secrets、e2e-smoke、test.env.example(公司環境變數範本)
 ├─ secrets/                       ※ 本機機密(不進版控)
 └─ docs/                          PRD、ARCHITECTURE、API、UI-GUIDE、Gherkin、修正紀錄
 ```
