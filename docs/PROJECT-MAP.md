@@ -1,6 +1,6 @@
 # 專案地圖 — GigaItApp(IT 管理系統)
 
-> **最後更新:2026-09-26**(API 路由:開發專案欄與 Gherkin 行為規格)。
+> **最後更新:2026-09-26**(頂列應用切換 GAppSwitcher、`composables/apps.ts`)。
 > 開發新功能後,在同一個變更內更新本文件(`AGENT.md` §9.1、Gateway `AGENT.md` §10.7)。只寫結構與職責,細節連到 `docs/` 對應章節。
 
 IT 部門的管理系統:`/it/`(Vue 前端)+ `/it/api/*`(itapp-api,Fastify,port 51291)。自有登入;Gateway BFF 資料由後端以服務帳號取得;端點管理由前端經 BFF(`/api/endpoint/*`)。
@@ -31,7 +31,7 @@ GigaItApp/
 │  │  ├─ layouts/                 AppLayout(選單、頁首)、TabbedPage、ChangePasswordModal
 │  │  ├─ ui/                      全域 UI 套件:G* 元件(components/)、圖表(charts/)、tokens.css、feedback(toast / confirm)
 │  │  ├─ components/              本專案專用的小元件(非全域):SourceTag(BFF 來源)、GherkinView(行為規格顯示)
-│  │  ├─ composables/             共用邏輯:useAsync、usePaged、主題、權限資料快取
+│  │  ├─ composables/             共用邏輯:useAsync、usePaged、主題、權限資料快取、apps(應用切換:讀 Gateway /api/auth/me)
 │  │  ├─ api/                     HTTP:http.ts(/it/api)、gateway.ts(/api/endpoint/*)、auth、型別、顯示格式
 │  │  └─ components.d.ts          全域元件型別(新增 G* 元件時更新)
 │  └─ public/                     靜態資源

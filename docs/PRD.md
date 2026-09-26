@@ -10,17 +10,18 @@
 | 項目 | 內容 |
 | --- | --- |
 | 產品名稱 | GigaNexus IT 管理系統(GigaItApp) |
-| 文件版本 | **v0.1.2** |
+| 文件版本 | **v0.1.5** |
 | 建立日期 | 2026-09-25 |
 | 技術棧 | Vue 3 + Vite(前端)/ Node.js 22 + Fastify 5 + TypeScript(後端 itapp-api)/ 經 Gateway Nginx 對外(詳見 [ARCHITECTURE.md](ARCHITECTURE.md)) |
 | 相關文件 | [ARCHITECTURE.md](ARCHITECTURE.md)(架構與技術)、[API.md](API.md)(API 規格)、[UI-GUIDE.md](UI-GUIDE.md)(前端 UI 規範)、[Gherkin/](Gherkin/README.md)(驗收場景)、[../AGENT.md](../AGENT.md)(AI 協作準則)、Gateway 專案 `giga-api-gateway-bff/docs/`(上位規範) |
 | 上位規範 | Gateway PRD v0.5(§7.2 SPA 子路徑、§8.3 RBAC、§8.7 管理 API)、FRONTEND-GUIDE、BACKEND-GUIDE §3.3(port 51291 已登記) |
-| 狀態 | v0.1 基本框架完成(登入、UI、網頁框架、權限框架、BFF 讀取);待決事項見 §10 |
+| 狀態 | v0.1 基本框架完成(登入、UI、網頁框架、權限框架、BFF 讀取);頂列應用切換已完成(v0.1.5);改用單一入口(giga-Portal PRD I1–I5)尚未實作;待決事項見 §10 |
 
 ### 1.1 修訂紀錄
 
 | 版本 | 日期 | 變更內容 |
 | --- | --- | --- |
+| v0.1.5 | 2026-09-26 | 頂列**應用切換**(giga-Portal PRD FR-2.3、I3 的一部分):列出使用者有權限的應用並整頁導向,資料取自使用者的 Gateway 登入(`/api/auth/me`;沒有 Gateway 登入時不顯示);Gateway `me.apps`(G3)前暫以 `*.app.access` 推導。文件版本欄對齊修訂紀錄(原誤為 v0.1.2) |
 | v0.1.4 | 2026-09-26 | **決策紀錄(尚未實作)**:需求方決定本系統**改用 Gateway 單一入口**,取消自有帳號與「職級 × 部門」權限;權限(含應用 / 選單 / Tab / 按鈕)以 BFF 為唯一來源,本系統提供各應用的權限設定畫面;新增應用切換與路由守衛(無 `it.app.access` 導回員工入口網)。詳見 `../giga-Portal/docs/PRD.md` D2、§9.2(I1–I5)與 Gateway PRD v0.7;本文件 FR-1.x、FR-2.x 將於實作時改寫。Q4 由此定案 |
 | v0.1.3 | 2026-09-26 | API 路由新增「開發專案」欄(下游 repo 資料夾名稱,取自 Gateway `gw.upstream.project` / OpenAPI `x-gateway.project`,Gateway PRD v0.6)與明細的 **Gherkin 行為規格**(OpenAPI `x-gherkin`);關鍵字搜尋與匯出 CSV 含開發專案(FR-4.3) |
 | v0.1.2 | 2026-09-25 | **端點管理**(§6.8):選單「端點管理 → 電腦清單」,經 Gateway BFF 取得 Agent 基本資料,**權限以 BFF 為準**、本系統只決定顯示(Gateway PRD Q27);新增權限 `endpoint.device.read`(共 18 項);與 Gateway、Go Endpoint Server 等專案同層放置(Gateway `AGENT.md` §10) |

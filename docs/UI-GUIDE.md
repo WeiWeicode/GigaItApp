@@ -41,6 +41,7 @@
 | `GEmpty` | 空狀態 / 錯誤 | `icon`、`title`、`description`、`tone`(載入失敗用 danger,slot 放「重試」) |
 | `GSkeleton` | 載入骨架 | `lines` 或 `height` |
 | `GAvatar` / `GLogo` | 頭像 / 品牌標誌 | `name`、`size` |
+| `GAppSwitcher` | 應用切換(頂列帳號旁) | `apps: { code, name, basePath, icon }[]`、`current`、`derived`;一個以下不顯示,點選整頁導向;**與 `../giga-Portal/frontend/src/ui/components/GAppSwitcher.vue` 同一版本,兩邊同步修改** |
 | `GProgress` | 進度條 | `value`、`max`、`tone`,或多段 `segments: { value, tone, label? }[]` |
 | `GIcon` | 圖示 | `name`(在 `GIcon.vue` 的 `ICONS` 登記)、`size`、`stroke` |
 | 圖表 | `GSparkline`(趨勢)、`GAreaChart`(時間序列,含 tooltip)、`GBarList`(分類比較)、`GDonut`(組成,≤ 8 類)、`GRing`(單一比例) | 顏色自動取 palette |

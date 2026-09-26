@@ -3,6 +3,7 @@ export {};
 
 declare module 'vue' {
   interface GlobalComponents {
+    GAppSwitcher: (typeof import('./ui/components/GAppSwitcher.vue'))['default'];
     GAvatar: (typeof import('./ui/components/GAvatar.vue'))['default'];
     GBadge: (typeof import('./ui/components/GBadge.vue'))['default'];
     GButton: (typeof import('./ui/components/GButton.vue'))['default'];

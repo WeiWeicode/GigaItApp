@@ -8,6 +8,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/api/auth';
 import { http } from '@/api/http';
+import { CURRENT_APP, loadGatewayApps } from '@/composables/apps';
 import { useTheme } from '@/composables/theme';
 import ChangePasswordModal from './ChangePasswordModal.vue';
 
@@ -98,6 +99,10 @@ watch(
   },
 );
 
+// 應用切換:依使用者的 Gateway 登入列出有權限的應用(沒有 Gateway 登入時不顯示)
+const gwApps = ref<Awaited<ReturnType<typeof loadGatewayApps>>>({ apps: [], derived: false });
+loadGatewayApps().then((r) => (gwApps.value = r));
+
 // 資料來源(BFF mock / live)顯示在上方列
 const bffMode = ref<string | null>(null);
 http
@@ -187,6 +192,7 @@ async function doLogout() {
           :aria-label="theme === 'dark' ? '切換明亮模式' : '切換黑暗模式'"
           @click="toggle"
         />
+        <GAppSwitcher :apps="gwApps.apps" :current="CURRENT_APP" :derived="gwApps.derived" />
         <div class="user" @keydown.esc="userMenu = false">
           <button type="button" class="user-btn" :aria-expanded="userMenu" @click="userMenu = !userMenu">
             <GAvatar :name="me?.user.name ?? '?'" :size="34" />

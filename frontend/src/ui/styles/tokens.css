@@ -42,6 +42,10 @@
   --brand-3: #a855f7;
   --grad-brand: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-3) 50%, var(--brand-2) 100%);
   --grad-brand-soft: linear-gradient(135deg, rgb(99 102 241 / 0.18), rgb(34 211 238 / 0.14));
+  /* 與 giga-Portal 同名的 token(共用元件 GAppSwitcher 使用) */
+  --grad-primary: var(--grad-brand);
+  --on-primary: #ffffff;
+  --shadow-pop: var(--shadow-lg);
 
   /* 語意色 */
   --c-primary: #6366f1;

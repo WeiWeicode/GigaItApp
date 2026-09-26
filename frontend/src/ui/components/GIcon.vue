@@ -78,6 +78,10 @@ const ICONS: Record<string, Component> = {
   calendar: L.Calendar,
   repo: L.FolderGit2,
   spec: L.ListChecks,
+  // 應用切換(與 giga-Portal 同步)
+  apps: L.Grip,
+  home: L.House,
+  'arrow-right': L.ArrowRight,
 };
 
 const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: number }>(), { size: 18, stroke: 1.9 });

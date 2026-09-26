@@ -14,7 +14,7 @@
 | 做什麼 | IT 部門自己的管理系統:儀表板、Gateway BFF 的服務 / 路由 / 權限視覺化與設定、IT 人員(職級 × 部門)與按鈕權限 |
 | 子路徑 | `/it/`(取代 Gateway 原本的範例 IT 頁面,Nginx 對應 `/srv/www/it-admin/current`) |
 | API | `/it/api/*`,Nginx **直接**轉給 `itapp-api:51291`,**不經 BFF 路由表** |
-| 登入 | 目前為**自有帳號與登入頁,不共用 Gateway 單一入口**(FRONTEND-GUIDE §7.1 的例外)。**2026-09-26 需求方決定改用 Gateway 單一入口**(`../giga-Portal/docs/PRD.md` D2、Gateway PRD v0.7):API 改為 `/api/it/*` 經 BFF、權限改用 BFF、新增應用切換與路由守衛(無 `it.app.access` 導回員工入口網 `/`);**尚未實作**,動手前先讀該 PRD §9.2(I1–I5) |
+| 登入 | 目前為**自有帳號與登入頁,不共用 Gateway 單一入口**(FRONTEND-GUIDE §7.1 的例外)。**2026-09-26 需求方決定改用 Gateway 單一入口**(`../giga-Portal/docs/PRD.md` D2、Gateway PRD v0.7):API 改為 `/api/it/*` 經 BFF、權限改用 BFF、新增應用切換與路由守衛(無 `it.app.access` 導回員工入口網 `/`)。**頂列應用切換已先實作**(2026-09-26,讀使用者的 Gateway 登入 `/api/auth/me`,元件與 giga-Portal 同步);單一入口、權限改 BFF、路由守衛**尚未實作**,動手前先讀該 PRD §9.2(I1–I5) |
 | 與 BFF 的關係 | `itapp-api` 以 **BFF 服務帳號** 呼叫 BFF 管理 API 取得資料(`BFF_MODE=live`),或使用內建快照(`BFF_MODE=mock`) |
 | 端點管理 | 前端直接呼叫 `/api/endpoint/*`,經 BFF 到 Go Endpoint Server,**權限以 BFF 為準**、身分是使用者的 Gateway 登入(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8);`itapp-api` **只負責選單、Tab、按鈕是否顯示**,不轉送端點 API、不持有能呼叫 Endpoint Server 的帳號 |
 | 工作區 | 與 `../giga-api-gateway-bff/`(上位規範、本機 Gateway 環境、開發用憑證)、`../giga-Portal/`(員工入口網:單一入口與應用切換起點;**本系統負責設定其選單 / Tab / 按鈕權限**)、`../giga-endpoint/`(Go Endpoint Server,W6)同層;規則見 Gateway `AGENT.md` §10 |
