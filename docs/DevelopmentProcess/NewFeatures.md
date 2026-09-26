@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-09-26 專案地圖與核心設計原則
+- 內容:新增 `docs/PROJECT-MAP.md`(目錄職責、前後端分層、主要流程、「要改什麼看哪裡」、測試地圖、與設計原則的已知差異:前端尚無自動化測試、資料為 JSON 檔)。AGENT.md 新增 §9.1:開發新功能後必須更新專案地圖;核心設計原則(職責分離、`src/`、集中測試)依 Gateway `AGENT.md` §10.7.2 的 TypeScript / Vue 列落實;§0 目錄、§10 參考文件、§11 修正紀錄加上地圖路徑。
+- 檔案:`AGENT.md`、`docs/PROJECT-MAP.md`
+- 驗證:文件;地圖目錄與 `git ls-files` 對照
+
 ## 2026-09-25 端點管理:電腦清單(經 Gateway BFF);多專案工作區
 - 內容:依 Gateway PRD Q27(端點管理以 BFF 為準),新增選單「端點管理 → 電腦清單」與權限 `endpoint.device.read`(只控制顯示,預設主管 / 高級 / 一般工程師;共 18 項)。前端 `src/api/gateway.ts` 以使用者的 Gateway 登入呼叫 `/api/auth/me` 與 `/api/endpoint/devices`(唯讀 GET,暫不接 web-kit,PRD Q8);頁面處理未登入 Gateway、工號與本系統登入者不同、Gateway 無權限、BFF 404 / 5xx。`itapp-api` 不轉送端點 API。AGENT.md 加入端點管理規則與多專案工作區(同層目錄、`../giga-api-gateway-bff/` 相對路徑、用 BFF 路由表找 API,Gateway `AGENT.md` §10),修正查詢路由表的指令;PRD v0.1.2 §6.8、ARCHITECTURE D12、Gherkin `endpoint/devices.feature`。
 - 檔案:`backend/src/rbac/catalog.ts`、`backend/test/scenarios.test.ts`、`frontend/src/api/gateway.ts`、`frontend/src/pages/endpoint/Devices.vue`、`frontend/src/router.ts`、`frontend/src/ui/components/GIcon.vue`(`monitor`)、`frontend/vite.config.ts`(`/api` proxy 到本機 Gateway)、`AGENT.md`、`README.md`、`docs/`

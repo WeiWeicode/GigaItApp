@@ -18,7 +18,7 @@
 | 與 BFF 的關係 | `itapp-api` 以 **BFF 服務帳號** 呼叫 BFF 管理 API 取得資料(`BFF_MODE=live`),或使用內建快照(`BFF_MODE=mock`) |
 | 端點管理 | 前端直接呼叫 `/api/endpoint/*`,經 BFF 到 Go Endpoint Server,**權限以 BFF 為準**、身分是使用者的 Gateway 登入(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8);`itapp-api` **只負責選單、Tab、按鈕是否顯示**,不轉送端點 API、不持有能呼叫 Endpoint Server 的帳號 |
 | 工作區 | 與 `../giga-api-gateway-bff/`(上位規範、本機 Gateway 環境、開發用憑證)、Go Endpoint Server(W6,repo 名稱待定)同層;規則見 Gateway `AGENT.md` §10 |
-| 目錄 | `backend/`(Fastify,itapp-api)、`frontend/`(Vue 3 + Vite)、`deploy/`(compose)、`docs/DevelopmentProcess/`(修正紀錄) |
+| 目錄 | `backend/`(Fastify,itapp-api)、`frontend/`(Vue 3 + Vite)、`deploy/`(compose)、`docs/DevelopmentProcess/`(修正紀錄);**各目錄與檔案職責見專案地圖 `docs/PROJECT-MAP.md`** |
 
 因為不經 Gateway 單一入口,下游樣本中「只信任 `X-Internal-Token`」「自動註冊為 Gateway 草稿」**不適用**本專案;其餘原則(錯誤格式、機密、部署區、port 登記)照舊。
 
@@ -150,6 +150,19 @@
 | 註解語言 | 繁體中文,註明對應規格章節(例 `(PRD §8.7)`、`(AGENT.md §7.2)`);同一檔案內統一 |
 | 測試帳號 | 種子帳號皆為虛構資料,dev 密碼 `Passw0rd!`;**不可在瀏覽器輸入真實帳密** |
 
+### 9.1 專案地圖與設計原則
+
+- **專案地圖:`docs/PROJECT-MAP.md`**。開發新功能後,在同一個變更內更新(新增 / 搬移 / 刪除目錄或主要檔案、職責改變、新頁面、新 API 都要反映),並更新開頭的「最後更新」;規則見 Gateway `AGENT.md` §10.7.1。
+- 核心設計原則依 Gateway `AGENT.md` §10.7.2 的 **TypeScript / Node.js**(`backend/`)與 **Vue**(`frontend/`)兩列:
+
+| 原則 | 本專案做法 |
+| --- | --- |
+| 職責分離 | 後端:`routes/`(介面)只做 schema 驗證與權限宣告,權限規則在 `rbac/`,資料在 `store/`、`bff/`,不在路由裡直接操作 JSON 結構;前端:`pages/` 只組合畫面,邏輯放 `composables/`,HTTP 只在 `api/`,共用元件只在 `ui/` |
+| 原始碼根目錄 | `backend/src/`、`frontend/src/`;建置只取 `src/`(`tsconfig.build.json`、Vite) |
+| 集中測試 | `backend/test/`(與 `src/` 平行);前端目前無自動化測試,新增 composables 等邏輯時補 `frontend/test/`(Vitest) |
+
+- 既有程式與原則不同之處列在專案地圖 §6,不要為了符合原則大規模搬移(§3)。
+
 ### 常用指令
 | 位置 | 指令 | 說明 |
 | --- | --- | --- |
@@ -168,6 +181,7 @@
 
 | 文件 | 路徑 | 說明 |
 | --- | --- | --- |
+| **專案地圖** | `docs/PROJECT-MAP.md` | 目錄與檔案職責、分層、主要流程、「要改什麼去哪裡」;**開發新功能後必須更新**(§9.1) |
 | 產品需求(BDD) | `docs/PRD.md` | 需求編號 FR-x.y、權限表、錯誤代碼總表(§7)、待決事項 |
 | 架構與技術 | `docs/ARCHITECTURE.md` | 設計決策 D1–D12、請求流程、權限模型、資料模型、BFF 串接、技術棧、部署 |
 | API 規格 | `docs/API.md` | 端點、權限、請求 / 回應、錯誤 |
@@ -196,6 +210,8 @@
 | 後端修改紀錄 | `docs/DevelopmentProcess/BackendCorrection.md` | `backend/`、`deploy/` |
 
 動到 Gateway 專案(`nginx/`、`deploy/`、`docs/`)時,另在 Gateway 的 `docs/DevelopmentProcess/` 留紀錄。
+
+**開發新功能後,同一個變更內更新 `docs/PROJECT-MAP.md`**(§9.1),並在紀錄的「檔案」欄列出。
 
 ### 紀錄格式
 ```
