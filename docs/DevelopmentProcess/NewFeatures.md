@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-09-26 決策:改用 Gateway 單一入口;新增兄弟專案 giga-Portal(只改文件)
+- 內容:需求方新建員工入口網 `../giga-Portal`,並決定本系統**改用 Gateway 單一入口**、權限以 BFF 為唯一來源、由本系統提供各應用的權限設定畫面、新增應用切換與路由守衛(無 `it.app.access` 導回 `/`)。本次只記錄決策:AGENT.md §0 登入、工作區、權限設定列與 §10 參考文件;PRD v0.1.4 修訂紀錄、Q2 / Q3 / Q4 狀態。實作項目見 `../giga-Portal/docs/PRD.md` §9.2(I1–I5)、Gateway PRD v0.7。
+- 檔案:`AGENT.md`、`docs/PRD.md`
+- 驗證:文件;程式未修改
+
 ## 2026-09-26 API 路由:開發專案欄與 Gherkin 行為規格
 - 內容:API 路由頁新增「開發專案」欄(下游 repo 資料夾名稱),明細對話框顯示開發專案與 **Gherkin 行為規格**(關鍵字、標籤、註解醒目標示,純文字渲染)。BFF 原本沒有專案欄位,經需求方同意由 Gateway 新增 `gw.upstream.project`(OpenAPI `x-gateway.project`)並由路由查詢回傳(Gateway 端修改見 `../giga-api-gateway-bff/docs/DevelopmentProcess/NewFeatures.md` 同日紀錄,commit 302358b)。`gherkin` 原本 BFF 已回傳、`live.ts` 將其丟棄,改為保留;舊版 BFF 沒有 `project` 時補 `null`,mock / live 形狀一致。聚合 / mock 路由顯示「Gateway」,未登記的 proxy 路由顯示「未登記」。關鍵字搜尋比對開發專案,匯出 CSV 加入 `project` 欄。`mock-data.json` 的路由以本機 Gateway 快照補上 `project`、`gherkin`。新增圖示 `repo`、`spec`。PRD v0.1.3(FR-4.3)、API.md、Gherkin `bff/bff-read.feature`(新增「路由顯示開發專案與行為規格」)、專案地圖同步更新。
 - 檔案:`backend/src/bff/types.ts`、`backend/src/bff/live.ts`、`backend/src/bff/mock-data.json`、`backend/src/routes/bff.ts`、`backend/test/scenarios.test.ts`、`frontend/src/api/types.ts`、`frontend/src/pages/gateway/Routes.vue`、`frontend/src/components/GherkinView.vue`、`frontend/src/ui/components/GIcon.vue`、`docs/PRD.md`、`docs/API.md`、`docs/Gherkin/bff/bff-read.feature`、`docs/PROJECT-MAP.md`

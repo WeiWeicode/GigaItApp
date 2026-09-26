@@ -21,6 +21,7 @@
 
 | 版本 | 日期 | 變更內容 |
 | --- | --- | --- |
+| v0.1.4 | 2026-09-26 | **決策紀錄(尚未實作)**:需求方決定本系統**改用 Gateway 單一入口**,取消自有帳號與「職級 × 部門」權限;權限(含應用 / 選單 / Tab / 按鈕)以 BFF 為唯一來源,本系統提供各應用的權限設定畫面;新增應用切換與路由守衛(無 `it.app.access` 導回員工入口網)。詳見 `../giga-Portal/docs/PRD.md` D2、§9.2(I1–I5)與 Gateway PRD v0.7;本文件 FR-1.x、FR-2.x 將於實作時改寫。Q4 由此定案 |
 | v0.1.3 | 2026-09-26 | API 路由新增「開發專案」欄(下游 repo 資料夾名稱,取自 Gateway `gw.upstream.project` / OpenAPI `x-gateway.project`,Gateway PRD v0.6)與明細的 **Gherkin 行為規格**(OpenAPI `x-gherkin`);關鍵字搜尋與匯出 CSV 含開發專案(FR-4.3) |
 | v0.1.2 | 2026-09-25 | **端點管理**(§6.8):選單「端點管理 → 電腦清單」,經 Gateway BFF 取得 Agent 基本資料,**權限以 BFF 為準**、本系統只決定顯示(Gateway PRD Q27);新增權限 `endpoint.device.read`(共 18 項);與 Gateway、Go Endpoint Server 等專案同層放置(Gateway `AGENT.md` §10) |
 | v0.1.1 | 2026-09-25 | ① 側欄收合時滑鼠移上浮出功能清單(FR-6.1);② **懶加載**(FR-6.7):清單改後端篩選 + 分頁(路由、人員、發佈版本)、儀表板依區塊拆 API(Tab 切換 / 捲動到才載入)、對話框選項按需查詢 |
@@ -278,9 +279,9 @@
 | # | 問題 | 建議 | 狀態 |
 | --- | --- | --- | --- |
 | Q1 | v0.2 資料庫:沿用 Gateway 的 SQL Server 2012(獨立 schema)或其他? | SQL Server 2012 獨立資料庫,沿用 Drizzle 與 2012 相容規則 | 待決 |
-| Q2 | BFF 寫入:等 BFF P2-3,或先由 BFF 提供最小的角色權限 / 發佈 API? | 先開 `PUT /api/admin/roles/:id/permissions`、`POST /api/admin/releases` | 待決 |
-| Q3 | 正式區 BFF 服務帳號的建立與權限範圍 | IT 以 CLI 代建本機帳號,只給 `gw.admin.route.read`、`gw.admin.rbac.read`(寫入開放後再加) | 待決 |
-| Q4 | 是否需要讓 IT 人員也能用 AD 登入(保留獨立帳號為備援)? | v0.1 依需求只做獨立帳號 | 待決 |
+| Q2 | BFF 寫入:等 BFF P2-3,或先由 BFF 提供最小的角色權限 / 發佈 API? | 先開 `PUT /api/admin/roles/:id/permissions`、`POST /api/admin/releases` | 待決;角色權限、指派規則、權限試算已寫入 Gateway 規格 v0.7(§8.7,工作項目 P2-3a) |
+| Q3 | 正式區 BFF 服務帳號的建立與權限範圍 | IT 以 CLI 代建本機帳號,只給 `gw.admin.route.read`、`gw.admin.rbac.read`(寫入開放後再加) | 過渡用;改單一入口後以使用者身分呼叫管理 API,**不再需要服務帳號** |
+| Q4 | 是否需要讓 IT 人員也能用 AD 登入(保留獨立帳號為備援)? | v0.1 依需求只做獨立帳號 | **已決定(2026-09-26)**:改用 Gateway 單一入口(AD / 本機帳號),自有帳號退場;緊急管理帳號用 Gateway 本機帳號 + 個別指派 `gw-it-admin`(`../giga-Portal/docs/PRD.md` Q7) |
 | Q5 | `sys.dept.edit`、`sys.perm.edit` 預設只有系統管理員;是否開放給 IT 經理? | 維持,由系統管理員依需要在「職級權限」開放 | 待決 |
 | Q6 | 儀表板真實資料來源(監控、工單系統) | Nginx JSON 日誌 / Prometheus;工單待確認系統 | 待決 |
 | Q7 | 稽核保存期限 | 至少 1 年,改資料庫後實作 | 待決 |
