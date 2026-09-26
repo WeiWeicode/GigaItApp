@@ -21,6 +21,7 @@
 
 | 版本 | 日期 | 變更內容 |
 | --- | --- | --- |
+| v0.1.3 | 2026-09-26 | API 路由新增「開發專案」欄(下游 repo 資料夾名稱,取自 Gateway `gw.upstream.project` / OpenAPI `x-gateway.project`,Gateway PRD v0.6)與明細的 **Gherkin 行為規格**(OpenAPI `x-gherkin`);關鍵字搜尋與匯出 CSV 含開發專案(FR-4.3) |
 | v0.1.2 | 2026-09-25 | **端點管理**(§6.8):選單「端點管理 → 電腦清單」,經 Gateway BFF 取得 Agent 基本資料,**權限以 BFF 為準**、本系統只決定顯示(Gateway PRD Q27);新增權限 `endpoint.device.read`(共 18 項);與 Gateway、Go Endpoint Server 等專案同層放置(Gateway `AGENT.md` §10) |
 | v0.1.1 | 2026-09-25 | ① 側欄收合時滑鼠移上浮出功能清單(FR-6.1);② **懶加載**(FR-6.7):清單改後端篩選 + 分頁(路由、人員、發佈版本)、儀表板依區塊拆 API(Tab 切換 / 捲動到才載入)、對話框選項按需查詢 |
 | v0.1 | 2026-09-25 | 初稿。① `/it/` 由本系統取代 Gateway 範例 IT 頁面;② **自有登入、不共用單一入口**(需求方明確要求,為 Gateway FRONTEND-GUIDE §7.1 的例外);③ 職級(系統管理員 / 主管 / 高級工程師 / 一般工程師)× 部門(網管 / 系統 / 程式開發 / 資安)按鈕權限;④ BFF 讀取以服務帳號串接,寫入待 BFF 管理 API;⑤ 儀表板先以模擬資料呈現 |
@@ -163,7 +164,7 @@
 | --- | --- | --- |
 | FR-4.1 | 資料來源:`BFF_MODE=mock`(本機 Gateway 快照,離線開發)或 `live`(itapp-api 以 BFF 服務帳號登入,讀取既有管理 API);回應與畫面標示來源 | `bff/bff-read.feature`:回應與畫面標示資料來源 |
 | FR-4.2 | 讀取快取 30 秒,「重新整理」強制重取;BFF 無法連線時回 502 `ITAPP_BFF_UNAVAILABLE`,其他功能不受影響 | `bff/bff-read.feature` |
-| FR-4.3 | 服務與路由:上游卡片、限流政策、路由清單(**後端**搜尋、系統 / 上游 / 驗證模式篩選與分頁,篩選選項由回應 facets 提供;明細、請求路徑圖)、匯出 CSV(`bff.route.export`,按下時才逐頁取回全部符合資料)、發佈歷程(每次 10 筆,「載入更多」;版本、差異、回滾來源) | `bff/bff-read.feature`:服務與路由、路由清單由後端篩選與分頁、發佈版本分頁 |
+| FR-4.3 | 服務與路由:上游卡片、限流政策、路由清單(**後端**搜尋〔含開發專案〕、系統 / 上游 / 驗證模式篩選與分頁,篩選選項由回應 facets 提供;「開發專案」欄;明細、請求路徑圖、Gherkin 行為規格)、匯出 CSV(`bff.route.export`,按下時才逐頁取回全部符合資料)、發佈歷程(每次 10 筆,「載入更多」;版本、差異、回滾來源) | `bff/bff-read.feature`:服務與路由、路由清單由後端篩選與分頁、路由顯示開發專案與行為規格、發佈版本分頁 |
 | FR-4.4 | BFF 權限:角色 × 權限矩陣(依系統篩選、滑鼠十字高亮)、權限反查(角色、AD 群組、公司、個別指派、受保護 API)、關係圖(角色 → 權限 → API,高亮上下游) | `bff/bff-read.feature`:BFF 權限 |
 | FR-4.5 | 設定:角色權限編輯(`bff.rbac.edit`)、發佈草稿(`bff.route.publish`);mock 寫入本系統資料檔 / 模擬版本,**live 在 BFF 提供管理 API 前回 501 `ITAPP_BFF_NOT_SUPPORTED`** | `bff/bff-write.feature` |
 | FR-4.6 | 上游編輯(`bff.upstream.edit`)目前只提示「尚未開放」 | `bff/bff-write.feature`:上游編輯尚未開放 |

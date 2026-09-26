@@ -1,5 +1,5 @@
 /**
- * 由 Gateway BFF 取得的管理資料(欄位對應 BFF 的 /api/admin/demo/catalog、/api/admin/routes/catalog、
+ * 由 Gateway BFF 取得的管理資料(欄位對應 BFF 的 /api/admin/demo/catalog、/api/admin/routes/catalog(含 project、gherkin,Gateway PRD v0.6)、
  * /api/admin/db/tables/*、/api/admin/demo/who-can-access 回應;mock 與 live 回傳相同形狀)。
  */
 
@@ -21,12 +21,16 @@ export interface BffRoute {
   publicPath: string;
   routeType: 'proxy' | 'mock' | 'aggregate' | string;
   upstream: string | null;
+  /** 開發專案:實作上游服務的 repo 資料夾名稱(BFF gw.upstream.project,OpenAPI x-gateway.project);未登記或非 proxy 路由為 null */
+  project: string | null;
   upstreamPath: string | null;
   authMode: 'public' | 'authenticated' | 'permission' | string;
   permissionCode: string | null;
   status: 'draft' | 'published' | 'deprecated' | 'disabled' | string;
   tags: string | null;
   description: string | null;
+  /** 行為規格:Gherkin 場景文字(OpenAPI x-gherkin) */
+  gherkin: string | null;
 }
 
 export interface BffPolicy {

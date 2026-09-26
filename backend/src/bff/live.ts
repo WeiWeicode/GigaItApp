@@ -119,8 +119,9 @@ export class LiveBffSource implements BffSource {
   }
 
   async routes(): Promise<BffRoute[]> {
-    const r = await this.get<{ items: (BffRoute & { gherkin?: string })[] }>('/api/admin/routes/catalog');
-    return r.items.map(({ gherkin: _g, ...route }) => route);
+    const r = await this.get<{ items: BffRoute[] }>('/api/admin/routes/catalog');
+    // 舊版 BFF(Gateway PRD v0.6 之前)沒有 project,補 null 讓 mock / live 形狀一致
+    return r.items.map((route) => ({ ...route, project: route.project ?? null, gherkin: route.gherkin ?? null }));
   }
 
   async releases(page: number, pageSize: number): Promise<{ items: BffRelease[]; total: number }> {

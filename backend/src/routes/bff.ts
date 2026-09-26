@@ -69,7 +69,7 @@ const bffRoutes: FastifyPluginAsync<{ bff: BffService; store: Store }> = async (
           (!authMode || r.authMode === authMode) &&
           (!status || r.status === status) &&
           (!permission || r.permissionCode === permission) &&
-          matchesQ(q, [r.routeCode, r.name, r.publicPath, r.permissionCode, r.tags]),
+          matchesQ(q, [r.routeCode, r.name, r.publicPath, r.permissionCode, r.tags, r.project]),
       );
       const distinct = (xs: (string | null)[]) => [...new Set(xs.filter((x): x is string => !!x))].sort();
       return {

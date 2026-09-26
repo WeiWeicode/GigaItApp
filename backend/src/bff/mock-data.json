@@ -72,21 +72,6 @@
    "routes": {
     "published": 2
    }
-  },
-  {
-   "code": "dms-api",
-   "name": "dms-api",
-   "systemCode": "dms",
-   "timeoutMs": 10000,
-   "targets": [
-    {
-     "baseUrl": "http://dms-api:51290",
-     "environment": "test"
-    }
-   ],
-   "routes": {
-    "published": 6
-   }
   }
  ],
  "routes": [
@@ -98,102 +83,14 @@
    "publicPath": "/api/bpm/approvals",
    "routeType": "proxy",
    "upstream": "bpm-adapter",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/approvals",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "列出目前使用者在 BPM 的待簽核表單(表單號、名稱、申請人);入口網儀表板聚合路由的非必要步驟 approvals(逾時 2 秒)。"
-  },
-  {
-   "routeCode": "dms.category.list",
-   "name": "文件分類清單",
-   "systemCode": "dms",
-   "method": "GET",
-   "publicPath": "/api/dms/categories",
-   "routeType": "proxy",
-   "upstream": "dms-api",
-   "upstreamPath": "/v1/categories",
-   "authMode": "authenticated",
-   "permissionCode": null,
-   "status": "published",
-   "tags": "公司文件",
-   "description": "回傳文件系統可用的分類(固定清單),供前端下拉選單使用;所有登入者皆可呼叫,內容不含個資,Gateway 共用快取 5 分鐘。"
-  },
-  {
-   "routeCode": "dms.document.create",
-   "name": "新增文件",
-   "systemCode": "dms",
-   "method": "POST",
-   "publicPath": "/api/dms/documents",
-   "routeType": "proxy",
-   "upstream": "dms-api",
-   "upstreamPath": "/v1/documents",
-   "authMode": "permission",
-   "permissionCode": "dms.document.write",
-   "status": "published",
-   "tags": "公司文件",
-   "description": "新增一份文件;所屬部門、公司與建立者取自 Token 的 dept、cos(第一個)與 emp。visibility 為 dept(部門限定)或 company(全公司)。"
-  },
-  {
-   "routeCode": "dms.document.delete",
-   "name": "刪除文件",
-   "systemCode": "dms",
-   "method": "DELETE",
-   "publicPath": "/api/dms/documents/:id",
-   "routeType": "proxy",
-   "upstream": "dms-api",
-   "upstreamPath": "/v1/documents/:id",
-   "authMode": "permission",
-   "permissionCode": "dms.document.write",
-   "status": "published",
-   "tags": "公司文件",
-   "description": "刪除文件;只限文件所屬部門刪除,否則 403 DATA_ACCESS_DENIED。文件已不存在時同樣回 204(冪等,Gateway 可安全重試)。"
-  },
-  {
-   "routeCode": "dms.document.get",
-   "name": "查詢文件",
-   "systemCode": "dms",
-   "method": "GET",
-   "publicPath": "/api/dms/documents/:id",
-   "routeType": "proxy",
-   "upstream": "dms-api",
-   "upstreamPath": "/v1/documents/:id",
-   "authMode": "permission",
-   "permissionCode": "dms.document.read",
-   "status": "published",
-   "tags": "公司文件",
-   "description": "依 ID 取得文件完整內容;不存在回 404 DMS_DOCUMENT_NOT_FOUND,部門限定文件非同部門、或非所屬公司回 403 DATA_ACCESS_DENIED。"
-  },
-  {
-   "routeCode": "dms.document.list",
-   "name": "文件清單",
-   "systemCode": "dms",
-   "method": "GET",
-   "publicPath": "/api/dms/documents",
-   "routeType": "proxy",
-   "upstream": "dms-api",
-   "upstreamPath": "/v1/documents",
-   "authMode": "permission",
-   "permissionCode": "dms.document.read",
-   "status": "published",
-   "tags": "公司文件",
-   "description": "列出目前使用者可閱讀的公司文件(同部門的文件,以及所屬公司公開的文件),依更新時間新到舊排序;可依關鍵字(標題、摘要、內文)與分類篩選,支援分頁。清單不含內文。"
-  },
-  {
-   "routeCode": "dms.document.update",
-   "name": "修改文件",
-   "systemCode": "dms",
-   "method": "PUT",
-   "publicPath": "/api/dms/documents/:id",
-   "routeType": "proxy",
-   "upstream": "dms-api",
-   "upstreamPath": "/v1/documents/:id",
-   "authMode": "permission",
-   "permissionCode": "dms.document.write",
-   "status": "published",
-   "tags": "公司文件",
-   "description": "修改文件內容(整份取代),需帶目前的 version;版本不符回 409 VERSION_CONFLICT(已被他人修改)。只限文件所屬部門修改,否則 403 DATA_ACCESS_DENIED。內容與目前相同時直接回傳(冪等)。"
+   "description": "列出目前使用者在 BPM 的待簽核表單(表單號、名稱、申請人);入口網儀表板聚合路由的非必要步驟 approvals(逾時 2 秒)。",
+   "gherkin": "場景: 列出待簽核表單\n  假如 使用者已登入\n  當 呼叫 GET /api/bpm/approvals\n  那麼 回應 200,items 包含 formNo \"LV-20261201-001\""
   },
   {
    "routeCode": "hrm.profile.get",
@@ -203,12 +100,14 @@
    "publicPath": "/api/hrm/profile",
    "routeType": "proxy",
    "upstream": "core-hrm",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/profile",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "回傳目前使用者的工號、姓名、部門與所屬公司(取自內部 Token);含個資,稽核等級 meta。"
+   "description": "回傳目前使用者的工號、姓名、部門與所屬公司(取自內部 Token);含個資,稽核等級 meta。",
+   "gherkin": "場景: 查詢自己的個人資料\n  假如 使用者 S112009 已登入\n  當 呼叫 GET /api/hrm/profile\n  那麼 回應 200,emp 為 \"S112009\",並包含 name、dept、cos\n  而且 gw.api_access_log 記錄此請求(稽核等級 meta)"
   },
   {
    "routeCode": "hrm.todo.list",
@@ -218,12 +117,14 @@
    "publicPath": "/api/hrm/todos",
    "routeType": "proxy",
    "upstream": "core-hrm",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/todos",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "列出目前使用者的人事待辦(請假單、教育訓練等);入口網儀表板聚合路由的必要步驟 todos。"
+   "description": "列出目前使用者的人事待辦(請假單、教育訓練等);入口網儀表板聚合路由的必要步驟 todos。",
+   "gherkin": "場景: 列出自己的待辦\n  假如 使用者 S112009 已登入\n  當 呼叫 GET /api/hrm/todos\n  那麼 回應 200,items 包含「請假單待送出(S112009)」"
   },
   {
    "routeCode": "mes.catchall.echo",
@@ -233,12 +134,14 @@
    "publicPath": "/api/mes/*",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/echo",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用萬用路由:/api/mes/ 底下沒有明確路由的路徑都轉到 echo,用來驗證「明確路徑優先於萬用字元」。"
+   "description": "測試用萬用路由:/api/mes/ 底下沒有明確路由的路徑都轉到 echo,用來驗證「明確路徑優先於萬用字元」。",
+   "gherkin": "場景: 明確路徑優先於萬用字元\n  當 呼叫 GET /api/mes/work-orders/1001\n  那麼 x-route-code 為 \"mes.workorder.get\"\n  但是 呼叫 GET /api/mes/anything/else 時 x-route-code 為 \"mes.catchall.echo\""
   },
   {
    "routeCode": "mes.dashboard.rate",
@@ -248,12 +151,14 @@
    "publicPath": "/api/mes/dashboard/rate",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/dashboard/rate",
    "authMode": "permission",
    "permissionCode": "mes.dashboard.read",
    "status": "published",
    "tags": null,
-   "description": "回傳今日日期與生產達成率(0–1);入口網儀表板聚合路由的 mesRate 步驟也呼叫此 API。"
+   "description": "回傳今日日期與生產達成率(0–1);入口網儀表板聚合路由的 mesRate 步驟也呼叫此 API。",
+   "gherkin": "場景: 查詢今日達成率\n  假如 使用者擁有 mes.dashboard.read\n  當 呼叫 GET /api/mes/dashboard/rate\n  那麼 回應 200,包含 date 與 rate\n\n場景: 沒有看板權限\n  假如 使用者沒有 mes.dashboard.read\n  當 呼叫 GET /api/mes/dashboard/rate\n  那麼 回應 403,code 為 \"PERMISSION_DENIED\""
   },
   {
    "routeCode": "mes.debug.echo",
@@ -263,12 +168,14 @@
    "publicPath": "/api/mes/debug/echo",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/echo",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:原樣回傳上游收到的方法、路徑、查詢參數、標頭與內部 Token 身分;並故意回 Set-Cookie、X-Powered-By、CORS 標頭,驗證 Gateway 會清除。"
+   "description": "測試用:原樣回傳上游收到的方法、路徑、查詢參數、標頭與內部 Token 身分;並故意回 Set-Cookie、X-Powered-By、CORS 標頭,驗證 Gateway 會清除。",
+   "gherkin": "場景: 上游收到改寫後的路徑與身分\n  假如 使用者 S112009 已登入\n  當 呼叫 GET /api/mes/debug/echo?x=1\n  那麼 回應的 path 為 \"/v1/debug/echo?x=1\"\n  而且 上游收到 X-Request-Id,user.emp 為 \"S112009\"\n\n場景: Gateway 清除上游回應標頭\n  當 呼叫 GET /api/mes/debug/echo\n  那麼 回應不包含 Set-Cookie、X-Powered-By、Access-Control-Allow-Origin"
   },
   {
    "routeCode": "mes.debug.echo-post",
@@ -278,12 +185,14 @@
    "publicPath": "/api/mes/debug/echo",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/echo",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:POST 版的 echo,原樣回傳請求內容,用於驗證請求本文與 CSRF 檢查。"
+   "description": "測試用:POST 版的 echo,原樣回傳請求內容,用於驗證請求本文與 CSRF 檢查。",
+   "gherkin": "場景: 原樣回傳請求本文\n  假如 使用者已登入並帶 X-CSRF-Token\n  當 呼叫 POST /api/mes/debug/echo,內容為 {\"a\": 1}\n  那麼 回應 200,body 為 {\"a\": 1}\n\n場景: 缺少 CSRF Token\n  當 不帶 X-CSRF-Token 呼叫 POST /api/mes/debug/echo\n  那麼 回應 403,code 為 \"CSRF_INVALID\""
   },
   {
    "routeCode": "mes.debug.fail",
@@ -293,12 +202,14 @@
    "publicPath": "/api/mes/debug/fail",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/fail",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:一律回 500;Gateway 轉為 502 UPSTREAM_ERROR,連續失敗達閾值(10)後斷路器開啟。"
+   "description": "測試用:一律回 500;Gateway 轉為 502 UPSTREAM_ERROR,連續失敗達閾值(10)後斷路器開啟。",
+   "gherkin": "場景: 上游 5xx 轉為 502\n  當 呼叫 GET /api/mes/debug/fail\n  那麼 回應 502,code 為 \"UPSTREAM_ERROR\"\n\n場景: 連續失敗後斷路器開啟\n  假如 go-mes 已連續失敗 10 次\n  當 呼叫 go-mes 的任一路由\n  那麼 回應 503,code 為 \"UPSTREAM_UNAVAILABLE\""
   },
   {
    "routeCode": "mes.debug.flaky",
@@ -308,12 +219,14 @@
    "publicPath": "/api/mes/debug/flaky",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/flaky",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:同一個 key 的第一次請求直接中斷連線,之後正常回應 attempt 次數;用來驗證 GET(冪等)自動重試。"
+   "description": "測試用:同一個 key 的第一次請求直接中斷連線,之後正常回應 attempt 次數;用來驗證 GET(冪等)自動重試。",
+   "gherkin": "場景: 冪等方法連線錯誤時重試 1 次\n  當 呼叫 GET /api/mes/debug/flaky?key=g1\n  那麼 回應 200,attempt 為 2"
   },
   {
    "routeCode": "mes.debug.flaky-post",
@@ -323,12 +236,14 @@
    "publicPath": "/api/mes/debug/flaky",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/flaky",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:POST 版的 flaky;非冪等方法 Gateway 不重試,第一次即回 502。"
+   "description": "測試用:POST 版的 flaky;非冪等方法 Gateway 不重試,第一次即回 502。",
+   "gherkin": "場景: 非冪等方法不重試\n  當 呼叫 POST /api/mes/debug/flaky?key=p1\n  那麼 回應 502,code 為 \"UPSTREAM_ERROR\"\n  而且 上游只收到 1 次請求"
   },
   {
    "routeCode": "mes.debug.limited",
@@ -338,12 +253,14 @@
    "publicPath": "/api/mes/debug/limited",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/limited",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:套用限流政策 test-tight(每位使用者 60 秒 3 次),超過回 429 RATE_LIMITED。"
+   "description": "測試用:套用限流政策 test-tight(每位使用者 60 秒 3 次),超過回 429 RATE_LIMITED。",
+   "gherkin": "場景: 超過路由限流\n  假如 使用者在 60 秒內已呼叫 3 次\n  當 再呼叫 GET /api/mes/debug/limited\n  那麼 回應 429,code 為 \"RATE_LIMITED\""
   },
   {
    "routeCode": "mes.debug.slow",
@@ -353,12 +270,14 @@
    "publicPath": "/api/mes/debug/slow",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/slow",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:延遲 ms 毫秒(預設 3000)才回應;路由逾時設為 1000 毫秒,用來驗證 504 UPSTREAM_TIMEOUT。"
+   "description": "測試用:延遲 ms 毫秒(預設 3000)才回應;路由逾時設為 1000 毫秒,用來驗證 504 UPSTREAM_TIMEOUT。",
+   "gherkin": "場景: 超過路由逾時回 504\n  當 呼叫 GET /api/mes/debug/slow?ms=3000\n  那麼 約 1 秒後回應 504,code 為 \"UPSTREAM_TIMEOUT\""
   },
   {
    "routeCode": "mes.debug.unauthorized",
@@ -368,12 +287,14 @@
    "publicPath": "/api/mes/debug/unauthorized",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/debug/unauthorized",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "測試用:模擬後端驗證內部 Token 失敗(aud 不符)回 401;Gateway 視為設定錯誤並告警,對使用者回 502。"
+   "description": "測試用:模擬後端驗證內部 Token 失敗(aud 不符)回 401;Gateway 視為設定錯誤並告警,對使用者回 502。",
+   "gherkin": "場景: 上游 401 視為設定錯誤\n  當 呼叫 GET /api/mes/debug/unauthorized\n  那麼 回應 502,code 為 \"UPSTREAM_ERROR\"\n  而且 BFF 記錄上游設定錯誤告警"
   },
   {
    "routeCode": "mes.workorder.get",
@@ -383,12 +304,14 @@
    "publicPath": "/api/mes/work-orders/:id",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/work-orders/:id",
    "authMode": "permission",
    "permissionCode": "mes.workorder.read",
    "status": "published",
    "tags": "工單",
-   "description": "依工單號查詢品號、數量、狀態(open / closed)與部門;回應由 Gateway 共用快取 30 秒。工單不存在回 404 MES_WORK_ORDER_NOT_FOUND。"
+   "description": "依工單號查詢品號、數量、狀態(open / closed)與部門;回應由 Gateway 共用快取 30 秒。工單不存在回 404 MES_WORK_ORDER_NOT_FOUND。",
+   "gherkin": "場景: 查詢存在的工單\n  假如 使用者擁有 mes.workorder.read\n  當 呼叫 GET /api/mes/work-orders/1007\n  那麼 回應 200,id 為 \"1007\"\n\n場景: 查詢不存在的工單\n  當 呼叫 GET /api/mes/work-orders/9999\n  那麼 回應 404,code 為 \"MES_WORK_ORDER_NOT_FOUND\"\n\n場景: 30 秒內重複查詢由 Gateway 快取回應\n  假如 使用者 A 剛查詢過 GET /api/mes/work-orders/1012\n  當 使用者 B 在 30 秒內查詢同一張工單\n  那麼 回應標頭 x-cache 為 \"HIT\",上游只收到 1 次請求"
   },
   {
    "routeCode": "mes.workorder.list",
@@ -398,12 +321,14 @@
    "publicPath": "/api/mes/work-orders",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/work-orders",
    "authMode": "permission",
    "permissionCode": "mes.workorder.read",
    "status": "published",
    "tags": "工單",
-   "description": "分頁列出工單(page 從 1 開始、pageSize 上限 100),回應附目前使用者工號 viewer。不做回應快取。"
+   "description": "分頁列出工單(page 從 1 開始、pageSize 上限 100),回應附目前使用者工號 viewer。不做回應快取。",
+   "gherkin": "場景: 分頁查詢工單\n  假如 使用者 S112009 擁有 mes.workorder.read\n  當 呼叫 GET /api/mes/work-orders?page=2&pageSize=10\n  那麼 回應 200\n  而且 items 有 10 筆、total 為 25、page 為 2\n  而且 viewer 為 \"S112009\""
   },
   {
    "routeCode": "mes.workorder.report",
@@ -413,12 +338,14 @@
    "publicPath": "/api/mes/work-orders/:id/reports",
    "routeType": "proxy",
    "upstream": "go-mes",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/work-orders/:id/reports",
    "authMode": "permission",
    "permissionCode": "mes.workorder.report",
    "status": "published",
    "tags": "工單",
-   "description": "對開立中的工單回報完成數量 qty(必須大於 0),報工人與部門取自內部 Token;已結案工單回 422 MES_WORK_ORDER_CLOSED。稽核等級 meta。"
+   "description": "對開立中的工單回報完成數量 qty(必須大於 0),報工人與部門取自內部 Token;已結案工單回 422 MES_WORK_ORDER_CLOSED。稽核等級 meta。",
+   "gherkin": "場景: 對開立中的工單報工\n  假如 使用者 S112009 擁有 mes.workorder.report\n  當 呼叫 POST /api/mes/work-orders/1001/reports,內容為 {\"qty\": 5}\n  那麼 回應 201,reportedBy 為 \"S112009\"\n  而且 gw.api_access_log 記錄此請求(稽核等級 meta)\n\n場景: 已結案的工單不能報工\n  當 呼叫 POST /api/mes/work-orders/1000/reports,內容為 {\"qty\": 1}\n  那麼 回應 422,code 為 \"MES_WORK_ORDER_CLOSED\"\n\n場景: 數量必須大於 0\n  當 呼叫 POST /api/mes/work-orders/1001/reports,內容為 {\"qty\": 0}\n  那麼 回應 400,code 為 \"VALIDATION_FAILED\",details 指出欄位 qty"
   },
   {
    "routeCode": "portal.banner.mock",
@@ -428,12 +355,14 @@
    "publicPath": "/api/portal/banner",
    "routeType": "mock",
    "upstream": null,
+   "project": null,
    "upstreamPath": null,
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "首頁橫幅的假資料,後端尚未完成時供前端先行開發;不呼叫任何上游,只在 dev / test 生效。"
+   "description": "首頁橫幅的假資料,後端尚未完成時供前端先行開發;不呼叫任何上游,只在 dev / test 生效。",
+   "gherkin": "場景: 回傳設定的假資料\n  假如 使用者已登入\n  當 呼叫 GET /api/portal/banner\n  那麼 回應 200,source 為 \"mock route\"\n  而且 回應標頭帶有 x-mock"
   },
   {
    "routeCode": "portal.dashboard.get",
@@ -443,12 +372,14 @@
    "publicPath": "/api/portal/dashboard",
    "routeType": "aggregate",
    "upstream": null,
+   "project": null,
    "upstreamPath": null,
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "入口網首頁一次取得三個系統的資料:HRM 待辦(必要)、BPM 待簽核(非必要,逾時 2 秒)、MES 今日達成率(非必要,需 mes.dashboard.read);同順序步驟並行執行後合併。"
+   "description": "入口網首頁一次取得三個系統的資料:HRM 待辦(必要)、BPM 待簽核(非必要,逾時 2 秒)、MES 今日達成率(非必要,需 mes.dashboard.read);同順序步驟並行執行後合併。",
+   "gherkin": "場景: 並行取得三個系統的資料\n  假如 使用者擁有 mes.dashboard.read\n  當 呼叫 GET /api/portal/dashboard\n  那麼 回應 200,包含 todos、approvals、mesRate\n\n場景: 非必要步驟失敗時回傳部分結果\n  假如 bpm-adapter 逾時\n  當 呼叫 GET /api/portal/dashboard\n  那麼 回應 200,_meta.errors 包含 \"approvals\"\n\n場景: 必要步驟失敗時整體失敗\n  假如 core-hrm 回應 500\n  當 呼叫 GET /api/portal/dashboard\n  那麼 回應 502\n\n場景: 沒有權限的步驟略過\n  假如 使用者沒有 mes.dashboard.read\n  當 呼叫 GET /api/portal/dashboard\n  那麼 回應不包含 mesRate,go-mes 沒有收到請求"
   },
   {
    "routeCode": "portal.news.list",
@@ -458,12 +389,14 @@
    "publicPath": "/api/portal/news",
    "routeType": "proxy",
    "upstream": "portal-svc",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/news",
    "authMode": "public",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "入口網公告列表;公開 API,未登入也可呼叫(x-permission: public,需 IT 核准)。"
+   "description": "入口網公告列表;公開 API,未登入也可呼叫(x-permission: public,需 IT 核准)。",
+   "gherkin": "場景: 未登入也能查看公告\n  假如 使用者未登入\n  當 呼叫 GET /api/portal/news\n  那麼 回應 200,items 包含「GigaNexus 入口網試營運」"
   },
   {
    "routeCode": "portal.profile.get",
@@ -473,27 +406,17 @@
    "publicPath": "/api/portal/profile",
    "routeType": "proxy",
    "upstream": "portal-svc",
+   "project": "giga-api-gateway-bff",
    "upstreamPath": "/v1/profile",
    "authMode": "authenticated",
    "permissionCode": null,
    "status": "published",
    "tags": null,
-   "description": "回傳 Gateway 傳下來的完整身分(內部 Token 內容:工號、姓名、部門、公司、角色),前端可用來確認登入者。"
+   "description": "回傳 Gateway 傳下來的完整身分(內部 Token 內容:工號、姓名、部門、公司、角色),前端可用來確認登入者。",
+   "gherkin": "場景: 登入者取得自己的身分\n  假如 使用者 S112009 已登入\n  當 呼叫 GET /api/portal/profile\n  那麼 回應 200,emp 為 \"S112009\",roles 包含 \"employee\"\n\n場景: 未登入\n  當 未登入呼叫 GET /api/portal/profile\n  那麼 回應 401,code 為 \"UNAUTHENTICATED\""
   }
  ],
  "permissions": [
-  {
-   "code": "dms.document.write",
-   "name": "公司文件:新增 / 編輯 / 刪除",
-   "systemCode": "dms",
-   "description": null
-  },
-  {
-   "code": "dms.document.read",
-   "name": "公司文件:查詢",
-   "systemCode": "dms",
-   "description": null
-  },
   {
    "code": "gw.admin.route.register",
    "name": "API 自動註冊(後端服務 API Key 專用)",
@@ -699,29 +622,9 @@
    "name": "碩禾員工",
    "description": null,
    "isSystem": false
-  },
-  {
-   "code": "dms-reader",
-   "name": "公司文件:閱讀",
-   "description": "碩禾員工皆可閱讀公司文件(實際可見範圍再由後端依部門 / 公司過濾)",
-   "isSystem": false
-  },
-  {
-   "code": "dms-editor",
-   "name": "公司文件:編輯",
-   "description": "可新增、編輯、刪除所屬部門的文件",
-   "isSystem": false
   }
  ],
  "rolePermissions": [
-  {
-   "role": "dms-editor",
-   "permission": "dms.document.write"
-  },
-  {
-   "role": "dms-reader",
-   "permission": "dms.document.read"
-  },
   {
    "role": "gw-it-admin",
    "permission": "gw.admin.audit.read"
@@ -901,10 +804,6 @@
  ],
  "roleAdGroups": [
   {
-   "role": "dms-editor",
-   "adGroupDn": "CN=GN-IT-Admins,OU=Groups,DC=gsc,DC=com,DC=tw"
-  },
-  {
    "role": "it-endpoint",
    "adGroupDn": "CN=GN-IT-Admins,OU=Groups,DC=gsc,DC=com,DC=tw"
   },
@@ -922,10 +821,6 @@
   }
  ],
  "roleCompanies": [
-  {
-   "role": "dms-reader",
-   "company": "碩禾"
-  },
   {
    "role": "gs-employee",
    "company": "碩禾"

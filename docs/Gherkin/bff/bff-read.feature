@@ -44,7 +44,7 @@
     @auto @manual
     場景: 路由清單由後端篩選與分頁,並回傳篩選選項
       當 開啟「API 路由」
-      那麼 只呼叫 GET /it/api/bff/routes?page=1&pageSize=12,畫面顯示「共 26 筆 · 第 1 / 3 頁」
+      那麼 只呼叫 GET /it/api/bff/routes?page=1&pageSize=12,畫面顯示「共 20 筆 · 第 1 / 2 頁」
       而且 回應 facets 提供系統與上游的下拉選項
       當 輸入關鍵字 "work-orders"
       那麼 停止輸入 300 ms 後才以 q=work-orders 查詢一次,顯示 3 筆
@@ -79,11 +79,22 @@
       那麼 對話框顯示「瀏覽器 → Gateway BFF → 上游」的請求路徑、狀態、API 用途說明
       而且 有權限代碼時可按「誰可以呼叫這支 API?」跳到權限反查
 
+    @auto @manual
+    場景: 路由顯示開發專案與行為規格
+      假如 下游服務以 OpenAPI "x-gateway.project" 登記開發專案、以 "x-gherkin" 登記行為規格(Gateway PRD v0.6)
+      當 開啟「API 路由」
+      那麼 清單的「開發專案」欄顯示 repo 資料夾名稱,例 "giga-api-gateway-bff"
+      而且 未登記的 proxy 路由顯示「未登記」,聚合 / mock 路由顯示「Gateway」
+      而且 以開發專案當關鍵字搜尋,只列出該專案的路由
+      當 點選一列
+      那麼 對話框顯示開發專案與 Gherkin 行為規格(關鍵字 功能 / 場景 / 假如 / 當 / 那麼 / 而且 醒目標示)
+      而且 沒有行為規格時顯示「下游尚未提供行為規格」
+
     @manual
     場景: 匯出路由清單(需 bff.route.export)
       假如 使用者有 "bff.route.export"
       當 按「匯出 CSV」
-      那麼 下載目前篩選結果(UTF-8 BOM,Excel 可直接開啟)
+      那麼 下載目前篩選結果(UTF-8 BOM,Excel 可直接開啟),含開發專案欄
       但是 沒有此權限的使用者看不到此按鈕
 
   Rule: BFF 權限

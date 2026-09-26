@@ -235,17 +235,30 @@ describe('bff/bff-read.feature', () => {
     const s = await t.login('S100001');
     const page1 = (await t.call(s, 'GET', '/it/api/bff/routes?pageSize=5')).json();
     assert.equal(page1.items.length, 5);
-    assert.equal(page1.total, 26);
-    assert.equal(page1.facets.totalAll, 26);
+    assert.equal(page1.total, 20);
+    assert.equal(page1.facets.totalAll, 20);
     assert.ok(page1.facets.systems.includes('mes') && page1.facets.upstreams.includes('go-mes'));
-    const page6 = (await t.call(s, 'GET', '/it/api/bff/routes?pageSize=5&page=6')).json();
-    assert.equal(page6.items.length, 1);
-    const dms = (await t.call(s, 'GET', '/it/api/bff/routes?system=dms&authMode=permission')).json();
-    assert.ok(dms.total > 0 && dms.items.every((r: { systemCode: string; authMode: string }) => r.systemCode === 'dms' && r.authMode === 'permission'));
+    const page4 = (await t.call(s, 'GET', '/it/api/bff/routes?pageSize=6&page=4')).json();
+    assert.equal(page4.items.length, 2);
+    const mes = (await t.call(s, 'GET', '/it/api/bff/routes?system=mes&authMode=permission')).json();
+    assert.ok(mes.total > 0 && mes.items.every((r: { systemCode: string; authMode: string }) => r.systemCode === 'mes' && r.authMode === 'permission'));
     const byPerm = (await t.call(s, 'GET', '/it/api/bff/routes?permission=mes.workorder.read')).json();
     assert.ok(byPerm.items.every((r: { permissionCode: string }) => r.permissionCode === 'mes.workorder.read'));
     assert.equal((await t.call(s, 'GET', '/it/api/bff/routes?q=work-orders')).json().total, 3);
     assert.equal((await t.call(s, 'GET', '/it/api/bff/routes?pageSize=501')).statusCode, 400);
+  });
+
+  it('路由顯示開發專案與行為規格', async () => {
+    const s = await t.login('S100001');
+    const byProject = (await t.call(s, 'GET', '/it/api/bff/routes?q=giga-api-gateway-bff&pageSize=100')).json();
+    assert.equal(byProject.total, 18);
+    assert.ok(byProject.items.every((r: { project: string }) => r.project === 'giga-api-gateway-bff'));
+    // 聚合 / mock 路由由 Gateway 自己處理,沒有開發專案
+    const portal = (await t.call(s, 'GET', '/it/api/bff/routes?system=portal')).json();
+    const own = portal.items.filter((r: { routeType: string }) => r.routeType !== 'proxy');
+    assert.ok(own.length > 0 && own.every((r: { project: string | null }) => r.project === null));
+    const get = (await t.call(s, 'GET', '/it/api/bff/routes?q=mes.workorder.get')).json().items[0];
+    assert.match(get.gherkin, /^場景[::]/m);
   });
 
   it('發佈版本分頁(由新到舊)', async () => {

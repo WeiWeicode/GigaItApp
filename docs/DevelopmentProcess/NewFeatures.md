@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-09-26 API 路由:開發專案欄與 Gherkin 行為規格
+- 內容:API 路由頁新增「開發專案」欄(下游 repo 資料夾名稱),明細對話框顯示開發專案與 **Gherkin 行為規格**(關鍵字、標籤、註解醒目標示,純文字渲染)。BFF 原本沒有專案欄位,經需求方同意由 Gateway 新增 `gw.upstream.project`(OpenAPI `x-gateway.project`)並由路由查詢回傳(Gateway 端修改見 `../giga-api-gateway-bff/docs/DevelopmentProcess/NewFeatures.md` 同日紀錄,commit 302358b)。`gherkin` 原本 BFF 已回傳、`live.ts` 將其丟棄,改為保留;舊版 BFF 沒有 `project` 時補 `null`,mock / live 形狀一致。聚合 / mock 路由顯示「Gateway」,未登記的 proxy 路由顯示「未登記」。關鍵字搜尋比對開發專案,匯出 CSV 加入 `project` 欄。`mock-data.json` 的路由以本機 Gateway 快照補上 `project`、`gherkin`。新增圖示 `repo`、`spec`。PRD v0.1.3(FR-4.3)、API.md、Gherkin `bff/bff-read.feature`(新增「路由顯示開發專案與行為規格」)、專案地圖同步更新。
+- 檔案:`backend/src/bff/types.ts`、`backend/src/bff/live.ts`、`backend/src/bff/mock-data.json`、`backend/src/routes/bff.ts`、`backend/test/scenarios.test.ts`、`frontend/src/api/types.ts`、`frontend/src/pages/gateway/Routes.vue`、`frontend/src/components/GherkinView.vue`、`frontend/src/ui/components/GIcon.vue`、`docs/PRD.md`、`docs/API.md`、`docs/Gherkin/bff/bff-read.feature`、`docs/PROJECT-MAP.md`
+- 驗證:`backend/` `npm test` 46 項通過(新增 1 項)、`typecheck` 通過;`frontend/` `typecheck` 通過。重建本機 `itapp-api`(`BFF_MODE=live`)後以 `dev:gw`(http://localhost:5178/it/)用種子帳號 itadmin 操作:清單 27 支路由顯示開發專案(`giga-api-gateway-bff`、`giga-endpoint`,DMS 6 支為「未登記」),搜尋 `giga-endpoint` 得 1 / 27,明細顯示 Gherkin(明暗主題皆確認),console 僅有登入前的 401。`mock-data.json` 仍為原本的 1 空格縮排(Prettier 檢查本來就不通過,未改格式)。**`/it/` 正式發佈(`spa-it`)未執行**
+
 ## 2026-09-26 專案地圖與核心設計原則
 - 內容:新增 `docs/PROJECT-MAP.md`(目錄職責、前後端分層、主要流程、「要改什麼看哪裡」、測試地圖、與設計原則的已知差異:前端尚無自動化測試、資料為 JSON 檔)。AGENT.md 新增 §9.1:開發新功能後必須更新專案地圖;核心設計原則(職責分離、`src/`、集中測試)依 Gateway `AGENT.md` §10.7.2 的 TypeScript / Vue 列落實;§0 目錄、§10 參考文件、§11 修正紀錄加上地圖路徑。
 - 檔案:`AGENT.md`、`docs/PROJECT-MAP.md`

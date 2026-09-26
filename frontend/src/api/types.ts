@@ -29,12 +29,16 @@ export interface BffRoute {
   publicPath: string;
   routeType: string;
   upstream: string | null;
+  /** 開發專案(repo 資料夾名稱);未登記或非 proxy 路由為 null */
+  project: string | null;
   upstreamPath: string | null;
   authMode: string;
   permissionCode: string | null;
   status: string;
   tags: string | null;
   description: string | null;
+  /** 行為規格(Gherkin 場景文字) */
+  gherkin: string | null;
 }
 export interface BffRelease {
   releaseId: number;

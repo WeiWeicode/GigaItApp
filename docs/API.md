@@ -97,7 +97,7 @@
 | API | 回應主體 |
 | --- | --- |
 | `GET /bff/overview` | `{ upstreams: [{ code, name, systemCode, timeoutMs, targets: [{ baseUrl, environment }], routes: { published: 13 } }], policies: [{ code, limitCount, windowSec, keyBy }], release: { liveVersion, redisVersion, draftRoutes } }` |
-| `GET /bff/routes` | `{ items: [{ routeCode, name, systemCode, method, publicPath, routeType, upstream, upstreamPath, authMode, permissionCode, status, tags, description }], total, page, pageSize, facets: { systems, upstreams, totalAll } }`;篩選:`q`(代碼 / 名稱 / 路徑 / 權限 / 標籤)、`system`、`upstream`、`authMode`、`status`、`permission`。BFF 路由查詢本身不分頁,itapp-api 快取整份後分頁;`facets` 供下拉選單使用 |
+| `GET /bff/routes` | `{ items: [{ routeCode, name, systemCode, method, publicPath, routeType, upstream, project, upstreamPath, authMode, permissionCode, status, tags, description, gherkin }], total, page, pageSize, facets: { systems, upstreams, totalAll } }`;`project` 為開發專案(下游 repo 資料夾名稱,未登記或非 proxy 路由為 `null`)、`gherkin` 為行為規格(皆取自 BFF 路由查詢,Gateway PRD v0.6);篩選:`q`(代碼 / 名稱 / 路徑 / 權限 / 標籤 / 開發專案)、`system`、`upstream`、`authMode`、`status`、`permission`。BFF 路由查詢本身不分頁,itapp-api 快取整份後分頁;`facets` 供下拉選單使用 |
 | `GET /bff/releases` | `{ items: [{ releaseId, note, publishedBy, publishedAt, rolledBackFrom, diff: { added, modified, removed, upstreamsChanged, policiesChanged } }], total, page, pageSize }`;live 模式直接向 BFF 取該頁 |
 | `POST /bff/releases` | 請求 `{ note }`(1–200);回應 `{ release }`;live → 501 `ITAPP_BFF_NOT_SUPPORTED` |
 | `GET /bff/rbac` | `{ roles: [{ code, name, description, isSystem }], permissions: [{ code, name, systemCode, description }], rolePermissions: [{ role, permission }], roleAdGroups: [{ role, adGroupDn }], roleCompanies: [{ role, company }] }` |

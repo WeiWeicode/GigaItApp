@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router';
 import { describeError, http } from '@/api/http';
 import { AUTH_MODE, METHOD_TONE, ROUTE_STATUS } from '@/api/format';
 import type { BffRoute, BffRoutePage } from '@/api/types';
+import GherkinView from '@/components/GherkinView.vue';
 import SourceTag from '@/components/SourceTag.vue';
 import { usePaged } from '@/composables/usePaged';
 import { toast } from '@/ui';
@@ -33,6 +34,9 @@ async function refresh() {
 const systems = computed(() => (data.value?.facets.systems ?? []).map((s) => ({ label: s, value: s })));
 const upstreams = computed(() => (data.value?.facets.upstreams ?? []).map((s) => ({ label: s, value: s })));
 
+/** 開發專案欄:proxy 路由看上游登記的 repo(x-gateway.project);聚合 / mock 路由由 Gateway 自己處理 */
+const projectOf = (r: BffRoute) => r.project ?? (r.routeType === 'proxy' ? null : 'Gateway');
+
 const selected = ref<BffRoute | null>(null);
 const detailOpen = computed({ get: () => !!selected.value, set: (v) => !v && (selected.value = null) });
 
@@ -54,6 +58,7 @@ async function exportCsv() {
       'method',
       'publicPath',
       'upstream',
+      'project',
       'upstreamPath',
       'authMode',
       'permissionCode',
@@ -85,7 +90,7 @@ async function exportCsv() {
 
     <GCard padding="sm">
       <div class="filters">
-        <GInput v-model="filters.q" icon="search" placeholder="搜尋路由代碼、名稱、路徑、權限…" clearable class="grow" />
+        <GInput v-model="filters.q" icon="search" placeholder="搜尋路由代碼、名稱、路徑、權限、開發專案…" clearable class="grow" />
         <GSelect v-model="filters.system" :options="systems" placeholder="全部系統" icon="layers" />
         <GSelect v-model="filters.upstream" :options="upstreams" placeholder="全部上游" icon="server" />
         <GSegmented
@@ -121,6 +126,7 @@ async function exportCsv() {
           { key: 'publicPath', label: '對外路徑' },
           { key: 'name', label: '名稱', hideSm: true },
           { key: 'systemCode', label: '系統', hideSm: true },
+          { key: 'project', label: '開發專案', hideSm: true },
           { key: 'authMode', label: '驗證' },
           { key: 'permissionCode', label: '權限', hideSm: true },
           { key: 'status', label: '狀態' },
@@ -142,6 +148,11 @@ async function exportCsv() {
         <template #cell-systemCode="{ row }"
           ><GBadge tone="neutral">{{ row.systemCode }}</GBadge></template
         >
+        <template #cell-project="{ row }">
+          <span v-if="row.project" class="project nowrap"><GIcon name="repo" :size="14" />{{ row.project }}</span>
+          <span v-else-if="projectOf(row)" class="faint small">Gateway</span>
+          <span v-else class="faint small" title="上游服務未在 OpenAPI 登記 x-gateway.project">未登記</span>
+        </template>
         <template #cell-authMode="{ row }">
           <GBadge :tone="AUTH_MODE[row.authMode]?.tone ?? 'neutral'" :icon="AUTH_MODE[row.authMode]?.icon">{{
             AUTH_MODE[row.authMode]?.label ?? row.authMode
@@ -185,6 +196,12 @@ async function exportCsv() {
         <dl class="kv">
           <dt>系統</dt>
           <dd>{{ selected.systemCode }}</dd>
+          <dt>開發專案</dt>
+          <dd>
+            <span v-if="selected.project" class="project"><GIcon name="repo" :size="14" />{{ selected.project }}</span>
+            <span v-else-if="projectOf(selected)" class="faint">Gateway({{ selected.routeType }} 路由由 Gateway 處理)</span>
+            <span v-else class="faint">未登記(上游 {{ selected.upstream }} 的 OpenAPI 未提供 x-gateway.project)</span>
+          </dd>
           <dt>類型</dt>
           <dd>{{ selected.routeType }}</dd>
           <dt>狀態</dt>
@@ -197,6 +214,11 @@ async function exportCsv() {
         <div v-if="selected.description" class="desc">
           <p class="faint xs strong">API 用途說明</p>
           <p>{{ selected.description }}</p>
+        </div>
+        <div class="stack" style="--gap: 6px">
+          <p class="faint xs strong spec-title"><GIcon name="spec" :size="14" />Gherkin 行為規格</p>
+          <GherkinView v-if="selected.gherkin" :text="selected.gherkin" />
+          <p v-else class="faint small">下游尚未提供行為規格(OpenAPI x-gherkin)</p>
         </div>
         <GButton
           v-if="selected.permissionCode && $can('bff.rbac.read')"
@@ -231,6 +253,19 @@ async function exportCsv() {
 .perm {
   font-size: var(--fs-sm);
   color: var(--c-violet);
+}
+.project {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.spec-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
 }
 .flow {
   display: flex;

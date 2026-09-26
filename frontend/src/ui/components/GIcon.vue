@@ -76,6 +76,8 @@ const ICONS: Record<string, Component> = {
   minus: L.Minus,
   hash: L.Hash,
   calendar: L.Calendar,
+  repo: L.FolderGit2,
+  spec: L.ListChecks,
 };
 
 const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: number }>(), { size: 18, stroke: 1.9 });
