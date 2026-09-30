@@ -50,13 +50,14 @@ services:
       - gw_www:/srv/www
     command: ["publish", "it-admin"]
 
+# 機密目錄:本機為 repo 的 secrets/(gen-secrets.sh 產生);測試區 / 正式區以 ITAPP_SECRETS_DIR 指向主機受保護目錄
 secrets:
   itapp_jwt_secret:
-    file: ../secrets/itapp_jwt_secret
+    file: ${ITAPP_SECRETS_DIR:-../secrets}/itapp_jwt_secret
   itapp_seed_password:
-    file: ../secrets/itapp_seed_password
+    file: ${ITAPP_SECRETS_DIR:-../secrets}/itapp_seed_password
   bff_service_password:
-    file: ../secrets/bff_service_password
+    file: ${ITAPP_SECRETS_DIR:-../secrets}/bff_service_password
 
 volumes:
   itapp_data:

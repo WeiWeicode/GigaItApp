@@ -1,0 +1,49 @@
+# GigaItApp Pipeline(Runner:主機 2 WSL shell executor,tag windows-runner;與 Gateway 同一台主機)
+#   check        所有分支:後端型別檢查與測試、前端型別檢查
+#   deploy-test  develop:在主機 2 建置並更新 itapp-api(加入 Gateway 網路),前端發佈到 Gateway 的 /it/
+# 主機需有:${ITAPP_ENV_FILE}(範本 deploy/test.env.example)、ITAPP_SECRETS_DIR 內的機密檔;
+#           Gateway 已部署(giganexus-gw_default 網路、giganexus-gw_gw_www volume)
+stages: [check, deploy-test]
+
+variables:
+  ITAPP_ENV_FILE: /srv/giganexus/deploy/itapp.env
+
+.runner: &runner
+  tags: [windows-runner]
+
+check:backend:
+  <<: *runner
+  stage: check
+  script:
+    - cd backend
+    - npm ci --no-audit --no-fund
+    - npm run typecheck
+    - npm test
+
+check:frontend:
+  <<: *runner
+  stage: check
+  script:
+    - cd frontend
+    - npm ci --no-audit --no-fund
+    - npm run typecheck
+
+deploy-test:
+  <<: *runner
+  stage: deploy-test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+  environment: { name: test, url: https://10.10.130.124/it/ }
+  script:
+    - test -f "$ITAPP_ENV_FILE" || { echo "缺少 $ITAPP_ENV_FILE" >&2; exit 1; }
+    - export IMAGE_TAG=$CI_COMMIT_SHORT_SHA RELEASE_SHA=$CI_COMMIT_SHORT_SHA COMPOSE_ENV_FILES="$ITAPP_ENV_FILE"
+    - IT="docker compose -f deploy/docker-compose.yml"
+    # 1. 後端:建置並更新,等待 healthcheck(/healthz)
+    - $IT build itapp-api
+    - $IT up -d --wait itapp-api
+    # 2. 前端:建置並發佈到 gw_www 的 it-admin(保留上一版供回滾)
+    - $IT --profile publish build spa-it
+    - $IT run --rm spa-it
+    # 3. 冒煙測試(經 Gateway Nginx)
+    - curl -skf -o /dev/null https://127.0.0.1/it/ && echo "OK   /it/"
+    - curl -sk -o /dev/null -w '%{http_code}\n' https://127.0.0.1/it/api/auth/me | grep -q 401 && echo "OK   /it/api/auth/me → 401"
