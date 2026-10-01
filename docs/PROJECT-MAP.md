@@ -22,7 +22,7 @@ GigaItApp/
 │  │  ├─ auth/                    自有登入:Session Cookie、CSRF、密碼雜湊、/it/api/auth/*
 │  │  ├─ rbac/                    權限核心:catalog(權限代碼、選單)、authz(職級 ∩ 部門、canManage)
 │  │  ├─ bff/                     Gateway BFF 資料:BffSource 介面 + mock / live 來源、BffService(快取)
-│  │  └─ store/                   資料儲存:itapp.json(store.ts)、種子資料(seed.ts)
+│  │  └─ store/                   資料儲存:itapp.json(store.ts)、種子資料(seed.ts;示範帳號只在 dev,test / prod 啟動時移除)
 │  └─ test/                       測試(與 src 平行):app.test.ts(基本行為)、scenarios.test.ts(Gherkin @auto)
 ├─ frontend/                      Vue 3 + Vite(base /it/)
 │  ├─ src/

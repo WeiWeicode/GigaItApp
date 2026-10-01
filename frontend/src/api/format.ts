@@ -40,6 +40,7 @@ export const ACTION_LABEL: Record<string, string> = {
   'user.disable': '停用人員',
   'user.enable': '啟用人員',
   'user.reset-password': '重設密碼',
+  'user.demo-remove': '移除示範帳號',
   'dept.create': '新增部門',
   'dept.update': '編輯部門',
   'rbac.level.update': '調整職級權限',

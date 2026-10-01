@@ -16,7 +16,7 @@ import bffRoutes from './routes/bff.js';
 import dashboardRoutes from './routes/dashboard.js';
 import rbacRoutes from './routes/rbac.js';
 import usersRoutes from './routes/users.js';
-import { buildSeed, syncStaff } from './store/seed.js';
+import { buildSeed, syncSeedUsers } from './store/seed.js';
 import { Store } from './store/store.js';
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{8,64}$/;
@@ -37,12 +37,13 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     bodyLimit: 1024 * 1024,
   });
 
-  const { store, created } = await Store.open(config.dataDir, () => buildSeed(config.seedPassword));
+  const { store, created } = await Store.open(config.dataDir, () => buildSeed(config.seedPassword, config.env));
   if (created) {
     app.log.info({ dataDir: config.dataDir }, '已建立種子資料');
   } else {
-    const synced = await syncStaff(store, config.seedPassword);
-    if (synced) app.log.info('已同步最新 IT 人員名單至資料檔');
+    const { added, removed } = await syncSeedUsers(store, config.seedPassword, config.env);
+    if (removed.length) app.log.info({ removed }, '已移除示範帳號');
+    if (added.length) app.log.info({ added }, '已補齊 IT 人員名單');
   }
   const bff = new BffService(config.bff, store, app.log);
 
