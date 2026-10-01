@@ -1,6 +1,6 @@
 # IT 管理系統 — API 規格(itapp-api)
 
-> 對應 [PRD.md](PRD.md) v0.1。所有路徑在 `/it/api` 之下;經 Gateway 時為 `https://<gateway-ip>/it/api/...`。
+> 對應 [PRD.md](PRD.md) v0.1。所有路徑在 `/it/api` 之下;經 Gateway 時為 `https://<gateway-host>/it/api/...(測試區 `giganexus-test.gigasolar.com.tw`)`。
 > 行為驗收見 [Gherkin/](Gherkin/README.md);型別定義見 `backend/src/bff/types.ts`、`frontend/src/api/types.ts`。
 
 ## 1. 共通規則

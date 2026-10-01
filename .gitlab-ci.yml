@@ -33,7 +33,7 @@ deploy-test:
   stage: deploy-test
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"
-  environment: { name: test, url: https://10.10.130.124/it/ }
+  environment: { name: test, url: https://giganexus-test.gigasolar.com.tw/it/ }
   script:
     - test -f "$ITAPP_ENV_FILE" || { echo "缺少 $ITAPP_ENV_FILE" >&2; exit 1; }
     - export IMAGE_TAG=$CI_COMMIT_SHORT_SHA RELEASE_SHA=$CI_COMMIT_SHORT_SHA COMPOSE_ENV_FILES="$ITAPP_ENV_FILE"
