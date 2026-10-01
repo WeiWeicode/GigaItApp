@@ -1,6 +1,6 @@
 /**
  * 種子資料(第一次啟動時建立):部門、示範帳號、預設職級權限與部門限制。
- * 帳號皆為虛構資料;密碼取自 ITAPP_SEED_PASSWORD(_FILE),dev 預設 Passw0rd!。
+ * 示範帳號皆為虛構資料;IT_STAFF 為實際 IT 人員(不填 Email)。密碼取自 ITAPP_SEED_PASSWORD(_FILE),dev 預設 Passw0rd!。
  */
 import { hashPassword } from '../auth/password.js';
 import { DEFAULT_DEPT_RESTRICTIONS, DEFAULT_LEVEL_PERMISSIONS, type LevelCode } from '../rbac/catalog.js';
@@ -29,15 +29,22 @@ const SEED_USERS: [string, string, string, LevelCode, string, boolean?][] = [
   ['S100041', '鄭雅婷', 'SEC', 'engineer', '資安工程師', true],
 ];
 
+/** 實際 IT 人員(接在示範帳號之後,不影響既有 id) */
+const IT_STAFF: [string, string, string, LevelCode, string][] = [
+  ['V112001', '蔣佳緯', 'SYS', 'admin', '系統管理員'],
+  ['S112009', '蔣佳緯', 'SYS', 'admin', '系統管理員'],
+];
+const STAFF_NOS = new Set(IT_STAFF.map(([employeeNo]) => employeeNo));
+
 export async function buildSeed(password: string | null): Promise<StoreData> {
   if (!password) throw new Error('第一次啟動需要 ITAPP_SEED_PASSWORD_FILE(建立種子帳號用)');
   const hash = await hashPassword(password);
   const now = new Date().toISOString();
-  const users: User[] = SEED_USERS.map(([employeeNo, name, deptCode, level, title, disabled], i) => ({
+  const users: User[] = [...SEED_USERS, ...IT_STAFF].map(([employeeNo, name, deptCode, level, title, disabled], i) => ({
     id: i + 1,
     employeeNo,
     name,
-    email: employeeNo === 'itadmin' ? null : `${employeeNo.toLowerCase()}@example.test`,
+    email: employeeNo === 'itadmin' || STAFF_NOS.has(employeeNo) ? null : `${employeeNo.toLowerCase()}@example.test`,
     title,
     deptCode,
     level,
