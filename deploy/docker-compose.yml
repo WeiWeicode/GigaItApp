@@ -21,9 +21,10 @@ services:
       DATA_DIR: /app/data
       ITAPP_JWT_SECRET_FILE: /run/secrets/itapp_jwt_secret
       ITAPP_SEED_PASSWORD_FILE: /run/secrets/itapp_seed_password
-      # 經 Nginx 呼叫 BFF;開發用自簽憑證以 NODE_EXTRA_CA_CERTS 信任
+      # 經 Nginx 呼叫 BFF;本機 https://nginx + 開發用自簽憑證(NODE_EXTRA_CA_CERTS)
+      # 公司測試區 / 正式區:Gateway DNS 名稱(Gateway compose 已設為 nginx 的網路別名),公司憑證為公開 CA 不需額外信任(Gateway PRD Q1)
       BFF_MODE: ${BFF_MODE:-live}
-      BFF_BASE_URL: https://nginx
+      BFF_BASE_URL: ${BFF_BASE_URL:-https://nginx}
       BFF_SERVICE_USER: ${BFF_SERVICE_USER:-S100001}
       BFF_SERVICE_PASSWORD_FILE: /run/secrets/bff_service_password
       NODE_EXTRA_CA_CERTS: /run/gw-ca.crt

@@ -103,7 +103,7 @@ Gateway 的 `deploy/dev/up.sh` 也會以本專案 `frontend/` 建置 `spa-it`(`I
 
 ## 部署到公司測試區
 
-CI 未就緒前依 `../giga-api-gateway-bff/docs/TEST-DEPLOY-RUNBOOK.md` 步驟 8 手動部署:指令同上,加 `--env-file <主機受保護目錄>/itapp.env`(範本 `deploy/test.env.example`:公司的 Gateway 網路 / volume 名稱為 `giganexus-gw_*`、`GW_CA_CERT` 指向 Gateway 根 CA、`BFF_SERVICE_USER` 為公司服務帳號)。`gen-secrets.sh` 務必以 `BFF_SERVICE_PASSWORD`、`ITAPP_SEED_PASSWORD` 指定密碼,不要用本機預設值。正式區的 BFF 不提供 `/api/admin/demo/*`、`/api/admin/db/*`,需改 `BFF_MODE=mock`(2026-09-26 決定)。
+CI 未就緒前依 `../giga-api-gateway-bff/docs/TEST-DEPLOY-RUNBOOK.md` 步驟 8 手動部署:指令同上,加 `--env-file <主機受保護目錄>/itapp.env`(範本 `deploy/test.env.example`:公司的 Gateway 網路 / volume 名稱為 `giganexus-gw_*`、`BFF_BASE_URL` 為 Gateway DNS 名稱(公司 `*.gigasolar.com.tw` 憑證)、`GW_CA_CERT` 指向 Gateway `pki/ca.crt`、`BFF_SERVICE_USER` 為公司服務帳號)。`gen-secrets.sh` 務必以 `BFF_SERVICE_PASSWORD`、`ITAPP_SEED_PASSWORD` 指定密碼,不要用本機預設值。正式區的 BFF 不提供 `/api/admin/demo/*`、`/api/admin/db/*`,需改 `BFF_MODE=mock`(2026-09-26 決定)。
 
 ## API(皆在 `/it/api` 下)
 

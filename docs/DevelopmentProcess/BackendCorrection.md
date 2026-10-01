@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-01 配合 Gateway 公司 SSL 憑證:BFF 位址改用 DNS 名稱
+- 內容:Gateway `:443` 改用公司 `*.gigasolar.com.tw` 憑證(Gateway PRD Q1),`itapp-api` 以 `https://nginx` 呼叫時主機名稱不符憑證。compose 的 `BFF_BASE_URL` 改為可由 env 設定(預設維持本機 `https://nginx`);`deploy/test.env.example` 新增 `BFF_BASE_URL=https://giganexus-test.gigasolar.com.tw`(Gateway compose 將此名稱設為 nginx 網路別名,容器內不依賴公司 DNS)。配合 giga-api-gateway-bff 同日 commit
+- 檔案:`deploy/docker-compose.yml`、`deploy/test.env.example`、`README.md`
+- 驗證:`docker compose config`:env 設 `BFF_BASE_URL` 時解析為 `https://giganexus-test.gigasolar.com.tw`,未設時維持 `https://nginx`(主機 2 現有 itapp.env 不受影響;目前 `BFF_MODE=mock`,不會實際呼叫 BFF)。未對真實 Gateway 驗證 TLS 連線
+
 ## 2026-09-26 公司測試區部署:env 範本
 - 內容:公司 CI 與憑證未就緒,測試區依 Gateway `docs/TEST-DEPLOY-RUNBOOK.md` 手動架設(本專案為步驟 8)。新增 `deploy/test.env.example`:公司的 Gateway 網路 / SPA volume(`giganexus-gw_default`、`giganexus-gw_gw_www`,compose 預設值是本機的 `giganexus-gw-dev_*`)、`GW_CA_CERT`(Gateway 臨時根 CA,AD CS 後改企業根 CA)、`BFF_SERVICE_USER`(公司服務帳號,取代虛構的 S100001)。README 補公司部署段落:`gen-secrets.sh` 必須指定密碼;正式區 BFF 無 demo / db API,改 `BFF_MODE=mock`(需求方 2026-09-26 決定測試區保留、正式區關閉)。
 - 檔案:`deploy/test.env.example`(新增)、`README.md`、`docs/PROJECT-MAP.md`
