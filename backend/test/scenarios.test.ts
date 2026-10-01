@@ -16,14 +16,13 @@ const userId = async (emp: string) => {
 };
 
 describe('auth/login.feature', () => {
-  it('連續 5 次密碼錯誤後鎖定 15 分鐘', async () => {
-    for (let i = 0; i < 5; i++) {
+  it('多次密碼錯誤後仍不鎖定帳號(暫停鎖定策略)', async () => {
+    for (let i = 0; i < 6; i++) {
       const r = await t.app.inject({ method: 'POST', url: '/it/api/auth/login', payload: { username: 'S100030', password: 'wrong' } });
       assert.equal(r.json().code, 'ITAPP_LOGIN_FAILED');
     }
     const r = await t.app.inject({ method: 'POST', url: '/it/api/auth/login', payload: { username: 'S100030', password: PASSWORD } });
-    assert.equal(r.statusCode, 423);
-    assert.equal(r.json().code, 'ITAPP_ACCOUNT_LOCKED');
+    assert.equal(r.statusCode, 200);
   });
 
   it('工號不分大小寫', async () => {

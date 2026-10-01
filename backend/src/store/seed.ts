@@ -4,7 +4,7 @@
  */
 import { hashPassword } from '../auth/password.js';
 import { DEFAULT_DEPT_RESTRICTIONS, DEFAULT_LEVEL_PERMISSIONS, type LevelCode } from '../rbac/catalog.js';
-import type { Department, StoreData, User } from './store.js';
+import type { Department, Store, StoreData, User } from './store.js';
 
 export const SEED_DEPARTMENTS: Department[] = [
   { code: 'NET', name: '網管課', description: '網路、防火牆、Wi-Fi、VPN', leadEmployeeNo: 'S100010' },
@@ -30,9 +30,10 @@ const SEED_USERS: [string, string, string, LevelCode, string, boolean?][] = [
 ];
 
 /** 實際 IT 人員(接在示範帳號之後,不影響既有 id) */
-const IT_STAFF: [string, string, string, LevelCode, string][] = [
+export const IT_STAFF: [string, string, string, LevelCode, string][] = [
   ['V112001', '蔣佳緯', 'SYS', 'admin', '系統管理員'],
   ['S112009', '蔣佳緯', 'SYS', 'admin', '系統管理員'],
+  ['S094009', '鄭智寬', 'SYS', 'admin', '系統管理員'],
 ];
 const STAFF_NOS = new Set(IT_STAFF.map(([employeeNo]) => employeeNo));
 
@@ -64,4 +65,40 @@ export async function buildSeed(password: string | null): Promise<StoreData> {
     audit: [],
     bffMockRolePermissions: null,
   };
+}
+
+/** 既有資料檔啟動時,比對並自動補齊尚未存在的實際 IT 人員名單 */
+export async function syncStaff(store: Store, password: string | null): Promise<boolean> {
+  const existingNos = new Set(store.data.users.map((u: User) => u.employeeNo.toUpperCase()));
+  const missing = IT_STAFF.filter(([no]) => !existingNos.has(no.toUpperCase()));
+  if (missing.length === 0) return false;
+
+  const fallbackHash = store.data.users[0]?.passwordHash;
+  const hash = password ? await hashPassword(password) : fallbackHash;
+  if (!hash) return false;
+
+  const now = new Date().toISOString();
+  let maxId = store.data.users.reduce((m: number, u: User) => Math.max(m, u.id), 0);
+
+  await store.mutate((d: StoreData) => {
+    for (const [employeeNo, name, deptCode, level, title] of missing) {
+      maxId += 1;
+      d.users.push({
+        id: maxId,
+        employeeNo,
+        name,
+        email: null,
+        title,
+        deptCode,
+        level,
+        passwordHash: hash,
+        isDisabled: false,
+        tokenVersion: 0,
+        createdAt: now,
+        updatedAt: now,
+        lastLoginAt: null,
+      });
+    }
+  });
+  return true;
 }
