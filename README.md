@@ -127,6 +127,6 @@ CI 未就緒前依 `../giga-api-gateway-bff/docs/TEST-DEPLOY-RUNBOOK.md` 步驟 
 
 - **BFF 寫入**:BFF 尚未提供角色權限編輯、發佈等管理 API(PRD §8.7 / P2-3)。`BFF_MODE=live` 時這些按鈕會顯示「BFF 尚未開放」(`ITAPP_BFF_NOT_SUPPORTED`);`mock` 時只寫入本系統資料檔 / 模擬版本,不影響任何 Gateway。上游編輯按鈕目前只提示未開放。
 - **BFF 讀取**:live 模式使用 BFF 的 `/api/admin/demo/*`、`/api/admin/db/*`,這些只在 BFF dev / test 註冊;正式區需等 BFF 正式管理 API。服務帳號目前用虛構帳號 `S100001`,正式環境需專用帳號。
-- **儀表板**:KPI、流量、工單、告警、服務延遲為**模擬資料**(畫面已標示);Gateway 統計、部門人數、最近操作為真實資料。
+- **儀表板**:KPI、流量、工單、告警、服務延遲之模擬資料已清空,前端保留卡片並標示「開發中」;Gateway 統計、部門人數、最近操作為真實資料。
 - **資料儲存**:JSON 檔、單一實例(登出黑名單在記憶體);多實例或正式上線前需改接資料庫。
 - Linux 主機部署時,`secrets/*` 權限為 600,需確認容器內 `node` 使用者可讀(或改用 Docker Swarm / 外部 secret)。

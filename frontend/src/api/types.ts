@@ -119,7 +119,7 @@ export interface AuditEntry {
 export interface DashboardOverview {
   generatedAt: string;
   mockSections: string[];
-  kpis: { key: string; label: string; value: number; unit: string; delta: number; trend: number[]; tone: string }[];
+  kpis: { key: string; label: string; value: number | string; unit?: string; delta?: number; trend?: number[]; tone?: string; hint?: string }[];
   traffic: { hour: number; requests: number; errors: number }[];
   alerts: { level: string; title: string; at: string }[];
 }

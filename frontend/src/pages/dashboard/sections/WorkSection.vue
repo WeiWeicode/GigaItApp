@@ -26,12 +26,14 @@ const STATUS = {
   </GCard>
   <div v-else class="grid grid-3">
     <GCard class="span-2" title="近期工單" icon="ticket" padding="none">
-      <template #actions><GBadge tone="warning">模擬</GBadge></template>
+      <template #actions><GBadge tone="info">開發中</GBadge></template>
       <GTable
         :loading="!data"
         :rows="data?.tickets ?? []"
         row-key="id"
         :page-size="0"
+        empty-title="開發中"
+        empty-description="IT 工單系統整合開發中，尚未接入工單資料"
         :columns="[
           { key: 'id', label: '單號', mono: true, width: '130px' },
           { key: 'title', label: '主旨' },
@@ -45,10 +47,10 @@ const STATUS = {
           ><span class="muted">{{ row.deptName }}</span></template
         >
         <template #cell-priority="{ row }"
-          ><GBadge :tone="PRIORITY[row.priority].tone">{{ PRIORITY[row.priority].label }}</GBadge></template
+          ><GBadge :tone="PRIORITY[row.priority]?.tone ?? 'neutral'">{{ PRIORITY[row.priority]?.label ?? row.priority }}</GBadge></template
         >
         <template #cell-status="{ row }"
-          ><GBadge :tone="STATUS[row.status].tone" dot>{{ STATUS[row.status].label }}</GBadge></template
+          ><GBadge :tone="STATUS[row.status]?.tone ?? 'neutral'" dot>{{ STATUS[row.status]?.label ?? row.status }}</GBadge></template
         >
         <template #cell-updatedAt="{ row }"
           ><span class="faint small nowrap">{{ fromNow(row.updatedAt) }}</span></template

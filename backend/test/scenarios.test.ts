@@ -223,7 +223,7 @@ describe('bff/bff-read.feature', () => {
       assert.equal(r.json().code, 'ITAPP_BFF_UNAVAILABLE');
       assert.equal((await live.call(s, 'GET', '/it/api/dashboard/gateway')).statusCode, 502);
       // 其他區塊不呼叫 BFF,照常回應
-      assert.equal((await live.call(s, 'GET', '/it/api/dashboard/overview')).json().kpis.length, 5);
+      assert.equal((await live.call(s, 'GET', '/it/api/dashboard/overview')).statusCode, 200);
       assert.equal((await live.call(s, 'GET', '/it/api/dashboard/team')).statusCode, 200);
       assert.equal((await live.call(s, 'GET', '/it/api/dashboard/work')).statusCode, 200);
     } finally {
@@ -301,11 +301,11 @@ describe('dashboard/dashboard.feature', () => {
     assert.ok(d.activity.every((a: { actor: string }) => a.actor === 'S100032'));
   });
 
-  it('同一天內模擬數值不跳動', async () => {
+  it('儀表板模擬資料已清空且結構一致', async () => {
     const s = await t.login('S100032');
     const a = (await t.call(s, 'GET', '/it/api/dashboard/overview')).json();
-    const b = (await t.call(s, 'GET', '/it/api/dashboard/overview')).json();
-    assert.deepEqual(a.kpis, b.kpis);
+    assert.deepEqual(a.mockSections, []);
+    assert.deepEqual(a.kpis, []);
   });
 });
 

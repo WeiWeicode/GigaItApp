@@ -165,11 +165,11 @@ describe('BFF(mock)', () => {
     assert.equal((await call(s, 'PUT', '/it/api/bff/rbac/roles/mes-operator/permissions', { permissions: ['nope.x.y'] })).statusCode, 400);
   });
 
-  it('儀表板標示模擬區塊並包含 Gateway 真實統計', async () => {
+  it('儀表板已清空模擬資料並包含 Gateway 真實統計', async () => {
     const s = await login('S100032');
     const d = (await call(s, 'GET', '/it/api/dashboard/overview')).json();
-    assert.ok(d.mockSections.includes('kpis'));
-    assert.equal(d.kpis.length, 5);
+    assert.deepEqual(d.mockSections, []);
+    assert.equal(d.kpis.length, 0);
     const g = (await call(s, 'GET', '/it/api/dashboard/gateway')).json();
     assert.equal(typeof g.gateway.routes, 'number');
   });

@@ -181,7 +181,7 @@
 | FR-5.2 | Gateway 概況:上游 / 路由 / 已發佈 / 草稿 / 權限 / 角色數(可點擊)、路由依系統、驗證模式、線上版本、上游 p95 | `dashboard/dashboard.feature`:Gateway 概況與團隊工作 |
 | FR-5.3 | 團隊工作:各部門成員數、處理中 / 結案數、結案率 | 同上 |
 | FR-5.0 | 儀表板依區塊拆成 `/dashboard/overview`、`/work`、`/gateway`、`/team`,依 Tab 與捲動位置按需載入;只有 Gateway 區塊讀 BFF,BFF 無法連線不影響其他區塊 | `dashboard/dashboard.feature`:依 Tab 與捲動位置載入 |
-| FR-5.4 | 模擬資料必須標示(回應 `mockSections`、畫面「模擬」標籤);同一天內數值穩定 | `dashboard/dashboard.feature`:回應列出模擬區塊、同一天內模擬數值不跳動 |
+| FR-5.4 | 模擬資料已清空,前端保留卡片並標示「開發中」 | `dashboard/dashboard.feature`:模擬資料清空並標示開發中 |
 | FR-5.5 | 最近操作:有 `sys.audit.read` 看全部,否則只看自己的 | `dashboard/dashboard.feature`:最近操作的可見範圍 |
 
 ### 6.6 網頁框架與 UI

@@ -29,18 +29,18 @@
     當 具 "dashboard.view" 的人員開啟「儀表板 > 營運總覽」
     那麼 顯示問候卡(姓名、部門、職級、日期)與 5 張 KPI 卡(數值、較昨日、14 日趨勢)
     而且 顯示 24 小時流量圖、系統告警、近期工單與最近操作
-    而且 模擬區塊標示「模擬」,問候卡標示「部分為模擬資料」
+    而且 模擬區塊保留卡片並標示「開發中」,問候卡標示「部分功能開發中」
 
   @auto
-  場景: 回應列出模擬區塊
+  場景: 模擬資料清空並標示開發中
     當 呼叫 GET /it/api/dashboard/overview
-    那麼 mockSections 包含 "kpis"
+    那麼 mockSections 為空陣列
     而且 GET /it/api/dashboard/gateway 的 gateway 數字來自 BFF(routes 為數字)
 
   @auto
-  場景: 同一天內模擬數值不跳動
-    當 同一天內呼叫兩次 GET /it/api/dashboard/overview
-    那麼 兩次的 kpis 相同
+  場景: 儀表板模擬資料已清空且結構一致
+    當 呼叫 GET /it/api/dashboard/overview
+    那麼 kpis、traffic、alerts 皆為空陣列
 
   @auto
   場景: 最近操作的可見範圍

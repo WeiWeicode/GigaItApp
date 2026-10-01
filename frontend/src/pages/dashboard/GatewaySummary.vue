@@ -78,8 +78,8 @@ const services = computed(() => [...(data.value?.services ?? [])].sort((a, b) =>
       </div>
 
       <GCard title="上游服務健康" subtitle="p95 回應時間與可用率" icon="activity" tone="cyan">
-        <template #actions><GBadge tone="warning">模擬指標</GBadge></template>
-        <div v-if="data" class="svc-grid">
+        <template #actions><GBadge tone="info">開發中</GBadge></template>
+        <div v-if="data && services.length" class="svc-grid">
           <div v-for="s in services" :key="s.code" class="svc">
             <div class="row" style="--gap: 8px">
               <GBadge :tone="s.status === 'healthy' ? 'success' : 'warning'" dot>{{ s.status === 'healthy' ? '正常' : '偏慢' }}</GBadge>
@@ -99,6 +99,7 @@ const services = computed(() => [...(data.value?.services ?? [])].sort((a, b) =>
             <GProgress :value="s.p95" :max="400" :tone="s.status === 'healthy' ? 'success' : 'warning'" :height="6" />
           </div>
         </div>
+        <GEmpty v-else-if="data" compact icon="activity" title="開發中" description="上游服務健康指標監控功能開發中，尚未接入即時指標來源" />
         <GSkeleton v-else :lines="4" />
       </GCard>
     </template>

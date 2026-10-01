@@ -23,6 +23,33 @@ const greeting = computed(() => {
 const today = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 
 const KPI_ICON: Record<string, string> = { calls: 'zap', availability: 'check-circle', latency: 'gauge', tickets: 'ticket', alerts: 'shield' };
+const DEFAULT_KPIS = [
+  { key: 'calls', label: '今日 API 呼叫', hint: 'API 監控開發中' },
+  { key: 'availability', label: '服務可用率', hint: '監控系統開發中' },
+  { key: 'latency', label: '平均回應時間', hint: 'APM 整合開發中' },
+  { key: 'tickets', label: '待處理工單', hint: '工單整合開發中' },
+  { key: 'alerts', label: '資安告警', hint: '告警整合開發中' },
+];
+
+const displayKpis = computed(() => {
+  if (data.value?.kpis && data.value.kpis.length > 0) {
+    return data.value.kpis.map((k) => ({
+      ...k,
+      hint: k.hint ?? '較昨日',
+    }));
+  }
+  return DEFAULT_KPIS.map((k) => ({
+    key: k.key,
+    label: k.label,
+    value: '開發中',
+    unit: '',
+    delta: undefined,
+    trend: [],
+    tone: 'neutral',
+    hint: k.hint,
+  }));
+});
+
 const traffic = computed(() => {
   const t = data.value?.traffic ?? [];
   return {
@@ -47,8 +74,8 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
           <div class="row" style="--gap: 6px; margin-top: 8px">
             <GBadge tone="primary" icon="building">{{ me?.department?.name }}</GBadge>
             <GBadge tone="violet" icon="shield">{{ me?.level.name }}</GBadge>
-            <GBadge v-if="data" tone="warning" icon="info" title="KPI、流量、工單、告警為模擬資料;Gateway 統計、部門人數與操作紀錄為真實資料"
-              >部分為模擬資料</GBadge
+            <GBadge v-if="data" tone="neutral" icon="info" title="KPI、流量、工單、告警為開發中功能;Gateway 統計、部門人數與操作紀錄為真實資料"
+              >部分功能開發中</GBadge
             >
           </div>
         </div>
@@ -67,7 +94,7 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
       <div class="grid kpis">
         <template v-if="data">
           <GStatCard
-            v-for="k in data.kpis"
+            v-for="k in displayKpis"
             :key="k.key"
             :label="k.label"
             :value="k.value"
@@ -78,7 +105,7 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
             :tone="k.tone"
             :icon="KPI_ICON[k.key]"
             :invert="k.key === 'latency' || k.key === 'tickets' || k.key === 'alerts'"
-            hint="較昨日"
+            :hint="k.hint"
           />
         </template>
         <template v-else>
@@ -87,14 +114,15 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
       </div>
 
       <div class="grid grid-3">
-        <GCard class="span-2" title="今日 API 流量" subtitle="每小時請求數與錯誤數(錯誤數 ×20 顯示)" icon="activity">
-          <template #actions><GBadge tone="warning">模擬</GBadge></template>
-          <GAreaChart v-if="data" :labels="traffic.labels" :series="traffic.series" :height="250" />
+        <GCard class="span-2" title="今日 API 流量" subtitle="每小時請求數與錯誤數" icon="activity">
+          <template #actions><GBadge tone="info">開發中</GBadge></template>
+          <GAreaChart v-if="data && (data.traffic?.length ?? 0) > 0" :labels="traffic.labels" :series="traffic.series" :height="250" />
+          <GEmpty v-else-if="data" compact icon="activity" title="開發中" description="API 流量監控功能開發中，尚未接入即時指標來源" />
           <GSkeleton v-else height="250px" />
         </GCard>
-        <GCard title="系統告警" icon="bell" tone="danger">
-          <template #actions><GBadge tone="warning">模擬</GBadge></template>
-          <ul v-if="data" class="alerts">
+        <GCard title="系統告警" icon="bell" tone="neutral">
+          <template #actions><GBadge tone="info">開發中</GBadge></template>
+          <ul v-if="data && data.alerts.length" class="alerts">
             <li v-for="a in data.alerts" :key="a.title" :class="`tone-${a.level}`">
               <span class="al-ic"><GIcon :name="ALERT[a.level] ?? 'info'" :size="16" /></span>
               <div>
@@ -103,6 +131,7 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
               </div>
             </li>
           </ul>
+          <GEmpty v-else-if="data" compact icon="bell" title="開發中" description="系統告警模組開發中" />
           <GSkeleton v-else :lines="5" />
         </GCard>
       </div>

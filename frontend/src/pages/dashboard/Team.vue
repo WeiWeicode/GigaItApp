@@ -48,11 +48,11 @@ const totals = computed(() => ({
                 ><span>成員</span>
               </div>
               <div>
-                <b class="num">{{ d.open }}</b
+                <b class="num">{{ d.open || '—' }}</b
                 ><span>處理中</span>
               </div>
               <div>
-                <b class="num">{{ d.closed }}</b
+                <b class="num">{{ d.closed || '—' }}</b
                 ><span>本月結案</span>
               </div>
             </div>
@@ -64,24 +64,27 @@ const totals = computed(() => ({
       </div>
 
       <div class="grid grid-2">
-        <GCard title="各部門待處理工單" subtitle="成員人數為真實資料,工單為模擬" icon="ticket" tone="warning">
-          <GBarList v-if="data" :items="workload" colorful unit=" 件" />
+        <GCard title="各部門待處理工單" subtitle="部門工單統計" icon="ticket" tone="neutral">
+          <template #actions><GBadge tone="info">開發中</GBadge></template>
+          <GBarList v-if="data && workload.some((w) => w.value > 0)" :items="workload" colorful unit=" 件" />
+          <GEmpty v-else-if="data" compact icon="ticket" title="開發中" description="部門工單統計功能開發中" />
           <GSkeleton v-else :lines="6" />
         </GCard>
         <GCard title="本月總覽" icon="sparkles" tone="violet">
+          <template #actions><GBadge tone="info">工單開發中</GBadge></template>
           <div v-if="data" class="totals">
             <div class="t">
               <span class="muted small">IT 成員</span><b class="num">{{ totals.members }}</b>
             </div>
             <div class="t">
-              <span class="muted small">處理中</span><b class="num">{{ totals.open }}</b>
+              <span class="muted small">處理中</span><b class="num">{{ totals.open || '—' }}</b>
             </div>
             <div class="t">
-              <span class="muted small">已結案</span><b class="num">{{ totals.closed }}</b>
+              <span class="muted small">已結案</span><b class="num">{{ totals.closed || '—' }}</b>
             </div>
             <div class="span">
               <div class="row small muted" style="margin-bottom: 8px">
-                結案比例<span class="spacer" /><b class="num">{{ Math.round((totals.closed / Math.max(1, totals.open + totals.closed)) * 100) }}%</b>
+                結案比例<span class="spacer" /><b class="num">{{ totals.open + totals.closed ? `${Math.round((totals.closed / (totals.open + totals.closed)) * 100)}%` : '開發中' }}</b>
               </div>
               <GProgress
                 :segments="[
