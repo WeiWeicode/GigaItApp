@@ -124,8 +124,8 @@ async function authPlugin(app: FastifyInstance, { config, store }: { config: Con
   }
 
   app.addHook('onRequest', async (req, reply) => {
-    // 找不到路由交給 404;宣告 public 的路由不驗證
-    if (!req.routeOptions.url || req.routeOptions.config.public) return;
+    // 找不到路由交給 404;宣告 public 的路由不驗證;經 Gateway 轉入的 /api/it/* 由 gateway/plugin.ts 驗證內部 Token
+    if (!req.routeOptions.url || req.routeOptions.config.public || req.routeOptions.config.gateway) return;
     await authenticate(req, reply);
     const perm = req.routeOptions.config.permission;
     if (perm && !req.permissions.has(perm)) throw new AppError('ITAPP_PERMISSION_DENIED', undefined, { permission: perm });

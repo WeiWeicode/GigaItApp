@@ -1,21 +1,18 @@
 <script setup lang="ts">
 /**
- * 主框架:左側兩層選單(群組 → 功能,由 /auth/me 依權限回傳)、上方列(麵包屑、資料來源、主題、使用者)、內容區。
+ * 主框架:左側兩層選單(群組 → 功能,依 Gateway 權限過濾,api/auth.ts)、上方列(麵包屑、主題、應用切換、使用者)、內容區。
  * 頁面內的第三層切換使用 Tab(見 TabbedPage.vue)。窄螢幕時選單改為抽屜。
  * 側欄收合時只顯示群組圖示,滑鼠移上(或鍵盤聚焦、點擊)在右側浮出該群組的功能清單。
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useAuth } from '@/api/auth';
-import { http } from '@/api/http';
-import { CURRENT_APP, loadGatewayApps } from '@/composables/apps';
+import { appsOf, CURRENT_APP } from '@/composables/apps';
 import { useTheme } from '@/composables/theme';
-import ChangePasswordModal from './ChangePasswordModal.vue';
 
 const { me, menus, logout } = useAuth();
 const { theme, toggle } = useTheme();
 const route = useRoute();
-const router = useRouter();
 
 const COLLAPSE_KEY = 'itapp.sidebar.collapsed';
 const collapsed = ref(readCollapsed());
@@ -37,7 +34,6 @@ watch(collapsed, (v) => {
 const drawer = ref(false);
 const openGroups = ref<Set<string>>(new Set(menus.value.map((g) => g.key)));
 const userMenu = ref(false);
-const pwdOpen = ref(false);
 
 const activeItem = computed(() => {
   for (const g of menus.value) for (const c of g.children) if (route.path === c.path || route.path.startsWith(`${c.path}/`)) return { group: g, item: c };
@@ -99,21 +95,11 @@ watch(
   },
 );
 
-// 應用切換:依使用者的 Gateway 登入列出有權限的應用(沒有 Gateway 登入時不顯示)
-const gwApps = ref<Awaited<ReturnType<typeof loadGatewayApps>>>({ apps: [], derived: false });
-loadGatewayApps().then((r) => (gwApps.value = r));
+// 應用切換:Gateway /api/auth/me 的 apps(單一入口,切換不需再登入)
+const apps = computed(() => appsOf(me.value));
 
-// 資料來源(BFF mock / live)顯示在上方列
-const bffMode = ref<string | null>(null);
-http
-  .get<{ bffMode: string }>('/healthz')
-  .then((r) => (bffMode.value = r.bffMode))
-  .catch(() => undefined);
-
-async function doLogout() {
-  await logout();
-  router.replace('/login');
-}
+/** 登出:web-kit 呼叫 BFF 登出後導向入口網登入頁 */
+const doLogout = () => logout();
 </script>
 
 <template>
@@ -176,15 +162,6 @@ async function doLogout() {
           <li v-for="(c, i) in crumbs" :key="i" :class="{ last: i === crumbs.length - 1 }">{{ c }}</li>
         </ol>
         <div class="spacer" />
-        <GBadge
-          v-if="bffMode"
-          :tone="bffMode === 'live' ? 'success' : 'warning'"
-          dot
-          class="hide-sm"
-          :title="bffMode === 'live' ? '已連線 Gateway BFF' : 'BFF 模擬資料(BFF_MODE=mock)'"
-        >
-          BFF {{ bffMode === 'live' ? '即時' : '模擬' }}
-        </GBadge>
         <GButton
           variant="ghost"
           square
@@ -192,13 +169,13 @@ async function doLogout() {
           :aria-label="theme === 'dark' ? '切換明亮模式' : '切換黑暗模式'"
           @click="toggle"
         />
-        <GAppSwitcher :apps="gwApps.apps" :current="CURRENT_APP" :derived="gwApps.derived" />
+        <GAppSwitcher :apps="apps" :current="CURRENT_APP" />
         <div class="user" @keydown.esc="userMenu = false">
           <button type="button" class="user-btn" :aria-expanded="userMenu" @click="userMenu = !userMenu">
             <GAvatar :name="me?.user.name ?? '?'" :size="34" />
             <span class="who hide-sm">
               <strong>{{ me?.user.name }}</strong>
-              <span>{{ me?.department?.name }} · {{ me?.level.name }}</span>
+              <span>{{ me?.user.department ?? '未指定部門' }}{{ me?.user.title ? ` · ${me.user.title}` : '' }}</span>
             </span>
             <GIcon name="chevron-down" :size="15" class="faint" />
           </button>
@@ -212,11 +189,11 @@ async function doLogout() {
                 </div>
               </div>
               <div class="menu-tags">
-                <GBadge tone="primary" icon="building">{{ me?.department?.name ?? '未指定部門' }}</GBadge>
-                <GBadge tone="violet" icon="shield">{{ me?.level.name }}</GBadge>
+                <GBadge tone="primary" icon="building">{{ me?.user.department ?? '未指定部門' }}</GBadge>
+                <GBadge tone="violet" icon="shield">{{ me?.roles.length }} 個角色</GBadge>
                 <GBadge tone="cyan" icon="key">{{ me?.permissions.length }} 項權限</GBadge>
               </div>
-              <button type="button" class="menu-item" role="menuitem" @click="((pwdOpen = true), (userMenu = false))"><GIcon name="lock" />變更密碼</button>
+              <a class="menu-item" role="menuitem" href="/"><GIcon name="home" />回員工入口網</a>
               <button type="button" class="menu-item" role="menuitem" @click="toggle">
                 <GIcon :name="theme === 'dark' ? 'sun' : 'moon'" />{{ theme === 'dark' ? '明亮模式' : '黑暗模式' }}
               </button>
@@ -235,7 +212,6 @@ async function doLogout() {
         </RouterView>
       </main>
     </div>
-    <ChangePasswordModal v-model:open="pwdOpen" />
 
     <Teleport to="body">
       <Transition name="flyout">
@@ -672,6 +648,9 @@ async function doLogout() {
   font: inherit;
   color: var(--text);
   cursor: pointer;
+}
+a.menu-item {
+  text-decoration: none;
 }
 .menu-item:hover {
   background: var(--glass-soft);

@@ -1,203 +1,163 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
-import { describeError, http } from '@/api/http';
-import type { Department, LevelCode, UserRow } from '@/api/types';
+/**
+ * 部門樹(GET /api/admin/departments,Gateway PRD §8.7 v0.7):由 BPM OrganizationUnit / Organization 每小時同步(唯讀),
+ * 人數為 Gateway 中啟用的使用者。點部門可到「人員」查看成員;指派規則以部門代碼(可含下層)設定角色。
+ */
+import { computed, ref, watch } from 'vue';
+import { rbac, type DeptNode } from '@/api/admin';
+import { describeError } from '@/api/http';
+import { fmtTime } from '@/api/format';
 import { useAsync } from '@/composables/useAsync';
-import { toast } from '@/ui';
 
-type DeptRow = Department & { leadName: string | null; memberCount: number; byLevel: Record<LevelCode, number> };
-const { data, error, reload } = useAsync(() => http.get<{ items: DeptRow[] }>('/departments'));
+const { data, loading, error, reload } = useAsync(() => rbac.departments());
+const company = ref('');
+const q = ref('');
+const expanded = ref<Set<string>>(new Set());
 
-const LEVELS: { code: LevelCode; name: string; tone: string }[] = [
-  { code: 'manager', name: '主管', tone: 'violet' },
-  { code: 'senior', name: '高級工程師', tone: 'primary' },
-  { code: 'engineer', name: '一般工程師', tone: 'cyan' },
-  { code: 'admin', name: '系統管理員', tone: 'danger' },
-];
-const DEPT_ICON: Record<string, string> = { NET: 'wifi', SYS: 'server', DEV: 'code', SEC: 'shield' };
-const TONES = ['primary', 'cyan', 'violet', 'success', 'warning', 'info'];
+const companies = computed(() => [
+  { label: '全部公司', value: '' },
+  ...(data.value?.companies ?? []).map((c) => ({ label: c.name, value: String(c.companyId) })),
+]);
+const roots = computed(() => (data.value?.items ?? []).filter((d) => !company.value || String(d.companyId) === company.value));
 
-const open = ref(false);
-const editing = ref<DeptRow | null>(null);
-const form = reactive({ code: '', name: '', description: '', leadEmployeeNo: '' });
-const saving = ref(false);
-// 主管候選人:打開對話框時才查詢(編輯時只查該部門成員),不在進頁時載入全部人員
-const leads = ref<UserRow[]>([]);
-const leadsLoading = ref(false);
-const leadOptions = computed(() => leads.value.map((u) => ({ label: `${u.name}(${u.employeeNo})`, value: u.employeeNo })));
-async function loadLeads(dept?: string) {
-  leadsLoading.value = true;
-  try {
-    leads.value = (await http.get<{ items: UserRow[] }>('/users', { query: { dept, pageSize: 100 } })).items;
-  } catch (e) {
-    leads.value = [];
-    toast.fromError(e, '無法載入主管候選人');
-  } finally {
-    leadsLoading.value = false;
-  }
+/** 子樹總人數 */
+function total(n: DeptNode): number {
+  return n.userCount + n.children.reduce((s, c) => s + total(c), 0);
 }
-function openCreate() {
-  editing.value = null;
-  Object.assign(form, { code: '', name: '', description: '', leadEmployeeNo: '' });
-  open.value = true;
-  void loadLeads();
+function matches(n: DeptNode, k: string): boolean {
+  return n.name.toLowerCase().includes(k) || n.deptCode.toLowerCase().includes(k) || n.children.some((c) => matches(c, k));
 }
-function openEdit(d: DeptRow) {
-  editing.value = d;
-  Object.assign(form, { code: d.code, name: d.name, description: d.description, leadEmployeeNo: d.leadEmployeeNo ?? '' });
-  open.value = true;
-  void loadLeads(d.code);
+
+type Row = { node: DeptNode; depth: number; open: boolean; total: number };
+const rows = computed<Row[]>(() => {
+  const k = q.value.trim().toLowerCase();
+  const out: Row[] = [];
+  const walk = (list: DeptNode[], depth: number) => {
+    for (const n of list) {
+      if (k && !matches(n, k)) continue;
+      // 搜尋時自動展開符合的路徑
+      const open = !!k || expanded.value.has(n.deptCode);
+      out.push({ node: n, depth, open, total: total(n) });
+      if (open) walk(n.children, depth + 1);
+    }
+  };
+  walk(roots.value, 0);
+  return out;
+});
+
+function toggle(code: string) {
+  const s = new Set(expanded.value);
+  if (s.has(code)) s.delete(code);
+  else s.add(code);
+  expanded.value = s;
 }
-async function save() {
-  saving.value = true;
-  const body = { name: form.name, description: form.description, leadEmployeeNo: form.leadEmployeeNo || null };
-  try {
-    if (editing.value) await http.patch(`/departments/${editing.value.code}`, body);
-    else await http.post('/departments', { ...body, code: form.code.toUpperCase() });
-    toast.success(editing.value ? '已更新部門' : '已新增部門');
-    open.value = false;
-    await reload();
-  } catch (e) {
-    toast.fromError(e, '儲存失敗');
-  } finally {
-    saving.value = false;
-  }
-}
+// 預設展開第一層
+watch(roots, (r) => {
+  if (!expanded.value.size) expanded.value = new Set(r.map((d) => d.deptCode));
+});
+const deptCount = computed(() => {
+  let n = 0;
+  const walk = (l: DeptNode[]) => l.forEach((d) => (n++, walk(d.children)));
+  walk(data.value?.items ?? []);
+  return n;
+});
 </script>
 
 <template>
   <div class="stack" style="--gap: 16px">
     <Teleport to="#page-actions" defer>
-      <GButton v-can="'sys.dept.edit'" variant="primary" icon="plus" @click="openCreate">新增部門</GButton>
+      <GBadge v-if="data?.syncedAt" tone="info" icon="clock">BPM 同步:{{ fmtTime(data.syncedAt) }}</GBadge>
+      <GButton icon="refresh" :loading="loading" @click="reload">重新整理</GButton>
     </Teleport>
+
+    <GCard padding="sm">
+      <div class="filters">
+        <GInput v-model="q" icon="search" placeholder="搜尋部門名稱或代碼" clearable class="grow" />
+        <GSelect v-model="company" :options="companies" icon="building" />
+        <GButton size="sm" variant="ghost" icon="minus" @click="expanded = new Set()">全部收合</GButton>
+      </div>
+    </GCard>
 
     <GCard v-if="error">
       <GEmpty tone="danger" icon="building" title="無法載入部門" :description="describeError(error)"
         ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
       >
     </GCard>
-    <div v-else class="grid grid-auto" style="--min: 300px; --gap: 16px">
-      <template v-if="data">
-        <GCard v-for="(d, i) in data.items" :key="d.code" :tone="TONES[i % TONES.length]" glow>
-          <div class="head">
-            <span class="ic"><GIcon :name="DEPT_ICON[d.code] ?? 'building'" :size="22" /></span>
-            <div class="t">
-              <h3>{{ d.name }}</h3>
-              <span class="faint xs mono">{{ d.code }}</span>
-            </div>
-            <span class="spacer" />
-            <GButton v-can="'sys.dept.edit'" size="sm" variant="ghost" icon="edit" square aria-label="編輯部門" @click="openEdit(d)" />
-          </div>
-          <p class="muted small desc">{{ d.description || '—' }}</p>
-          <div class="lead">
-            <GAvatar v-if="d.leadName" :name="d.leadName" :size="30" />
-            <span v-else class="empty-av"><GIcon name="user" :size="14" /></span>
-            <div>
-              <div class="faint xs">部門主管</div>
-              <strong class="small">{{ d.leadName ?? '未指定' }}</strong>
-            </div>
-            <span class="spacer" />
-            <div class="count">
-              <b class="num">{{ d.memberCount }}</b>
-              <span class="faint xs">位成員</span>
-            </div>
-          </div>
-          <GProgress
-            :segments="LEVELS.map((l) => ({ value: d.byLevel[l.code] ?? 0, tone: l.tone, label: `${l.name} ${d.byLevel[l.code] ?? 0}` }))"
-            :height="8"
-          />
-          <div class="row levels" style="--gap: 10px">
-            <span v-for="l in LEVELS.filter((x) => d.byLevel[x.code])" :key="l.code" class="lv" :class="`tone-${l.tone}`"
-              ><i />{{ l.name }} {{ d.byLevel[l.code] }}</span
-            >
-          </div>
-        </GCard>
-      </template>
-      <template v-else>
-        <GCard v-for="i in 4" :key="i"><GSkeleton :lines="5" /></GCard>
-      </template>
-    </div>
-
-    <GModal v-model:open="open" :title="editing ? `編輯 ${editing.name}` : '新增部門'" icon="building" width="480px">
-      <form id="dept-form" class="stack" style="--gap: 14px" @submit.prevent="save">
-        <GInput v-model="form.code" label="部門代碼" :disabled="!!editing" required hint="大寫英數,2–10 碼,例:OPS" />
-        <GInput v-model="form.name" label="名稱" required />
-        <GInput v-model="form.description" label="說明" />
-        <GSelect v-model="form.leadEmployeeNo" label="部門主管" :options="leadOptions" :placeholder="leadsLoading ? '載入中…' : '(未指定)'" />
-      </form>
-      <template #footer>
-        <GButton variant="ghost" @click="open = false">取消</GButton>
-        <GButton variant="primary" type="submit" form="dept-form" :loading="saving">儲存</GButton>
-      </template>
-    </GModal>
+    <GCard v-else padding="none" title="部門樹" :subtitle="`${deptCount} 個部門`" icon="building">
+      <GSkeleton v-if="!data" :lines="10" style="padding: 20px" />
+      <GEmpty v-else-if="!rows.length" compact title="沒有符合的部門" />
+      <ul v-else class="tree">
+        <li v-for="r in rows" :key="r.node.deptCode" :style="{ '--depth': r.depth }">
+          <button
+            type="button"
+            class="twisty"
+            :class="{ hidden: !r.node.children.length }"
+            :aria-label="r.open ? '收合' : '展開'"
+            :aria-expanded="r.open"
+            @click="toggle(r.node.deptCode)"
+          >
+            <GIcon :name="r.open ? 'chevron-down' : 'chevron-right'" :size="15" />
+          </button>
+          <GIcon name="building" :size="15" class="faint" />
+          <span class="name">{{ r.node.name }}</span>
+          <code class="faint xs">{{ r.node.deptCode }}</code>
+          <span class="spacer" />
+          <GBadge v-if="r.node.children.length" tone="neutral" :title="'含下層'">{{ r.total }} 人(含下層)</GBadge>
+          <GButton size="sm" variant="ghost" icon-right="chevron-right" @click="$router.push({ path: '/system/users', query: { dept: r.node.deptCode } })">
+            {{ r.node.userCount }} 人
+          </GButton>
+        </li>
+      </ul>
+    </GCard>
   </div>
 </template>
 
 <style scoped>
-.head {
+.filters {
   display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.ic {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  color: var(--tone);
-  background: color-mix(in srgb, var(--tone) calc(var(--tone-bg-alpha) * 100%), transparent);
-  border: 1px solid color-mix(in srgb, var(--tone) 25%, transparent);
-}
-.t h3 {
-  font-size: var(--fs-lg);
-}
-.desc {
-  margin: 12px 0 16px;
-  min-height: 1.5em;
-}
-.lead {
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  padding: 10px 12px;
-  margin-bottom: 14px;
-  border-radius: var(--radius-md);
-  background: var(--glass-soft);
-  border: 1px solid var(--line);
+  align-items: center;
 }
-.empty-av {
+.grow {
+  flex: 1 1 260px;
+}
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+}
+.tree li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px 4px calc(16px + var(--depth) * 22px);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.tree li:last-child {
+  border-bottom: 0;
+}
+.tree li:hover {
+  background: var(--glass-soft);
+}
+.twisty {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 30%;
-  border: 1px dashed var(--line-strong);
-  color: var(--text-3);
-}
-.count {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.1;
-}
-.count b {
-  font-size: var(--fs-xl);
-}
-.levels {
-  margin-top: 10px;
-}
-.lv {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-xs);
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
   color: var(--text-2);
+  cursor: pointer;
 }
-.lv i {
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
-  background: var(--tone);
+.twisty.hidden {
+  visibility: hidden;
+}
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

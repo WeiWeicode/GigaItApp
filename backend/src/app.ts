@@ -1,7 +1,8 @@
 /**
  * Fastify 應用程式(itapp-api):
- *   - 所有業務 API 在 /it/api/* 下(Nginx 將 /it/api/ 轉給本服務,不經 BFF,AGENT.md §4)
- *   - 自有登入與權限(auth/plugin.ts),錯誤格式 { code, message, requestId, details? }
+ *   - /api/it/*:經 Gateway BFF 轉入(單一入口,giga-Portal PRD I1、G5),只驗證 X-Internal-Token(gateway/plugin.ts)
+ *   - /it/api/*:過渡期保留的自有登入 API(Nginx 直通,auth/plugin.ts);前端已改用單一入口,測試區驗收後移除
+ *   - 錯誤格式 { code, message, requestId, details? }
  *   - GET /healthz、/readyz 供 Docker 與 Nginx 檢查
  */
 import { randomUUID } from 'node:crypto';
@@ -11,9 +12,11 @@ import authRoutes from './auth/routes.js';
 import { BffService } from './bff/service.js';
 import type { Config } from './config.js';
 import { AppError, errorBody } from './errors.js';
+import gatewayPlugin from './gateway/plugin.js';
 import auditRoutes from './routes/audit.js';
 import bffRoutes from './routes/bff.js';
 import dashboardRoutes from './routes/dashboard.js';
+import itDashboardRoutes from './routes/it-dashboard.js';
 import rbacRoutes from './routes/rbac.js';
 import usersRoutes from './routes/users.js';
 import { buildSeed, syncSeedUsers } from './store/seed.js';
@@ -25,7 +28,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: config.logLevel,
-      redact: ['req.headers.cookie', 'req.headers["x-csrf-token"]', 'res.headers["set-cookie"]'],
+      redact: ['req.headers.cookie', 'req.headers["x-csrf-token"]', 'req.headers["x-internal-token"]', 'res.headers["set-cookie"]'],
     },
     // 沿用 Nginx 傳入的 X-Request-Id(格式不符時自行產生)
     requestIdHeader: false,
@@ -76,6 +79,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   });
   app.setNotFoundHandler((req, reply) => reply.status(404).send(errorBody('ITAPP_NOT_FOUND', '找不到此 API', req.id)));
 
+  await app.register(gatewayPlugin, { config });
   await app.register(authPlugin, { config, store });
 
   const open = { config: { public: true }, logLevel: 'warn' as const };
@@ -83,6 +87,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   app.get('/readyz', open, async () => ({ status: 'ok', bffMode: bff.mode }));
   app.get(`${API_PREFIX}/healthz`, open, async () => ({ status: 'ok', env: config.env, bffMode: bff.mode }));
 
+  await app.register(itDashboardRoutes);
   await app.register(authRoutes, { store });
   await app.register(dashboardRoutes, { store, bff });
   await app.register(bffRoutes, { store, bff });

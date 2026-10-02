@@ -1,0 +1,36 @@
+# IT 管理系統的權限與角色(Gateway CLI `apply` 格式;giga-Portal PRD §9.2 I2、Gateway PRD P2-3a)
+#
+#   sh deploy/apply-gateway-rbac.sh test <Gateway 區域 env 檔>      # CI rbac-test 於 develop 自動執行
+#
+# 內容:
+#   ① 本系統的選單權限(系統代碼 it,kind / parent / sort 供「角色與按鈕權限 › 應用權限」樹狀設定)
+#      資料與按鈕權限直接使用 BFF 管理 API 的 gw.admin.*(按鈕 = API),不在此重複登記
+#   ② 角色 it-admin:IT 管理系統全部選單;成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
+#      (此處不寫 adGroups / companies,套用時不會覆蓋 IT 在畫面上的設定;permissions 會整組取代,新增選單請改此檔)
+#   上游 itapp-api 與 /api/it/* 路由在 gateway-routes.yaml(apply 會把路由設回草稿,不隨 CI 每次套用)
+# 測試區與正式區設定不互通(Gateway PRD Q3),兩區各自套用;正式區的上游位址於 2026-12 建置時調整 targets.prod。
+# it.app.access 與入口網 giga-Portal/deploy/gateway-rbac.yaml 相同(兩邊需一致)。
+
+permissions:
+  - { code: it.app.access, name: IT 管理系統使用權限, kind: app, sort: 20 }
+  - { code: it.dashboard.read, name: 儀表板, kind: menu, parent: it.app.access, sort: 10 }
+  - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.app.access, sort: 20 }
+  - { code: it.gw-rbac.read, name: BFF 權限, kind: menu, parent: it.app.access, sort: 30 }
+  - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.app.access, sort: 40 }
+  - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.app.access, sort: 50 }
+  - { code: it.sys-role.read, name: 角色與按鈕權限, kind: menu, parent: it.app.access, sort: 60 }
+  - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.app.access, sort: 70 }
+
+roles:
+  - code: it-admin
+    name: IT 管理系統管理員
+    description: IT 管理系統全部選單;實際可讀寫的資料依 gw.admin.* 權限(gw-it-admin / gw-super-admin)
+    permissions:
+      - it.app.access
+      - it.dashboard.read
+      - it.gw-service.read
+      - it.gw-rbac.read
+      - it.endpoint-device.read
+      - it.sys-user.read
+      - it.sys-role.read
+      - it.sys-audit.read

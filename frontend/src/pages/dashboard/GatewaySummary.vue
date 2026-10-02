@@ -1,12 +1,12 @@
 <script setup lang="ts">
-/** Gateway 概況:切到這個 Tab 才呼叫 /dashboard/gateway(唯一會讀 BFF 的儀表板區塊) */
+/** Gateway 概況:切到這個 Tab 才以 BFF 管理 API 即時統計(上游、路由、角色 / 權限、待發佈草稿) */
 import { computed } from 'vue';
-import { describeError, http } from '@/api/http';
+import { describeError } from '@/api/http';
 import { AUTH_MODE } from '@/api/format';
-import type { DashboardGateway } from '@/api/types';
+import { loadGateway } from '@/composables/dashboard';
 import { useAsync } from '@/composables/useAsync';
 
-const { data, error, reload } = useAsync(() => http.get<DashboardGateway>('/dashboard/gateway'));
+const { data, error, reload } = useAsync(loadGateway);
 const gw = computed(() => data.value?.gateway);
 
 const stats = computed(() => {

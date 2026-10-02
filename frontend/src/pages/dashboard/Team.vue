@@ -1,11 +1,13 @@
 <script setup lang="ts">
-/** 團隊工作:切到這個 Tab 才呼叫 /dashboard/team */
+/** 團隊工作:切到這個 Tab 才載入;部門與人數取自 Gateway 部門樹(登入者所在單位),工單數待工單系統整合 */
 import { computed } from 'vue';
-import { describeError, http } from '@/api/http';
-import type { DashboardTeam } from '@/api/types';
+import { useAuth } from '@/api/auth';
+import { describeError } from '@/api/http';
+import { loadTeam } from '@/composables/dashboard';
 import { useAsync } from '@/composables/useAsync';
 
-const { data, error, reload } = useAsync(() => http.get<DashboardTeam>('/dashboard/team'));
+const { user } = useAuth();
+const { data, error, reload } = useAsync(() => loadTeam(user.value?.deptCode ?? null));
 const DEPT_ICON: Record<string, string> = { NET: 'wifi', SYS: 'server', DEV: 'code', SEC: 'shield' };
 const TONES = ['primary', 'cyan', 'violet', 'success', 'warning', 'info'];
 
@@ -84,7 +86,9 @@ const totals = computed(() => ({
             </div>
             <div class="span">
               <div class="row small muted" style="margin-bottom: 8px">
-                結案比例<span class="spacer" /><b class="num">{{ totals.open + totals.closed ? `${Math.round((totals.closed / (totals.open + totals.closed)) * 100)}%` : '開發中' }}</b>
+                結案比例<span class="spacer" /><b class="num">{{
+                  totals.open + totals.closed ? `${Math.round((totals.closed / (totals.open + totals.closed)) * 100)}%` : '開發中'
+                }}</b>
               </div>
               <GProgress
                 :segments="[

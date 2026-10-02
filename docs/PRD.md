@@ -10,7 +10,7 @@
 | 項目 | 內容 |
 | --- | --- |
 | 產品名稱 | GigaNexus IT 管理系統(GigaItApp) |
-| 文件版本 | **v0.1.6** |
+| 文件版本 | **v0.2** |
 | 建立日期 | 2026-09-25 |
 | 技術棧 | Vue 3 + Vite(前端)/ Node.js 22 + Fastify 5 + TypeScript(後端 itapp-api)/ 經 Gateway Nginx 對外(詳見 [ARCHITECTURE.md](ARCHITECTURE.md)) |
 | 相關文件 | [ARCHITECTURE.md](ARCHITECTURE.md)(架構與技術)、[API.md](API.md)(API 規格)、[UI-GUIDE.md](UI-GUIDE.md)(前端 UI 規範)、[Gherkin/](Gherkin/README.md)(驗收場景)、[../AGENT.md](../AGENT.md)(AI 協作準則)、Gateway 專案 `giga-api-gateway-bff/docs/`(上位規範) |
@@ -21,6 +21,7 @@
 
 | 版本 | 日期 | 變更內容 |
 | --- | --- | --- |
+| v0.2 | 2026-10-02 | **實作 Gateway 單一入口與 BFF 管理(giga-Portal PRD I1–I4、Gateway P2-3a)**:登入改用 Gateway web-kit,移除自有登入;選單權限 `it.*` 與角色 `it-admin` 登記在 Gateway(`deploy/gateway-rbac.yaml`);Gateway 管理與系統管理各頁以使用者身分直接呼叫 BFF 管理 API(可新增 / 編輯 / 發佈 / 回滾、角色權限、指派規則、AD 群組、個別指派、試算、稽核);部門採 Gateway 部門樹(v0.1.6 建議定案);itapp-api 新增經 BFF 轉入的 `/api/it/*`(內部 Token)。「職級 × 部門」權限退場;FR-1.x、FR-2.x 以 [Gherkin/auth/gateway-sso.feature](Gherkin/auth/gateway-sso.feature) 與 [API.md](API.md) §0 為準,其餘章節待改寫 |
 | v0.1.6 | 2026-10-01 | **建議(待確認,尚未實作)**:部門改綁 Gateway 的 BPM 部門樹(`gw.department`),以 Gateway 角色規則依部門指派 IT 管理系統權限,不在本系統複製部門資料(§5.2.1);新增 Q9–Q11。測試區 / 正式區已不保留示範帳號(後端修改紀錄 2026-10-01) |
 | v0.1.5 | 2026-09-26 | 頂列**應用切換**(giga-Portal PRD FR-2.3、I3 的一部分):列出使用者有權限的應用並整頁導向,資料取自使用者的 Gateway 登入(`/api/auth/me`;沒有 Gateway 登入時不顯示);Gateway `me.apps`(G3)前暫以 `*.app.access` 推導。文件版本欄對齊修訂紀錄(原誤為 v0.1.2) |
 | v0.1.4 | 2026-09-26 | **決策紀錄(尚未實作)**:需求方決定本系統**改用 Gateway 單一入口**,取消自有帳號與「職級 × 部門」權限;權限(含應用 / 選單 / Tab / 按鈕)以 BFF 為唯一來源,本系統提供各應用的權限設定畫面;新增應用切換與路由守衛(無 `it.app.access` 導回員工入口網)。詳見 `../giga-Portal/docs/PRD.md` D2、§9.2(I1–I5)與 Gateway PRD v0.7;本文件 FR-1.x、FR-2.x 將於實作時改寫。Q4 由此定案 |

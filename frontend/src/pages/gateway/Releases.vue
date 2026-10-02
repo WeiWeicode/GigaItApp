@@ -1,69 +1,72 @@
 <script setup lang="ts">
-/** 發佈歷程:一次載入 10 筆,按「載入更多」再取下一頁(不一次取回全部版本) */
-import { ref } from 'vue';
-import { ApiError, describeError, http } from '@/api/http';
+/**
+ * 發佈 / 回滾(Gateway PRD §8.4.3、§8.7、P2-2;權限 gw.admin.release):
+ *   發佈前先看草稿清單與「目前版本 → 發佈後」差異(GET /api/admin/releases/preview),發佈會一併發佈**所有**草稿,≤ 5 秒全部 BFF 生效;
+ *   回滾以歷史版本內容產生新版本。BFF 只回傳最近 50 個版本。
+ */
+import { computed, ref } from 'vue';
+import { gw, type Release } from '@/api/admin';
+import { describeError } from '@/api/http';
 import { fmtTime, fromNow } from '@/api/format';
-import type { BffRelease, BffReleasePage } from '@/api/types';
-import SourceTag from '@/components/SourceTag.vue';
 import { useAsync } from '@/composables/useAsync';
-import { toast } from '@/ui';
+import { confirm, toast } from '@/ui';
 
-const PAGE_SIZE = 10;
-let refreshing = false;
-/** 目前已載入的全部版本(第 1 頁由 useAsync 載入,之後的頁數由 loadMore 追加) */
-const items = ref<BffRelease[]>([]);
-const { data, loading, error, reload } = useAsync(async () => {
-  const r = await http.get<BffReleasePage>('/bff/releases', { query: { page: 1, pageSize: PAGE_SIZE, refresh: refreshing ? 1 : undefined } });
-  items.value = r.items;
-  return r;
-});
-async function refresh() {
-  refreshing = true;
-  await reload();
-  refreshing = false;
-}
-const loadingMore = ref(false);
-async function loadMore() {
-  loadingMore.value = true;
-  try {
-    const page = Math.floor(items.value.length / PAGE_SIZE) + 1;
-    const r = await http.get<BffReleasePage>('/bff/releases', { query: { page, pageSize: PAGE_SIZE } });
-    items.value = [...items.value, ...r.items.filter((x) => !items.value.some((y) => y.releaseId === x.releaseId))];
-  } catch (e) {
-    toast.fromError(e, '載入失敗');
-  } finally {
-    loadingMore.value = false;
-  }
+const { data, loading, error, reload } = useAsync(() => gw.releases());
+const items = computed(() => data.value?.items ?? []);
+const preview = useAsync(() => gw.releasePreview());
+function refresh() {
+  reload();
+  preview.reload();
 }
 
 const open = ref(false);
 const note = ref('');
 const saving = ref(false);
+async function openPublish() {
+  open.value = true;
+  await preview.reload();
+}
 async function publish() {
   saving.value = true;
   try {
-    const r = await http.post<{ release: BffRelease }>('/bff/releases', { note: note.value });
-    toast.success(`已發佈 v${r.release.releaseId}`, r.release.note ?? undefined);
+    const r = await gw.publish(note.value.trim());
+    toast.success(`已發佈 v${r.version}`, r.redisSynced ? '所有 BFF 實例 5 秒內生效' : 'Redis 同步失敗,補償機制將於 60 秒內修正');
     open.value = false;
     note.value = '';
-    await refresh();
+    refresh();
   } catch (e) {
-    if (e instanceof ApiError && e.code === 'ITAPP_BFF_NOT_SUPPORTED') toast.warning('BFF 尚未開放發佈 API', e.message);
-    else toast.fromError(e, '發佈失敗');
+    toast.fromError(e, '發佈失敗');
   } finally {
     saving.value = false;
   }
 }
 
-const count = (r: BffRelease) => (r.diff ? r.diff.added.length + r.diff.modified.length + r.diff.removed.length : 0);
+async function rollback(r: Release) {
+  const ok = await confirm({
+    title: `回滾到 v${r.version}?`,
+    message: '會以 v' + r.version + ' 的內容產生新版本並立即生效;目前的草稿不受影響。',
+    tone: 'danger',
+    confirmText: '回滾',
+  });
+  if (!ok) return;
+  try {
+    const x = await gw.rollback(r.version, `回滾到 v${r.version}`);
+    toast.success(`已回滾,新版本 v${x.version}`);
+    refresh();
+  } catch (e) {
+    toast.fromError(e, '回滾失敗');
+  }
+}
+
+const count = (r: Release) => (r.diff ? r.diff.added.length + r.diff.modified.length + r.diff.removed.length : 0);
+const pv = computed(() => preview.data.value);
 </script>
 
 <template>
   <div class="stack" style="--gap: 16px">
     <Teleport to="#page-actions" defer>
-      <SourceTag :source="data?.source" :fetched-at="data?.fetchedAt" />
       <GButton icon="refresh" :loading="loading" @click="refresh">重新整理</GButton>
-      <GButton v-can="'bff.route.publish'" variant="primary" icon="rocket" @click="open = true">發佈草稿</GButton>
+      <GButton variant="primary" icon="rocket" @click="openPublish">發佈草稿{{ pv?.drafts.length ? `(${pv.drafts.length})` : '' }}</GButton>
     </Teleport>
 
     <GCard v-if="error">
@@ -72,18 +75,31 @@ const count = (r: BffRelease) => (r.diff ? r.diff.added.length + r.diff.modified
       >
     </GCard>
 
-    <GCard v-else title="發佈歷程" subtitle="每次發佈都會產生一個版本快照,可回滾" icon="release" tone="success">
+    <GCard v-if="pv?.changed" tone="warning" icon="alert" title="有尚未發佈的變更" :subtitle="`目前線上 v${pv.currentVersion};發佈後才會生效`">
+      <div class="row" style="--gap: 6px">
+        <GBadge v-if="pv.diff.added.length" tone="success">+{{ pv.diff.added.length }} 新增</GBadge>
+        <GBadge v-if="pv.diff.modified.length" tone="info">~{{ pv.diff.modified.length }} 修改</GBadge>
+        <GBadge v-if="pv.diff.removed.length" tone="danger">−{{ pv.diff.removed.length }} 移除</GBadge>
+        <GBadge v-if="pv.diff.upstreamsChanged" tone="violet">上游變更</GBadge>
+        <GBadge v-if="pv.diff.policiesChanged" tone="warning">限流變更</GBadge>
+        <span class="spacer" />
+        <GButton size="sm" variant="primary" icon="rocket" @click="openPublish">檢視並發佈</GButton>
+      </div>
+    </GCard>
+
+    <GCard v-if="!error" title="發佈歷程" subtitle="每次發佈都會產生一個版本快照,可回滾(顯示最近 50 個)" icon="release" tone="success">
       <GSkeleton v-if="!data" :lines="8" />
       <ol v-else class="releases">
-        <li v-for="(r, i) in items" :key="r.releaseId" :class="{ live: i === 0 }">
+        <li v-for="(r, i) in items" :key="r.version" :class="{ live: i === 0 }">
           <span class="dot" />
           <div class="card glass">
             <div class="row" style="--gap: 8px">
-              <strong class="ver num">v{{ r.releaseId }}</strong>
+              <strong class="ver num">v{{ r.version }}</strong>
               <GBadge v-if="i === 0" tone="success" dot>線上版本</GBadge>
               <GBadge v-if="r.rolledBackFrom" tone="warning" icon="undo">回滾自 v{{ r.rolledBackFrom }}</GBadge>
               <span class="spacer" />
               <span class="faint xs" :title="fmtTime(r.publishedAt)">{{ fromNow(r.publishedAt) }}</span>
+              <GButton v-if="i > 0" size="sm" variant="ghost" icon="undo" @click="rollback(r)">回滾到此版</GButton>
             </div>
             <p class="note">{{ r.note ?? '(無說明)' }}</p>
             <div class="row meta" style="--gap: 6px">
@@ -104,35 +120,39 @@ const count = (r: BffRelease) => (r.diff ? r.diff.added.length + r.diff.modified
           </div>
         </li>
       </ol>
-      <div v-if="data" class="more">
-        <span class="faint xs">已顯示 {{ items.length }} / {{ data.total }} 個版本</span>
-        <GButton v-if="items.length < data.total" size="sm" icon="chevron-down" :loading="loadingMore" @click="loadMore">載入更多</GButton>
-      </div>
     </GCard>
 
-    <GModal v-model:open="open" title="發佈草稿路由" subtitle="將所有草稿路由發佈為新版本,線上立即生效" icon="rocket">
-      <form id="publish-form" @submit.prevent="publish">
-        <GInput v-model="note" label="發佈說明" placeholder="例:MES 新增報工 API" required />
-      </form>
-      <p class="faint xs" style="margin: 12px 0 0">
-        {{ data?.source === 'live' ? '目前連線 BFF 即時資料;BFF 尚未提供發佈 API 時會提示改用 CLI。' : '模擬模式:只新增一筆模擬版本,不影響任何 Gateway。' }}
-      </p>
+    <GModal v-model:open="open" title="發佈草稿" subtitle="所有草稿(含其他人與後端自動註冊的)會一起發佈,所有 BFF 5 秒內生效" icon="rocket" width="600px">
+      <div class="stack" style="--gap: 12px">
+        <GSkeleton v-if="preview.loading.value && !pv" :lines="4" />
+        <GEmpty v-else-if="preview.error.value" tone="danger" compact :description="describeError(preview.error.value)" />
+        <template v-else-if="pv">
+          <p class="small">目前線上 v{{ pv.currentVersion }} → 發佈後 v{{ pv.currentVersion + 1 }}</p>
+          <div v-if="pv.drafts.length" class="codes">
+            <code v-for="d in pv.drafts" :key="d.routeId" :title="`${d.name}(${d.updatedBy} ${fromNow(d.updatedAt)})`">{{ d.routeCode }}</code>
+          </div>
+          <div class="row" style="--gap: 6px">
+            <GBadge v-for="c in pv.diff.added" :key="`a${c}`" tone="success">+ {{ c }}</GBadge>
+            <GBadge v-for="c in pv.diff.modified" :key="`m${c}`" tone="info">~ {{ c }}</GBadge>
+            <GBadge v-for="c in pv.diff.removed" :key="`r${c}`" tone="danger">− {{ c }}</GBadge>
+            <GBadge v-if="pv.diff.upstreamsChanged" tone="violet">上游變更</GBadge>
+            <GBadge v-if="pv.diff.policiesChanged" tone="warning">限流變更</GBadge>
+          </div>
+          <p v-if="!pv.changed" class="faint small">與線上版本沒有差異,不需要發佈。</p>
+        </template>
+        <form id="publish-form" @submit.prevent="publish">
+          <GInput v-model="note" label="發佈說明" placeholder="例:IT 管理系統儀表板 API 上線" required />
+        </form>
+      </div>
       <template #footer>
         <GButton variant="ghost" @click="open = false">取消</GButton>
-        <GButton variant="primary" type="submit" form="publish-form" icon="rocket" :loading="saving" :disabled="!note.trim()">發佈</GButton>
+        <GButton variant="primary" type="submit" form="publish-form" icon="rocket" :loading="saving" :disabled="!note.trim() || !pv?.changed">發佈</GButton>
       </template>
     </GModal>
   </div>
 </template>
 
 <style scoped>
-.more {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 16px;
-}
 .releases {
   list-style: none;
   margin: 0;

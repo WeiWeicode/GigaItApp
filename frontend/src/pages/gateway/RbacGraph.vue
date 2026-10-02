@@ -4,15 +4,14 @@
  * 只畫「需權限」的路由(公開 / 登入即可的路由不經角色控管)。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { describeError, http } from '@/api/http';
-import type { BffRoutePage } from '@/api/types';
-import SourceTag from '@/components/SourceTag.vue';
+import { gw } from '@/api/admin';
+import { describeError } from '@/api/http';
 import { useBffRbac } from '@/composables/bffRbac';
 import { useAsync } from '@/composables/useAsync';
 
 const { data: rbac, error, grants, bySystem, reload } = useBffRbac();
-// 關係圖只畫「需權限」的路由,由後端篩選(上限 500 支,超過時畫面會提示)
-const routes = useAsync(() => http.get<BffRoutePage>('/bff/routes', { query: { authMode: 'permission', pageSize: 500 } }));
+// 關係圖只畫「需權限」且未停用的路由(BFF 每頁上限 200 支,超過時畫面會提示)
+const routes = useAsync(() => gw.routes({ status: 'draft,published,deprecated', page: 1, pageSize: 200 }));
 
 const system = ref('');
 const systems = computed(() => [{ label: '全部', value: '' }, ...bySystem.value.map((g) => ({ label: g.system, value: g.system }))]);
@@ -118,7 +117,7 @@ const COL_TONES = ['primary', 'violet', 'cyan'];
 <template>
   <div class="stack" style="--gap: 16px">
     <Teleport to="#page-actions" defer>
-      <SourceTag :source="rbac?.source" :fetched-at="rbac?.fetchedAt" />
+      <GButton icon="refresh" @click="(reload(), routes.reload())">重新整理</GButton>
     </Teleport>
 
     <GCard padding="sm">

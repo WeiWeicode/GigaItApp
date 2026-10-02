@@ -1,218 +1,304 @@
 <script setup lang="ts">
 /**
- * 人員清單:非系統管理員只看得到自己部門;寫入按鈕依權限顯示,後端另外檢查「只能管理同部門且職級較低者」。
- * 篩選與分頁由後端處理(每次只取一頁)。
+ * 人員(Gateway 使用者,Gateway PRD §8.7、P2-3):GET /api/admin/users(後端搜尋、篩選、分頁)、明細、停用 / 啟用、強制登出、個別指派角色。
+ * 人員資料由 BPM / LOS 每小時同步(W3-4.6b);本頁不新增人員(本機帳號由入口網自行註冊或 IT 代建)。
+ * 寫入需 gw.admin.user.write;個別指派的角色所含權限須是操作人本身具備的,否則 BFF 回 403(防止提權)。
  */
 import { computed, reactive, ref } from 'vue';
-import { useAuth } from '@/api/auth';
-import { describeError, http } from '@/api/http';
-import { fromNow, LEVEL_TONE } from '@/api/format';
-import type { Department, Level, LevelCode, PagedResponse, UserRow } from '@/api/types';
+import { useRoute } from 'vue-router';
+import { can, GW, useAuth } from '@/api/auth';
+import { rbac, users, type UserDetail, type UserRow } from '@/api/admin';
+import { describeError } from '@/api/http';
+import { fmtTime, fromNow } from '@/api/format';
+import { useAsync } from '@/composables/useAsync';
 import { usePaged } from '@/composables/usePaged';
 import { confirm, toast } from '@/ui';
 
+const route = useRoute();
 const { me } = useAuth();
-type UserPage = PagedResponse<UserRow> & { scope: 'all' | 'dept'; levels: Level[]; departments: Department[] };
-const PAGE_SIZE = 10;
-const filters = reactive({ q: '', dept: '', level: '' });
-const list = usePaged<UserRow, UserPage>((page, pageSize) => http.get<UserPage>('/users', { query: { ...filters, page, pageSize } }), {
-  pageSize: PAGE_SIZE,
-  watch: () => ({ ...filters }),
+const PAGE_SIZE = 12;
+const filters = reactive({
+  q: '',
+  deptCode: typeof route.query.dept === 'string' ? route.query.dept : '',
+  authType: '',
+  disabled: '',
 });
-const { data, loading, error, reload } = list;
-
-const deptName = (code: string) => data.value?.departments.find((d) => d.code === code)?.name ?? code;
-const levelName = (code: string) => data.value?.levels.find((l) => l.code === code)?.name ?? code;
-const deptOptions = computed(() => (data.value?.departments ?? []).map((d) => ({ label: d.name, value: d.code })));
-const myRank = computed(() => me.value?.level.rank ?? 0);
-/** 可指派的職級:比自己低(admin 全部) */
-const levelOptions = computed(() =>
-  (data.value?.levels ?? []).filter((l) => me.value?.level.code === 'admin' || l.rank < myRank.value).map((l) => ({ label: l.name, value: l.code })),
+const list = usePaged<UserRow>(
+  (page, pageSize) =>
+    users.list({
+      q: filters.q.trim() || undefined,
+      deptCode: filters.deptCode || undefined,
+      authType: filters.authType || undefined,
+      disabled: filters.disabled === '' ? undefined : filters.disabled === '1',
+      page,
+      pageSize,
+    }),
+  { pageSize: PAGE_SIZE, watch: () => ({ ...filters }) },
 );
-const canManage = (u: UserRow) => {
-  if (!me.value || u.id === me.value.user.id) return false;
-  if (me.value.level.code === 'admin') return true;
-  const rank = data.value?.levels.find((l) => l.code === u.level)?.rank ?? 0;
-  return u.deptCode === me.value.department?.code && rank < myRank.value;
-};
 
-// ---- 新增 / 編輯 ----
-const formOpen = ref(false);
-const editing = ref<UserRow | null>(null);
-const form = reactive({ employeeNo: '', name: '', email: '', title: '', deptCode: '', level: 'engineer' as LevelCode });
-const saving = ref(false);
-function openCreate() {
-  editing.value = null;
-  Object.assign(form, { employeeNo: '', name: '', email: '', title: '', deptCode: me.value?.department?.code ?? '', level: 'engineer' });
-  formOpen.value = true;
-}
-function openEdit(u: UserRow) {
-  editing.value = u;
-  Object.assign(form, { employeeNo: u.employeeNo, name: u.name, email: u.email ?? '', title: u.title ?? '', deptCode: u.deptCode, level: u.level });
-  formOpen.value = true;
-}
-const tempPassword = ref<{ emp: string; password: string } | null>(null);
-async function save() {
-  saving.value = true;
-  const body = { name: form.name, email: form.email || null, title: form.title || null, deptCode: form.deptCode, level: form.level };
+const AUTH: Record<string, { label: string; tone: string }> = { ad: { label: 'AD', tone: 'primary' }, local: { label: '本機帳號', tone: 'cyan' } };
+const EMPLOYMENT: Record<string, string> = { active: '在職', resigned: '離職' };
+const LOCAL: Record<string, string> = { pending: '待審核', active: '已啟用', locked: '已鎖定', disabled: '已停用', invited: '待啟用' };
+const canWrite = computed(() => can(GW.userWrite));
+
+// ---- 明細 ----
+const detail = ref<UserDetail | null>(null);
+const detailOpen = computed({ get: () => !!detail.value, set: (v) => !v && ((detail.value = null), (roleEdit.value = false)) });
+const busy = ref(false);
+async function openDetail(u: UserRow) {
+  busy.value = true;
   try {
-    if (editing.value) {
-      await http.patch(`/users/${editing.value.id}`, body);
-      toast.success('已更新人員資料');
-    } else {
-      const r = await http.post<{ tempPassword: string }>('/users', { ...body, employeeNo: form.employeeNo });
-      tempPassword.value = { emp: form.employeeNo, password: r.tempPassword };
-    }
-    formOpen.value = false;
-    await reload();
+    detail.value = await users.get(u.userId);
   } catch (e) {
-    toast.fromError(e, '儲存失敗');
+    toast.fromError(e, '無法取得人員明細');
   } finally {
-    saving.value = false;
+    busy.value = false;
   }
 }
+const isSelf = computed(() => detail.value?.employeeNo === me.value?.user.employeeNo);
 
-async function toggleDisable(u: UserRow) {
+async function toggleDisable(u: UserDetail) {
   const disable = !u.isDisabled;
   const ok = await confirm({
-    title: `${disable ? '停用' : '啟用'} ${u.name}(${u.employeeNo})?`,
-    message: disable ? '停用後此帳號會立即登出且無法登入。' : '啟用後可再次登入。',
+    title: `${disable ? '停用' : '啟用'} ${u.displayName}(${u.employeeNo})?`,
+    message: disable ? '停用後此帳號立即登出且無法登入任何應用。' : '啟用後可再次登入。',
     tone: disable ? 'danger' : 'primary',
     confirmText: disable ? '停用' : '啟用',
   });
   if (!ok) return;
   try {
-    await http.post(`/users/${u.id}/${disable ? 'disable' : 'enable'}`);
-    toast.success(disable ? '已停用' : '已啟用', `${u.name}(${u.employeeNo})`);
-    await reload();
+    detail.value = await users.update(u.userId, u.rowVer, { isDisabled: disable });
+    toast.success(disable ? '已停用' : '已啟用', `${u.displayName}(${u.employeeNo})`);
+    await list.reload();
+  } catch (e) {
+    toast.fromError(e);
+  }
+}
+async function revoke(u: UserDetail) {
+  const ok = await confirm({ title: `強制登出 ${u.displayName}?`, message: '所有裝置上的登入會失效,需重新登入。', tone: 'danger', confirmText: '強制登出' });
+  if (!ok) return;
+  try {
+    await users.revokeSessions(u.userId);
+    detail.value = await users.get(u.userId);
+    toast.success('已強制登出');
   } catch (e) {
     toast.fromError(e);
   }
 }
 
-async function resetPassword(u: UserRow) {
-  const ok = await confirm({ title: `重設 ${u.name} 的密碼?`, message: '會產生一組臨時密碼並登出此帳號的所有工作階段。', tone: 'danger', confirmText: '重設' });
-  if (!ok) return;
+// ---- 個別指派角色(整組取代) ----
+const roleEdit = ref(false);
+const roleList = useAsync(() => rbac.roles(), { immediate: false });
+const picked = ref<Set<string>>(new Set());
+const reason = ref('');
+async function startRoleEdit(u: UserDetail) {
+  picked.value = new Set(u.roles.map((r) => r.code));
+  reason.value = '';
+  roleEdit.value = true;
+  if (!roleList.data.value) await roleList.reload();
+}
+function togglePick(code: string, on: boolean) {
+  const s = new Set(picked.value);
+  if (on) s.add(code);
+  else s.delete(code);
+  picked.value = s;
+}
+async function saveRoles(u: UserDetail) {
+  const keep = new Map(u.roles.map((r) => [r.code, r]));
+  const roles = [...picked.value].map((code) => ({
+    code,
+    validTo: keep.get(code)?.validTo ?? null,
+    reason: keep.get(code)?.reason ?? (reason.value.trim() || null),
+  }));
+  busy.value = true;
   try {
-    const r = await http.post<{ tempPassword: string }>(`/users/${u.id}/reset-password`);
-    tempPassword.value = { emp: u.employeeNo, password: r.tempPassword };
+    detail.value = await users.update(u.userId, u.rowVer, { roles });
+    roleEdit.value = false;
+    toast.success('已更新個別指派角色', '該使用者下次請求即生效');
   } catch (e) {
-    toast.fromError(e);
+    toast.fromError(e, '儲存失敗');
+  } finally {
+    busy.value = false;
   }
 }
-async function copyTemp() {
-  await navigator.clipboard?.writeText(tempPassword.value!.password).catch(() => undefined);
-  toast.success('已複製臨時密碼');
-}
-const tempOpen = computed({ get: () => !!tempPassword.value, set: (v) => !v && (tempPassword.value = null) });
 </script>
 
 <template>
   <div class="stack" style="--gap: 16px">
     <Teleport to="#page-actions" defer>
-      <GBadge v-if="data" :tone="data.scope === 'all' ? 'success' : 'info'" icon="eye">{{
-        data.scope === 'all' ? '可檢視全部部門' : `只顯示${deptName(me?.department?.code ?? '')}`
-      }}</GBadge>
-      <GButton v-can="'sys.user.create'" variant="primary" icon="user-plus" @click="openCreate">新增人員</GButton>
+      <GButton icon="refresh" :loading="list.loading.value" @click="list.reload">重新整理</GButton>
     </Teleport>
 
     <GCard padding="sm">
       <div class="filters">
-        <GInput v-model="filters.q" icon="search" placeholder="搜尋工號、姓名、Email、職稱" clearable class="grow" />
-        <GSelect v-if="data?.scope === 'all'" v-model="filters.dept" :options="deptOptions" placeholder="全部部門" icon="building" />
+        <GInput v-model="filters.q" icon="search" placeholder="搜尋工號、姓名、Email" clearable class="grow" />
+        <GInput v-model="filters.deptCode" icon="building" placeholder="部門代碼" clearable style="width: 150px" />
         <GSegmented
-          v-model="filters.level"
+          v-model="filters.authType"
           size="sm"
-          :options="[{ label: '全部職級', value: '' }, ...(data?.levels ?? []).map((l) => ({ label: l.name, value: l.code }))]"
+          :options="[
+            { label: '全部', value: '' },
+            { label: 'AD', value: 'ad' },
+            { label: '本機帳號', value: 'local' },
+          ]"
+        />
+        <GSegmented
+          v-model="filters.disabled"
+          size="sm"
+          :options="[
+            { label: '全部', value: '' },
+            { label: '啟用中', value: '0' },
+            { label: '已停用', value: '1' },
+          ]"
         />
       </div>
     </GCard>
 
-    <GCard v-if="error">
-      <GEmpty tone="danger" icon="users" title="無法載入人員" :description="describeError(error)"
-        ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
+    <GCard v-if="list.error.value">
+      <GEmpty tone="danger" icon="users" title="無法載入人員" :description="describeError(list.error.value)"
+        ><GButton icon="refresh" @click="list.reload">重試</GButton></GEmpty
       >
     </GCard>
-    <GCard v-else padding="none" title="人員" :subtitle="`${list.total.value} 人`" icon="users">
+    <GCard v-else padding="none" title="人員" :subtitle="`${list.total.value.toLocaleString()} 人`" icon="users">
       <GTable
         v-model:page="list.page.value"
-        :loading="loading && !data"
+        :loading="(list.loading.value && !list.data.value) || busy"
         :rows="list.items.value"
         :total="list.total.value"
-        row-key="id"
+        row-key="userId"
         :page-size="PAGE_SIZE"
+        clickable
         :columns="[
-          { key: 'name', label: '人員' },
-          { key: 'deptCode', label: '部門' },
-          { key: 'level', label: '職級' },
+          { key: 'displayName', label: '人員' },
+          { key: 'department', label: '部門' },
+          { key: 'orgName', label: '公司', hideSm: true },
+          { key: 'authType', label: '登入方式', hideSm: true },
           { key: 'isDisabled', label: '狀態' },
           { key: 'lastLoginAt', label: '最後登入', hideSm: true },
-          { key: 'actions', label: '', align: 'right' },
         ]"
+        @row-click="openDetail"
       >
-        <template #cell-name="{ row }">
+        <template #cell-displayName="{ row }">
           <div class="who">
-            <GAvatar :name="row.name" :size="34" />
+            <GAvatar :name="row.displayName" :size="34" />
             <div>
-              <strong>{{ row.name }}</strong>
+              <strong>{{ row.displayName }}</strong>
               <div class="faint xs">
-                <span class="mono">{{ row.employeeNo }}</span> · {{ row.title ?? '—' }}
+                <span class="mono">{{ row.employeeNo }}</span> · {{ row.title ?? '—' }}{{ row.jobLevel ? ` · 職級 ${row.jobLevel}` : '' }}
               </div>
             </div>
           </div>
         </template>
-        <template #cell-deptCode="{ row }"
-          ><GBadge tone="neutral" icon="building">{{ deptName(row.deptCode) }}</GBadge></template
+        <template #cell-department="{ row }">
+          <span class="nowrap">{{ row.department ?? '—' }}</span>
+          <div v-if="row.deptCode" class="faint xs mono">{{ row.deptCode }}</div>
+        </template>
+        <template #cell-orgName="{ row }"
+          ><span class="nowrap small">{{ row.orgName ?? '—' }}</span></template
         >
-        <template #cell-level="{ row }"
-          ><GBadge :tone="LEVEL_TONE[row.level]">{{ levelName(row.level) }}</GBadge></template
-        >
+        <template #cell-authType="{ row }">
+          <GBadge v-if="row.authType" :tone="AUTH[row.authType]?.tone ?? 'neutral'">{{ AUTH[row.authType]?.label ?? row.authType }}</GBadge>
+          <span v-else class="faint xs" title="人員同步建立,尚未登入過">尚未登入</span>
+          <span v-if="row.localStatus && row.localStatus !== 'active'" class="faint xs"> {{ LOCAL[row.localStatus] ?? row.localStatus }}</span>
+        </template>
         <template #cell-isDisabled="{ row }">
           <GBadge :tone="row.isDisabled ? 'danger' : 'success'" dot>{{ row.isDisabled ? '已停用' : '啟用中' }}</GBadge>
         </template>
         <template #cell-lastLoginAt="{ row }"
           ><span class="faint small nowrap">{{ fromNow(row.lastLoginAt) }}</span></template
         >
-        <template #cell-actions="{ row }">
-          <div v-if="canManage(row)" class="acts">
-            <GButton v-can="'sys.user.edit'" size="sm" variant="ghost" icon="edit" @click="openEdit(row)">編輯</GButton>
-            <GButton v-can="'sys.user.reset-password'" size="sm" variant="ghost" icon="key" @click="resetPassword(row)">重設密碼</GButton>
-            <GButton v-can="'sys.user.disable'" size="sm" variant="ghost" :icon="row.isDisabled ? 'user-check' : 'user-x'" @click="toggleDisable(row)">
-              {{ row.isDisabled ? '啟用' : '停用' }}
-            </GButton>
-          </div>
-          <span v-else-if="row.id === me?.user.id" class="faint xs">本人</span>
-          <span v-else class="faint xs" title="只能管理同部門且職級較低的人員"><GIcon name="lock" :size="14" /></span>
-        </template>
       </GTable>
     </GCard>
 
-    <GModal v-model:open="formOpen" :title="editing ? `編輯 ${editing.name}` : '新增人員'" :icon="editing ? 'edit' : 'user-plus'" width="560px">
-      <form id="user-form" class="grid grid-2" style="--gap: 14px" @submit.prevent="save">
-        <GInput v-model="form.employeeNo" label="工號" :disabled="!!editing" required placeholder="例:S100050" />
-        <GInput v-model="form.name" label="姓名" required />
-        <GInput v-model="form.title" label="職稱" />
-        <GInput v-model="form.email" label="Email" type="email" />
-        <GSelect v-model="form.deptCode" label="部門" :options="deptOptions" :disabled="me?.level.code !== 'admin'" required />
-        <GSelect v-model="form.level" label="職級" :options="levelOptions" required />
-      </form>
-      <p class="faint xs" style="margin: 12px 0 0">只能指派比自己低的職級;非系統管理員只能管理自己部門的人員。</p>
-      <template #footer>
-        <GButton variant="ghost" @click="formOpen = false">取消</GButton>
-        <GButton variant="primary" type="submit" form="user-form" :loading="saving">{{ editing ? '儲存' : '建立' }}</GButton>
-      </template>
-    </GModal>
+    <GModal v-model:open="detailOpen" :title="detail?.displayName" :subtitle="detail?.employeeNo" icon="user" width="620px">
+      <div v-if="detail" class="stack" style="--gap: 16px">
+        <dl class="kv">
+          <dt>部門</dt>
+          <dd>
+            {{ detail.department ?? '—' }} <span class="faint mono xs">{{ detail.deptCode }}</span>
+          </dd>
+          <dt>職稱 / 職級</dt>
+          <dd>{{ detail.title ?? '—' }} / {{ detail.jobLevel ?? '—' }}</dd>
+          <dt>Email</dt>
+          <dd>{{ detail.email ?? '—' }}</dd>
+          <dt>登入方式</dt>
+          <dd>
+            {{ detail.authType ? (AUTH[detail.authType]?.label ?? detail.authType) : '尚未登入過' }}{{ detail.adDomain ? `(${detail.adDomain})` : '' }}
+            <template v-if="detail.localAccount"> · 本機帳號 {{ LOCAL[detail.localAccount.status] ?? detail.localAccount.status }}</template>
+          </dd>
+          <dt>在職</dt>
+          <dd>{{ detail.employmentStatus ? (EMPLOYMENT[detail.employmentStatus] ?? detail.employmentStatus) : '—' }}</dd>
+          <dt>最後登入</dt>
+          <dd>{{ fmtTime(detail.lastLoginAt) }} · 登入中裝置 {{ detail.sessions ?? '—' }}</dd>
+          <dt>所屬公司</dt>
+          <dd>
+            <GBadge v-for="c in detail.companies" :key="c.companyId" :tone="c.isPrimary ? 'primary' : 'neutral'" :title="c.department ?? ''">
+              {{ c.compName }}{{ c.isVirtual ? '(兼任)' : '' }}
+            </GBadge>
+            <span v-if="!detail.companies.length" class="faint">—</span>
+          </dd>
+          <dt>AD 群組</dt>
+          <dd>
+            <span v-if="!detail.adGroups.length" class="faint">—</span>
+            <code v-for="g in detail.adGroups.slice(0, 6)" :key="g" class="chip">{{ g.split(',')[0] }}</code>
+            <span v-if="detail.adGroups.length > 6" class="faint xs">…共 {{ detail.adGroups.length }} 個</span>
+          </dd>
+        </dl>
 
-    <GModal v-model:open="tempOpen" title="臨時密碼" icon="key" tone="warning" width="440px" persistent>
-      <p class="muted" style="margin-top: 0">
-        請將 <b class="mono">{{ tempPassword?.emp }}</b> 的臨時密碼交給本人,登入後到右上角「變更密碼」。此密碼<b>只顯示這一次</b>。
-      </p>
-      <div class="temp">
-        <code>{{ tempPassword?.password }}</code>
-        <GButton size="sm" icon="check" @click="copyTemp">複製</GButton>
+        <div class="box stack" style="--gap: 10px">
+          <div class="row">
+            <p class="faint xs strong" style="margin: 0">個別指派角色</p>
+            <span class="spacer" />
+            <GButton v-if="canWrite && !roleEdit" size="sm" variant="ghost" icon="edit" @click="startRoleEdit(detail)">調整</GButton>
+          </div>
+          <template v-if="!roleEdit">
+            <div class="row" style="--gap: 6px">
+              <GBadge
+                v-for="r in detail.roles"
+                :key="r.code"
+                tone="violet"
+                :title="[r.reason, r.validTo ? `至 ${r.validTo.slice(0, 10)}` : ''].filter(Boolean).join(' · ')"
+              >
+                {{ r.name }}
+              </GBadge>
+              <span v-if="!detail.roles.length" class="faint small">沒有個別指派(角色來自所有登入者、AD 群組、公司預設或指派規則)</span>
+            </div>
+          </template>
+          <template v-else>
+            <GSkeleton v-if="!roleList.data.value" :lines="3" />
+            <div v-else class="picks">
+              <GCheckbox
+                v-for="r in roleList.data.value.items"
+                :key="r.code"
+                :model-value="picked.has(r.code)"
+                :label="`${r.name}(${r.code})`"
+                @update:model-value="togglePick(r.code, $event)"
+              />
+            </div>
+            <GInput v-model="reason" label="新增角色的原因(選填)" placeholder="例:IT 管理系統管理員" />
+            <div class="row" style="--gap: 8px; justify-content: flex-end">
+              <GButton size="sm" variant="ghost" @click="roleEdit = false">取消</GButton>
+              <GButton size="sm" variant="primary" icon="save" :loading="busy" @click="saveRoles(detail)">儲存</GButton>
+            </div>
+          </template>
+        </div>
       </div>
       <template #footer>
-        <GButton variant="primary" @click="tempPassword = null">我已記下</GButton>
+        <GButton
+          v-if="detail && $can(GW.rbacRead)"
+          variant="ghost"
+          icon="eye"
+          @click="$router.push({ path: '/system/permissions/preview', query: { emp: detail.employeeNo } })"
+        >
+          有效權限
+        </GButton>
+        <span class="spacer" />
+        <template v-if="canWrite && detail && !isSelf">
+          <GButton variant="ghost" icon="logout" @click="revoke(detail)">強制登出</GButton>
+          <GButton :variant="detail.isDisabled ? 'primary' : 'danger'" :icon="detail.isDisabled ? 'user-check' : 'user-x'" @click="toggleDisable(detail)">
+            {{ detail.isDisabled ? '啟用' : '停用' }}
+          </GButton>
+        </template>
       </template>
     </GModal>
   </div>
@@ -233,23 +319,41 @@ const tempOpen = computed({ get: () => !!tempPassword.value, set: (v) => !v && (
   align-items: center;
   gap: 12px;
 }
-.acts {
-  display: inline-flex;
-  gap: 2px;
-  flex-wrap: nowrap;
+.kv {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: var(--fs-sm);
 }
-.temp {
+.kv dt {
+  color: var(--text-3);
+}
+.kv dd {
+  margin: 0;
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
+}
+.chip {
+  font-size: var(--fs-xs);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--glass-soft);
+  border: 1px solid var(--line);
+}
+.box {
+  padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--glass-soft);
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--line);
 }
-.temp code {
-  flex: 1;
-  font-size: var(--fs-xl);
-  letter-spacing: 0.08em;
+.picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
 }
 </style>

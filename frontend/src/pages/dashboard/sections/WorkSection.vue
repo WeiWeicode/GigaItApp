@@ -1,13 +1,20 @@
 <script setup lang="ts">
-/** 儀表板「近期工單 + 最近操作」:由 Overview 以 GLazy 包住,捲動到附近才掛載並呼叫 /dashboard/work */
-import { watch } from 'vue';
-import { describeError, http } from '@/api/http';
+/**
+ * 儀表板「近期工單 + 最近操作」:由 Overview 以 GLazy 包住,捲動到附近才掛載。
+ * 工單取自 itapp-api(/api/it/dashboard/work),最近操作取自 Gateway 稽核(需 gw.admin.audit.read);兩者各自載入,互不影響。
+ */
+import { computed, watch } from 'vue';
+import { describeError } from '@/api/http';
 import { ACTION_LABEL, fromNow } from '@/api/format';
-import type { DashboardWork } from '@/api/types';
+import { loadActivity, loadTickets } from '@/composables/dashboard';
 import { useAsync } from '@/composables/useAsync';
 
 const props = defineProps<{ refreshKey?: number }>();
-const { data, error, reload } = useAsync(() => http.get<DashboardWork>('/dashboard/work'));
+const tickets = useAsync(loadTickets);
+const act = useAsync(loadActivity);
+const data = computed(() => (tickets.data.value ? { tickets: tickets.data.value.tickets } : null));
+const error = computed(() => tickets.error.value);
+const reload = () => Promise.all([tickets.reload(), act.reload()]);
 watch(() => props.refreshKey, reload);
 
 const PRIORITY = { high: { label: '高', tone: 'danger' }, medium: { label: '中', tone: 'warning' }, low: { label: '低', tone: 'neutral' } } as const;
@@ -19,15 +26,14 @@ const STATUS = {
 </script>
 
 <template>
-  <GCard v-if="error && !data">
-    <GEmpty compact tone="danger" icon="alert" title="工單與操作紀錄載入失敗" :description="describeError(error)"
-      ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
-    >
-  </GCard>
-  <div v-else class="grid grid-3">
+  <div class="grid grid-3">
     <GCard class="span-2" title="近期工單" icon="ticket" padding="none">
       <template #actions><GBadge tone="info">開發中</GBadge></template>
+      <GEmpty v-if="error && !data" compact tone="danger" icon="alert" title="工單載入失敗" :description="describeError(error)"
+        ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
+      >
       <GTable
+        v-else
         :loading="!data"
         :rows="data?.tickets ?? []"
         row-key="id"
@@ -57,9 +63,11 @@ const STATUS = {
         >
       </GTable>
     </GCard>
-    <GCard title="最近操作" :subtitle="data?.activityScope === 'self' ? '只顯示自己的操作' : '全部人員'" icon="audit" tone="cyan">
-      <ol v-if="data?.activity.length" class="timeline">
-        <li v-for="a in data.activity" :key="a.id">
+    <GCard title="最近操作" subtitle="Gateway 管理操作(全部人員)" icon="audit" tone="cyan">
+      <GEmpty v-if="act.error.value" compact tone="danger" :description="describeError(act.error.value)" />
+      <GEmpty v-else-if="act.data.value === null && !act.loading.value" compact icon="lock" title="需要稽核查詢權限" />
+      <ol v-else-if="act.data.value?.length" class="timeline">
+        <li v-for="a in act.data.value" :key="a.id">
           <i :class="a.result === 'success' ? 'ok' : 'fail'" />
           <div>
             <strong>{{ a.actor }}</strong> {{ ACTION_LABEL[a.action] ?? a.action }}
@@ -68,7 +76,7 @@ const STATUS = {
           </div>
         </li>
       </ol>
-      <GEmpty v-else-if="data" compact icon="audit" title="尚無操作紀錄" />
+      <GEmpty v-else-if="act.data.value" compact icon="audit" title="最近 30 天沒有操作紀錄" />
       <GSkeleton v-else :lines="6" />
     </GCard>
   </div>

@@ -5,6 +5,7 @@
 export const ERROR_CODES = {
   ITAPP_VALIDATION_FAILED: [400, '參數驗證失敗'],
   ITAPP_UNAUTHENTICATED: [401, '請先登入'],
+  ITAPP_INTERNAL_TOKEN_INVALID: [401, '內部 Token 無效'],
   ITAPP_LOGIN_FAILED: [401, '帳號或密碼錯誤'],
   ITAPP_PERMISSION_DENIED: [403, '您沒有此功能的權限'],
   ITAPP_DATA_ACCESS_DENIED: [403, '您沒有此筆資料的權限'],

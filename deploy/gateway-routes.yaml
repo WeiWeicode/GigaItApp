@@ -1,0 +1,41 @@
+# IT 管理系統 API 在 Gateway 的上游與路由(Gateway CLI `apply` 格式;giga-Portal PRD G5、Gateway PRD P2-3a)
+#
+#   sh deploy/apply-gateway-rbac.sh test <Gateway 區域 env 檔> gateway-routes.yaml   # 新增 / 修改路由時手動執行一次
+#
+# 套用後路由為草稿,於 GigaItApp「服務與路由 › 發佈版本」(或 Gateway CLI publish)發佈後生效;
+# 也可直接在「服務與路由」畫面新增 / 修改(效果相同,畫面修改後請同步此檔)。
+# BFF 以容器名稱 itapp-api:51291 連入(同一個 Gateway Docker 網路);正式區於 2026-12 建置時補 targets.prod。
+
+upstreams:
+  - code: itapp-api
+    name: IT 管理系統 API
+    systemCode: it
+    project: GigaItApp
+    timeoutMs: 8000
+    healthCheckPath: /healthz
+    targets:
+      test: [http://itapp-api:51291]
+
+routes:
+  - routeCode: it.dashboard.overview
+    name: IT 儀表板:營運總覽
+    systemCode: it
+    method: GET
+    publicPath: /api/it/dashboard/overview
+    routeType: proxy
+    upstream: itapp-api
+    upstreamPath: /api/it/dashboard/overview
+    authMode: permission
+    permissionCode: it.dashboard.read
+    description: KPI、24 小時流量、告警(監控整合開發中,目前為空清單)
+  - routeCode: it.dashboard.work
+    name: IT 儀表板:近期工單
+    systemCode: it
+    method: GET
+    publicPath: /api/it/dashboard/work
+    routeType: proxy
+    upstream: itapp-api
+    upstreamPath: /api/it/dashboard/work
+    authMode: permission
+    permissionCode: it.dashboard.read
+    description: 近期工單(工單系統整合開發中,目前為空清單)

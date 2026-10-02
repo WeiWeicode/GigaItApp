@@ -1,96 +1,153 @@
 <script setup lang="ts">
-/** 權限試算:選職級 + 部門,即時算出有效權限與看得到的選單(後端 /rbac/preview 計算,與實際登入結果一致) */
-import { computed, ref, watch } from 'vue';
-import { http } from '@/api/http';
-import { LEVEL_TONE } from '@/api/format';
-import type { LevelCode, RbacCatalog } from '@/api/types';
-import { useRbacCatalog } from '@/composables/rbacCatalog';
+/**
+ * 權限試算(giga-Portal PRD I4、Gateway PRD §8.7 POST /api/admin/rbac/preview):與實際登入的計算為同一函式。
+ *   依工號:實際使用者(含 AD 群組、所屬公司、個別指派)
+ *   依人事條件:公司 + 部門 + 職級 + 職稱(假設條件,不含 AD 群組與個別指派)
+ * 結果:命中的角色與來源、可進入的應用,以及所選應用的「選單 → Tab → 按鈕」權限樹(✓ = 擁有)。
+ */
+import { computed, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { rbac, type PermNode, type RbacPreview } from '@/api/admin';
+import { describeError } from '@/api/http';
+import { useAsync } from '@/composables/useAsync';
+import { toast } from '@/ui';
 
-const { data, byModule } = useRbacCatalog();
-const level = ref<LevelCode>('senior');
-const dept = ref('DEV');
-const result = ref<{ permissions: string[]; menus: RbacCatalog['menus'] } | null>(null);
+const route = useRoute();
+const mode = ref<'emp' | 'facts'>(typeof route.query.emp === 'string' || route.query.mode !== 'facts' ? 'emp' : 'facts');
+const form = reactive({ employeeNo: typeof route.query.emp === 'string' ? route.query.emp : '', company: '', deptCode: '', jobLevel: '', title: '' });
+const result = ref<RbacPreview | null>(null);
 const loading = ref(false);
 
-watch(
-  [level, dept],
-  async () => {
-    loading.value = true;
-    try {
-      result.value = await http.get('/rbac/preview', { query: { level: level.value, dept: dept.value } });
-    } finally {
-      loading.value = false;
-    }
-  },
-  { immediate: true },
-);
+const depts = useAsync(() => rbac.departments());
+const apps = useAsync(() => rbac.apps());
+const companyOptions = computed(() => [
+  { label: '不指定公司', value: '' },
+  ...(depts.data.value?.companies ?? []).map((c) => ({ label: c.name, value: c.name })),
+]);
 
+async function run() {
+  if (mode.value === 'emp' && !form.employeeNo.trim()) return;
+  loading.value = true;
+  try {
+    result.value = await rbac.preview(
+      mode.value === 'emp'
+        ? { employeeNo: form.employeeNo.trim() }
+        : {
+            company: form.company || undefined,
+            deptCode: form.deptCode.trim() || undefined,
+            jobLevel: form.jobLevel.trim() || undefined,
+            title: form.title.trim() || undefined,
+          },
+    );
+  } catch (e) {
+    result.value = null;
+    toast.fromError(e, '試算失敗');
+  } finally {
+    loading.value = false;
+  }
+}
+if (form.employeeNo) void run();
+
+const SOURCE: Record<string, { label: string; tone: string }> = {
+  default: { label: '所有登入者', tone: 'warning' },
+  ad_group: { label: 'AD 群組', tone: 'primary' },
+  company: { label: '公司預設', tone: 'cyan' },
+  rule: { label: '指派規則', tone: 'violet' },
+  user: { label: '個別指派', tone: 'success' },
+};
+
+// ---- 應用權限樹 ----
+const app = ref('');
+watch(
+  () => apps.data.value,
+  (a) => {
+    if (!app.value && a?.items[0]) app.value = a.items.find((x) => x.code === 'it')?.code ?? a.items[0].code;
+  },
+);
+const tree = useAsync(() => (app.value ? rbac.permissionTree(app.value) : Promise.resolve({ items: [] as PermNode[] })), { immediate: false });
+watch(app, () => tree.reload());
+const appOptions = computed(() => (apps.data.value?.items ?? []).map((a) => ({ label: a.name, value: a.code })));
 const granted = computed(() => new Set(result.value?.permissions ?? []));
-/** 被部門限制擋掉的權限(職級有、但部門不在清單) */
-const blocked = computed(() => {
-  const lp = new Set(data.value?.levelPermissions[level.value] ?? []);
-  return new Set([...lp].filter((p) => !granted.value.has(p)));
+const KIND: Record<string, string> = { app: '應用', menu: '選單', tab: 'Tab', button: '按鈕', api: 'API' };
+type Flat = { node: PermNode; depth: number };
+const flat = computed<Flat[]>(() => {
+  const out: Flat[] = [];
+  const walk = (l: PermNode[], d: number) => l.forEach((n) => (out.push({ node: n, depth: d }), walk(n.children, d + 1)));
+  walk(tree.data.value?.items ?? [], 0);
+  return out;
 });
-const deptName = (c: string) => data.value?.departments.find((d) => d.code === c)?.name ?? c;
+const grantedInTree = computed(() => flat.value.filter((f) => granted.value.has(f.node.code)).length);
 </script>
 
 <template>
   <div class="layout">
     <div class="stack" style="--gap: 16px">
       <GCard title="試算條件" icon="filter">
-        <div class="stack" style="--gap: 14px">
-          <div>
-            <p class="lbl">職級</p>
-            <GSegmented v-model="level" :options="(data?.levels ?? []).map((l) => ({ label: l.name, value: l.code }))" />
+        <form class="stack" style="--gap: 14px" @submit.prevent="run">
+          <GSegmented
+            v-model="mode"
+            :options="[
+              { label: '依工號', value: 'emp', icon: 'user' },
+              { label: '依人事條件', value: 'facts', icon: 'building' },
+            ]"
+          />
+          <template v-if="mode === 'emp'">
+            <GInput v-model="form.employeeNo" label="工號" icon="user" placeholder="例:S112009" required hint="實際使用者:含 AD 群組、所屬公司與個別指派" />
+          </template>
+          <template v-else>
+            <GSelect v-model="form.company" label="公司" :options="companyOptions" icon="building" />
+            <GInput v-model="form.deptCode" label="部門代碼" placeholder="例:S1800" hint="規則設定「含下層」時,下層部門也會命中" />
+            <div class="grid" style="grid-template-columns: 1fr 1fr; --gap: 12px">
+              <GInput v-model="form.jobLevel" label="職級" placeholder="例:3" />
+              <GInput v-model="form.title" label="職稱" placeholder="選填" />
+            </div>
+            <p class="faint xs" style="margin: 0">假設條件不含 AD 群組與個別指派。</p>
+          </template>
+          <GButton variant="primary" type="submit" icon="eye" :loading="loading">試算</GButton>
+        </form>
+      </GCard>
+
+      <GCard v-if="result" title="命中的角色" :subtitle="`${result.roles.length} 個角色 · ${result.permissions.length} 項權限`" icon="shield" tone="violet">
+        <div class="stack" style="--gap: 10px">
+          <div v-for="r in result.roles" :key="r.code" class="role">
+            <code>{{ r.code }}</code>
+            <span class="spacer" />
+            <GBadge v-for="s in r.sources" :key="s" :tone="SOURCE[s]?.tone ?? 'neutral'">
+              {{ SOURCE[s]?.label ?? s }}{{ s === 'rule' && r.ruleIds.length ? ` #${r.ruleIds.join(', #')}` : '' }}
+            </GBadge>
           </div>
-          <GSelect v-model="dept" label="部門" icon="building" :options="(data?.departments ?? []).map((d) => ({ label: d.name, value: d.code }))" />
-          <div class="summary">
-            <div>
-              <b class="num">{{ granted.size }}</b
-              ><span>有效權限</span>
-            </div>
-            <div>
-              <b class="num warn">{{ blocked.size }}</b
-              ><span>被部門擋下</span>
-            </div>
-            <div>
-              <b class="num">{{ result?.menus.reduce((s, g) => s + g.children.length, 0) ?? 0 }}</b
-              ><span>可見選單</span>
-            </div>
-          </div>
+          <GEmpty v-if="!result.roles.length" compact icon="lock" title="沒有命中任何角色" />
         </div>
       </GCard>
 
-      <GCard title="選單預覽" subtitle="這個人登入後看到的側邊選單" icon="menu" tone="violet">
-        <div class="menu-preview" :class="{ loading }">
-          <div v-for="g in result?.menus ?? []" :key="g.key" class="mg">
-            <div class="mg-t"><GIcon :name="g.icon" :size="16" />{{ g.title }}</div>
-            <div v-for="c in g.children" :key="c.key" class="mi"><i />{{ c.title }}</div>
-          </div>
-          <GEmpty v-if="result && !result.menus.length" compact icon="lock" title="沒有任何可見選單" />
+      <GCard v-if="result" title="可進入的應用" icon="apps" tone="success">
+        <div class="row" style="--gap: 6px">
+          <GBadge v-for="a in result.apps" :key="a.code" tone="success" icon="check">{{ a.name }}</GBadge>
+          <span v-if="!result.apps.length" class="faint small">沒有任何應用權限</span>
         </div>
       </GCard>
     </div>
 
-    <GCard title="權限明細" :subtitle="`${data?.levels.find((l) => l.code === level)?.name} · ${deptName(dept)}`" icon="key" padding="none">
-      <template #actions
-        ><GBadge :tone="LEVEL_TONE[level]">{{ data?.levels.find((l) => l.code === level)?.name }}</GBadge></template
-      >
-      <div v-for="m in byModule" :key="m.code" class="mod">
-        <p class="mod-t">{{ m.name }}</p>
-        <div v-for="p in m.perms" :key="p.code" class="perm" :class="granted.has(p.code) ? 'yes' : blocked.has(p.code) ? 'blocked' : 'no'">
-          <span class="st">
-            <GIcon :name="granted.has(p.code) ? 'check' : blocked.has(p.code) ? 'building' : 'minus'" :size="14" :stroke="2.6" />
-          </span>
-          <div class="pinfo">
-            <b>{{ p.name }}</b>
-            <code>{{ p.code }}</code>
-          </div>
-          <span class="spacer" />
-          <GBadge v-if="blocked.has(p.code)" tone="warning" icon="building">限 {{ data?.deptRestrictions[p.code]?.map(deptName).join('、') }}</GBadge>
-          <GBadge :tone="p.type === 'page' ? 'info' : 'neutral'" variant="outline">{{ p.type === 'page' ? '頁面' : '按鈕' }}</GBadge>
-        </div>
-      </div>
+    <GCard title="應用權限樹" :subtitle="result ? `此應用擁有 ${grantedInTree} / ${flat.length} 項` : '先在左側試算'" icon="grid" padding="none">
+      <template #actions>
+        <GSelect v-model="app" :options="appOptions" icon="apps" />
+      </template>
+      <GEmpty v-if="tree.error.value" tone="danger" compact :description="describeError(tree.error.value)" />
+      <GSkeleton v-else-if="tree.loading.value" :lines="8" style="padding: 20px" />
+      <GEmpty
+        v-else-if="!flat.length"
+        compact
+        title="此應用尚未登記權限"
+        description="由應用的 gateway-rbac.yaml 或 OpenAPI x-permissions 登記(kind / parent)"
+      />
+      <ul v-else class="tree">
+        <li v-for="f in flat" :key="f.node.code" :style="{ '--depth': f.depth }" :class="!result ? '' : granted.has(f.node.code) ? 'yes' : 'no'">
+          <span class="st"><GIcon :name="!result ? 'minus' : granted.has(f.node.code) ? 'check' : 'x'" :size="14" :stroke="2.6" /></span>
+          <GBadge tone="neutral" variant="outline">{{ KIND[f.node.kind] ?? f.node.kind }}</GBadge>
+          <span class="name">{{ f.node.name }}</span>
+          <code class="faint xs">{{ f.node.code }}</code>
+        </li>
+      </ul>
     </GCard>
   </div>
 </template>
@@ -102,126 +159,59 @@ const deptName = (c: string) => data.value?.departments.find((d) => d.code === c
   gap: 16px;
   align-items: start;
 }
-.lbl {
-  margin: 0 0 6px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--text-2);
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }
-.summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.summary div {
+.role {
   display: flex;
-  flex-direction: column;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
   background: var(--glass-soft);
   border: 1px solid var(--line);
 }
-.summary b {
-  font-size: var(--fs-2xl);
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
 }
-.summary b.warn {
-  color: var(--c-warning);
-}
-.summary span {
-  font-size: var(--fs-xs);
-  color: var(--text-3);
-}
-.menu-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: opacity var(--dur);
-}
-.menu-preview.loading {
-  opacity: 0.5;
-}
-.mg-t {
+.tree li {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 650;
-  padding: 6px 4px;
+  padding: 6px 16px 6px calc(16px + var(--depth) * 22px);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
 }
-.mi {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: 12px;
-  padding: 6px 10px;
-  border-left: 1px solid var(--line-strong);
-  font-size: var(--fs-sm);
-  color: var(--text-2);
-}
-.mi i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--c-violet);
-  margin-left: -14px;
-}
-.mod {
-  padding: 4px 0 8px;
-}
-.mod-t {
-  margin: 12px 20px 4px;
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text-3);
-}
-.perm {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 20px;
-  flex-wrap: wrap;
-  transition: opacity var(--dur);
-}
-.perm.no {
-  opacity: 0.45;
+.tree li:last-child {
+  border-bottom: 0;
 }
 .st {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  flex: none;
-  border: 1px dashed var(--line-strong);
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
   color: var(--text-3);
+  background: var(--glass-soft);
 }
 .yes .st {
-  border: 0;
-  color: #fff;
-  background: var(--grad-brand);
-  box-shadow: 0 4px 12px rgb(99 102 241 / 0.35);
+  color: var(--c-success);
+  background: color-mix(in srgb, var(--c-success) 16%, transparent);
 }
-.blocked .st {
-  border: 1px solid color-mix(in srgb, var(--c-warning) 50%, transparent);
-  color: var(--c-warning);
-  background: color-mix(in srgb, var(--c-warning) 12%, transparent);
+.no .st {
+  color: var(--c-danger);
 }
-.pinfo {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-}
-.pinfo b {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
-.pinfo code {
-  font-size: 11px;
+.no .name {
   color: var(--text-3);
 }
-@media (max-width: 960px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

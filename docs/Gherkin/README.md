@@ -9,6 +9,7 @@
 | --- | --- | --- |
 | `auth/login.feature` | 自有帳號登入、鎖定、登入紀錄、示範帳號 | §6.1 |
 | `auth/session.feature` | Session Cookie、CSRF、自動換發、登出、停用即失效、變更密碼 | §6.1 |
+| `auth/gateway-sso.feature` | Gateway 單一入口、`/api/it/*` 只信任內部 Token、管理操作以本人身分寫入 BFF(v0.2) | giga-Portal PRD §9.2 |
 | `rbac/effective-permission.feature` | 有效權限 = 職級 ∩ 部門限制、選單過濾 | §6.2 |
 | `rbac/permission-settings.feature` | 職級權限、部門限制、權限試算 | §6.2 |
 | `system/users.feature` | 人員資料範圍、新增 / 停用 / 重設密碼 | §6.3 |

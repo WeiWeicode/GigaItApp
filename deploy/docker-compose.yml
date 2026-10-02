@@ -5,8 +5,9 @@
 #   docker compose -f deploy/docker-compose.yml run --rm --build spa-it               # 前端:發佈到 gw_www 的 it-admin(取代範例 IT 頁面)
 #   docker compose -f deploy/docker-compose.yml run --rm spa-it rollback it-admin     # 前端回滾到上一版
 #
-# 與 Gateway 同一台主機:加入 Gateway 的 Docker 網路,Nginx 以容器名稱 itapp-api:51291 轉入(ITAPP_API_UPSTREAM)。
-# 登入不經 Gateway 單一入口;讀取 BFF 管理資料時以服務帳號登入 BFF(BFF_MODE=live)。
+# 與 Gateway 同一台主機:加入 Gateway 的 Docker 網路。
+#   /api/it/*:BFF 依路由表(deploy/gateway-routes.yaml)以容器名稱 itapp-api:51291 轉入,本服務以 BFF JWKS 驗證內部 Token
+#   /it/api/*:過渡期保留的自有登入 API(Nginx ITAPP_API_UPSTREAM 直通),前端已改 Gateway 單一入口,測試區驗收後移除
 name: giganexus-itapp
 
 services:
@@ -28,6 +29,9 @@ services:
       BFF_SERVICE_USER: ${BFF_SERVICE_USER:-S100001}
       BFF_SERVICE_PASSWORD_FILE: /run/secrets/bff_service_password
       NODE_EXTRA_CA_CERTS: /run/gw-ca.crt
+      # 經 Gateway 轉入的 /api/it/*:內部 Token 的 aud 與 BFF JWKS(同一 Docker 網路直連 bff-1,不經 Nginx 的內網白名單)
+      SERVICE_CODE: itapp-api
+      GW_JWKS_URL: ${GW_JWKS_URL:-http://bff-1:3000/.well-known/jwks.json}
     secrets:
       - itapp_jwt_secret
       - itapp_seed_password
@@ -43,6 +47,9 @@ services:
     image: giganexus/spa-it-admin:${IMAGE_TAG:-dev}
     build:
       context: ../frontend
+      # Gateway web-kit 原始碼(尚未發佈到 Registry,同 giga-Portal);GATEWAY_DIR 可覆寫兄弟 repo 位置
+      additional_contexts:
+        webkit: ${GATEWAY_DIR:-../../giga-api-gateway-bff}/web-kit/src
       args:
         RELEASE_SHA: ${RELEASE_SHA:-dev}
     profiles: ["publish"]

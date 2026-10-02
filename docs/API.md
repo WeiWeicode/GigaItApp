@@ -1,7 +1,30 @@
 # IT 管理系統 — API 規格(itapp-api)
 
-> 對應 [PRD.md](PRD.md) v0.1。所有路徑在 `/it/api` 之下;經 Gateway 時為 `https://<gateway-host>/it/api/...(測試區 `giganexus-test.gigasolar.com.tw`)`。
-> 行為驗收見 [Gherkin/](Gherkin/README.md);型別定義見 `backend/src/bff/types.ts`、`frontend/src/api/types.ts`。
+> **2026-10-02 起前端改用 Gateway 單一入口**(giga-Portal PRD I1–I4):
+> - 管理資料直接呼叫 Gateway BFF 管理 API `/api/admin/*`(Gateway PRD §8.7;呼叫與型別集中在 `frontend/src/api/admin.ts`),不再經 itapp-api。
+> - 本系統自己的資料為 **§0 `/api/it/*`**,經 BFF 路由表轉給 itapp-api。
+> - §1 之後的 `/it/api/*`(自有登入)為**過渡期保留**,前端已不使用,測試區驗收後移除。
+>
+> 行為驗收見 [Gherkin/](Gherkin/README.md)。
+
+## 0. 經 Gateway BFF 轉入的 API(`/api/it/*`)
+
+| 項目 | 規則 |
+| --- | --- |
+| 呼叫方式 | 瀏覽器呼叫 `https://<gateway-host>/api/it/...`;BFF 依路由表(`deploy/gateway-routes.yaml`)檢查權限後轉給 `itapp-api:51291`,附 `X-Internal-Token` |
+| 驗證 | 只接受 `X-Internal-Token`(ES256、`iss = giganexus-bff`、`aud = itapp-api`,公鑰取自 `GW_JWKS_URL`);缺少或無效回 401 `ITAPP_INTERNAL_TOKEN_INVALID`(`backend/src/gateway/plugin.ts`) |
+| 權限 | 由 BFF 路由檢查(下表「Gateway 權限」),itapp-api 不再檢查 |
+
+| 方法 | 路徑 | Gateway 路由 / 權限 | 說明 |
+| --- | --- | --- | --- |
+| GET | `/api/it/dashboard/overview` | `it.dashboard.overview` / `it.dashboard.read` | `{ generatedAt, mockSections, kpis[], traffic[], alerts[] }`(監控整合開發中,目前為空清單) |
+| GET | `/api/it/dashboard/work` | `it.dashboard.work` / `it.dashboard.read` | `{ generatedAt, mockSections, tickets[] }`(工單整合開發中,目前為空清單) |
+
+儀表板的 Gateway 統計、部門人數、最近操作改由前端直接讀 BFF 管理 API(`frontend/src/composables/dashboard.ts`)。
+
+---
+
+以下為過渡期保留的自有登入 API:所有路徑在 `/it/api` 之下(Nginx 直通 itapp-api)。型別定義見 `backend/src/bff/types.ts`。
 
 ## 1. 共通規則
 

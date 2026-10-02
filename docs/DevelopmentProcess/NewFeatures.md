@@ -2,6 +2,19 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-02 改用 Gateway 單一入口,管理頁接 BFF 管理 API(giga-Portal PRD I1–I4、Gateway P2-3a)
+- 內容:
+  - **前端單一入口(I1、I3)**:改用 `@giganexus/web-kit`(`api/http.ts` 包裝、`api/auth.ts` 讀 `/api/auth/me`),移除自有登入頁、變更密碼、`it_csrf`;未登入導向入口網 `/login?redirect=/it/...`,沒有 `it.app.access` 導回 `/`,BFF 無法連線顯示 `Unavailable` 頁;首次導覽前顯示載入畫面。
+  - **權限改用 BFF(I2)**:選單權限 `it.*`(kind menu、上層 `it.app.access`)與角色 `it-admin` 登記在 `deploy/gateway-rbac.yaml`(CI rbac-test 套用);頁面 / 選單可見 = 選單權限 ∩ 該頁的 BFF 讀取權限(`meta.requires`),按鈕直接用 `gw.admin.*`。
+  - **管理頁改為以使用者身分直呼 BFF 管理 API**(`api/admin.ts`):上游服務(新增、編輯、健康檢查)、API 路由(篩選、明細、新增 / 編輯草稿、停用、試打、匯出)、發佈版本(差異預覽、發佈、回滾)、BFF 權限(矩陣編輯、反查含規則 / 個別指派 / API Key、關係圖)、人員(搜尋、停用、強制登出、個別指派角色)、部門樹(BPM 同步)、**應用權限樹 × 角色(I4)**、角色與指派規則、AD 群組、權限試算(工號 / 人事條件)、稽核(操作含前後內容、登入)。儀表板的 Gateway 概況、團隊工作、最近操作改讀 BFF。移除職級 × 部門權限頁(LevelMatrix、DeptRestrictions)與 SourceTag。新增全域元件 `GTextarea`。
+  - **itapp-api 經 BFF 轉入(G5 / P2-3a)**:新增 `/api/it/dashboard/overview`、`/work`,只驗證 `X-Internal-Token`(`gateway/plugin.ts`,以 jose 對 BFF JWKS 驗證;compose 預設 `GW_JWKS_URL=http://bff-1:3000/.well-known/jwks.json`);上游與路由登記於 `deploy/gateway-routes.yaml`。舊 `/it/api/*` 過渡期保留。
+  - 部署:spa-it 建置帶入 web-kit(`additional_contexts`、`WEB_KIT_DIR`,同 giga-Portal);CI 新增 `rbac-test`,前端型別檢查連到 Gateway 共用目錄的 web-kit;本機開發 `/api`、入口網 `/`、`/login` proxy 到測試區 Gateway(`/` 也要轉,否則應用層守衛導回 `/` 會與 Vite 互相導向造成畫面一直閃)。
+- 檔案:`frontend/src/api/{http,auth,admin,format,types}.ts`、`frontend/src/router.ts`、`frontend/src/App.vue`、`frontend/src/main.ts`、`frontend/src/layouts/AppLayout.vue`、`frontend/src/composables/{apps,bffRbac,dashboard}.ts`、`frontend/src/pages/gateway/*`、`frontend/src/pages/system/{Users,Departments,AppPermissions,RoleRules,PermissionPreview,Audit}.vue`、`frontend/src/pages/dashboard/*`、`frontend/src/pages/endpoint/Devices.vue`、`frontend/src/pages/Unavailable.vue`、`frontend/src/ui/components/GTextarea.vue`、`frontend/vite.config.ts`、`frontend/tsconfig.json`、`frontend/Dockerfile`、`backend/src/gateway/plugin.ts`、`backend/src/routes/it-dashboard.ts`、`backend/src/{app,config,errors}.ts`、`backend/src/auth/plugin.ts`、`backend/test/gateway.test.ts`、`deploy/gateway-rbac.yaml`、`deploy/gateway-routes.yaml`、`deploy/apply-gateway-rbac.sh`、`deploy/docker-compose.yml`、`.gitlab-ci.yml`、`AGENT.md`、`docs/API.md`、`docs/PROJECT-MAP.md`、`docs/Gherkin/auth/gateway-sso.feature`
+- 驗證:
+  - `frontend`:`npm run typecheck`、`npm run build` 通過;`backend`:`npm run typecheck` 通過,`npm test` 新增 `auth/gateway-sso.feature` 4 個場景通過(另 `app.test.ts`、`bff-read` 502、`bff-write` live 共 3 項於 Windows 因暫存檔改名被鎖 EBUSY / EPERM 失敗,改動前即如此,CI 為 Linux)。
+  - 瀏覽器(本機 `npm run dev` 經測試區 Gateway,S112009 登入):未登入導向入口網登入頁、登入後回到 `/it/`;無 `it.app.access` 時導回入口網(修正前畫面無限閃爍)。測試區先以本機 CLI 套用 `gateway-rbac.yaml`,並經需求方同意指派 S112009 `gw-super-admin` + `it-admin`。逐頁操作:新增上游 itapp-api → 健康檢查 200(64 ms);新增路由 `it.dashboard.overview` / `work`(草稿)→ 編輯上游路徑 → 試打(允許,舊版 itapp-api 回 404 屬預期);發佈版本預覽 +2 新增、上游變更;角色權限矩陣 7 角色 × 54 權限;權限反查、關係圖;人員 2,272 筆、搜尋、明細;部門樹 875 個;應用權限樹(IT 管理系統、員工入口網);角色與規則;試算 S112009 → 3 角色 47 權限、應用 portal / it;稽核顯示上述操作(操作人 S112009)與前後內容、登入紀錄;儀表板 Gateway 概況即時統計、團隊工作(資訊服務部 7 人);電腦清單顯示 Gateway 權限不足(端點權限待 W6)。
+  - 未完成:路由尚未發佈(待 CI 部署新版 itapp-api 後於「發佈版本」發佈);未推送。
+
 ## 2026-09-26 決策:改用 Gateway 單一入口;新增兄弟專案 giga-Portal(只改文件)
 - 內容:需求方新建員工入口網 `../giga-Portal`,並決定本系統**改用 Gateway 單一入口**、權限以 BFF 為唯一來源、由本系統提供各應用的權限設定畫面、新增應用切換與路由守衛(無 `it.app.access` 導回 `/`)。本次只記錄決策:AGENT.md §0 登入、工作區、權限設定列與 §10 參考文件;PRD v0.1.4 修訂紀錄、Q2 / Q3 / Q4 狀態。實作項目見 `../giga-Portal/docs/PRD.md` §9.2(I1–I5)、Gateway PRD v0.7。
 - 檔案:`AGENT.md`、`docs/PRD.md`

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-/** 權限反查:選一個 BFF 權限,列出擁有它的角色,以及角色如何被指派(AD 群組 / 公司 / 個別使用者 / 所有人) */
+/**
+ * 權限反查(GET /api/admin/permissions/:code/who-can-access,P2-6):選一個 BFF 權限,列出擁有它的角色,
+ * 以及角色如何被指派(所有登入者 / AD 群組 / 公司預設 / 指派規則 / 個別使用者)與具備此權限的 API Key。
+ */
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { describeError, http } from '@/api/http';
-import type { BffRoutePage, BffWhoCanAccess } from '@/api/types';
-import SourceTag from '@/components/SourceTag.vue';
+import { gw, rbac as rbacApi, type WhoCanAccess } from '@/api/admin';
+import { describeError } from '@/api/http';
 import { useBffRbac } from '@/composables/bffRbac';
 import { useAsync } from '@/composables/useAsync';
 
@@ -14,9 +16,9 @@ const { data: rbac, bySystem } = useBffRbac();
 
 const q = ref('');
 const selected = ref<string>(typeof route.query.permission === 'string' ? route.query.permission : '');
-// 只取需要目前這個權限的路由(後端篩選),選擇的權限變更時重新查詢
-const routes = useAsync(() => http.get<BffRoutePage>('/bff/routes', { query: { permission: selected.value, pageSize: 100 } }), { immediate: false });
-const result = ref<BffWhoCanAccess | null>(null);
+// 需要目前這個權限的路由:以權限代碼搜尋(後端 LIKE),再取完全相符者;選擇的權限變更時重新查詢
+const routes = useAsync(() => gw.routes({ q: selected.value, page: 1, pageSize: 200 }), { immediate: false });
+const result = ref<WhoCanAccess | null>(null);
 const loading = ref(false);
 const error = ref<Error | null>(null);
 
@@ -26,8 +28,19 @@ const filteredGroups = computed(() => {
     .map((g) => ({ ...g, perms: g.perms.filter((p) => !k || p.code.includes(k) || p.name.toLowerCase().includes(k)) }))
     .filter((g) => g.perms.length);
 });
+/** 指派規則的條件文字(公司 / 部門〔含下層〕/ 職級 / 職稱) */
+function ruleText(x: WhoCanAccess['roles'][number]['rules'][number]): string {
+  return [
+    x.company,
+    x.deptCode ? `${x.deptCode}${x.includeSubDepts ? '(含下層)' : ''}` : null,
+    x.jobLevels?.length ? `職級 ${x.jobLevels.join('、')}` : null,
+    x.title ? `職稱「${x.title}」` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 const perm = computed(() => rbac.value?.permissions.find((p) => p.code === selected.value));
-const relatedRoutes = computed(() => routes.data.value?.items ?? []);
+const relatedRoutes = computed(() => (routes.data.value?.items ?? []).filter((r) => r.permissionCode === selected.value && r.status !== 'disabled'));
 
 watch(
   selected,
@@ -39,7 +52,7 @@ watch(
     loading.value = true;
     error.value = null;
     try {
-      result.value = await http.get<BffWhoCanAccess>('/bff/rbac/who-can-access', { query: { permission: code } });
+      result.value = await rbacApi.whoCanAccess(code);
     } catch (e) {
       error.value = e as Error;
     } finally {
@@ -61,10 +74,6 @@ watch(
 
 <template>
   <div class="layout">
-    <Teleport to="#page-actions" defer>
-      <SourceTag :source="result?.source ?? rbac?.source" :fetched-at="result?.fetchedAt" />
-    </Teleport>
-
     <GCard class="picker" padding="none">
       <div class="search"><GInput v-model="q" icon="search" placeholder="搜尋權限代碼或名稱" clearable /></div>
       <div class="list">
@@ -112,15 +121,29 @@ watch(
                 <p class="lbl"><GIcon name="building" :size="13" /> 公司預設</p>
                 <GBadge v-for="c in r.companies" :key="c" tone="cyan">{{ c }}</GBadge>
               </div>
+              <div v-if="r.rules.length">
+                <p class="lbl"><GIcon name="workflow" :size="13" /> 指派規則</p>
+                <GBadge v-for="x in r.rules" :key="x.ruleId" tone="violet">{{ ruleText(x) }}</GBadge>
+              </div>
               <div v-if="r.users.length">
                 <p class="lbl"><GIcon name="user" :size="13" /> 個別指派</p>
-                <GBadge v-for="u in r.users" :key="u" tone="neutral">{{ u }}</GBadge>
+                <GBadge v-for="u in r.users" :key="u.employeeNo" tone="neutral" :title="u.validTo ? `至 ${u.validTo.slice(0, 10)}` : ''"
+                  >{{ u.name }}({{ u.employeeNo }})</GBadge
+                >
               </div>
-              <p v-if="!r.everyone && !r.adGroups.length && !r.companies.length && !r.users.length" class="faint small">尚未指派給任何人</p>
+              <p v-if="!r.everyone && !r.adGroups.length && !r.companies.length && !r.rules.length && !r.users.length" class="faint small">尚未指派給任何人</p>
             </div>
           </GCard>
         </div>
       </template>
+
+      <GCard v-if="result?.apiClients.length" title="具備此權限的 API Key" icon="key" padding="sm">
+        <div class="row" style="--gap: 6px">
+          <GBadge v-for="c in result.apiClients" :key="c.code" :tone="c.active ? 'cyan' : 'neutral'" :title="c.name"
+            >{{ c.code }}{{ c.active ? '' : '(停用 / 過期)' }}</GBadge
+          >
+        </div>
+      </GCard>
 
       <GCard v-if="selected" title="需要此權限的 API" :subtitle="`${relatedRoutes.length} 支`" icon="route" padding="none">
         <GTable

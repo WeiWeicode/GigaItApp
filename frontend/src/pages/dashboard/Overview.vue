@@ -2,14 +2,14 @@
 /** 營運總覽:上半部(KPI、流量、告警)進頁即載入;下半部(工單、最近操作)捲動到附近才載入(GLazy) */
 import { computed, ref } from 'vue';
 import { useAuth } from '@/api/auth';
-import { describeError, http } from '@/api/http';
+import { describeError } from '@/api/http';
 import { fromNow } from '@/api/format';
-import type { DashboardOverview } from '@/api/types';
+import { loadOverview } from '@/composables/dashboard';
 import { useAsync } from '@/composables/useAsync';
 import WorkSection from './sections/WorkSection.vue';
 
 const { me } = useAuth();
-const { data, loading, error, reload: reloadOverview } = useAsync(() => http.get<DashboardOverview>('/dashboard/overview'));
+const { data, loading, error, reload: reloadOverview } = useAsync(loadOverview);
 const refreshKey = ref(0);
 function reload() {
   refreshKey.value++;
@@ -72,8 +72,8 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
           <h2>{{ greeting }},{{ me?.user.name }}</h2>
           <p class="muted">{{ today }}</p>
           <div class="row" style="--gap: 6px; margin-top: 8px">
-            <GBadge tone="primary" icon="building">{{ me?.department?.name }}</GBadge>
-            <GBadge tone="violet" icon="shield">{{ me?.level.name }}</GBadge>
+            <GBadge tone="primary" icon="building">{{ me?.user.department ?? '未指定部門' }}</GBadge>
+            <GBadge v-if="me?.user.title" tone="violet" icon="shield">{{ me.user.title }}</GBadge>
             <GBadge v-if="data" tone="neutral" icon="info" title="KPI、流量、工單、告警為開發中功能;Gateway 統計、部門人數與操作紀錄為真實資料"
               >部分功能開發中</GBadge
             >
@@ -84,68 +84,70 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
       </div>
     </GCard>
 
-    <GCard v-if="error && !data">
-      <GEmpty tone="danger" icon="alert" title="儀表板載入失敗" :description="describeError(error)"
-        ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
-      >
+    <!-- KPI / 流量 / 告警來自 itapp-api(經 BFF /api/it/*);連不到時只影響這幾個區塊,其餘照常顯示 -->
+    <GCard v-if="error && !data" padding="sm" tone="warning">
+      <div class="row" style="--gap: 8px">
+        <GIcon name="alert-circle" :size="16" />
+        <span class="small">IT 系統 API 暫時無法取得,KPI、流量與告警以「開發中」顯示:{{ describeError(error) }}</span>
+        <span class="spacer" />
+        <GButton size="sm" icon="refresh" @click="reload">重試</GButton>
+      </div>
     </GCard>
 
-    <template v-else>
-      <div class="grid kpis">
-        <template v-if="data">
-          <GStatCard
-            v-for="k in displayKpis"
-            :key="k.key"
-            :label="k.label"
-            :value="k.value"
-            :unit="k.unit"
-            :delta="k.delta"
-            :delta-unit="k.key === 'tickets' || k.key === 'alerts' ? ' 件' : k.key === 'availability' ? ' pt' : '%'"
-            :trend="k.trend"
-            :tone="k.tone"
-            :icon="KPI_ICON[k.key]"
-            :invert="k.key === 'latency' || k.key === 'tickets' || k.key === 'alerts'"
-            :hint="k.hint"
-          />
-        </template>
-        <template v-else>
-          <GCard v-for="i in 5" :key="i" padding="sm"><GSkeleton :lines="3" /></GCard>
-        </template>
-      </div>
+    <div class="grid kpis">
+      <template v-if="data || error">
+        <GStatCard
+          v-for="k in displayKpis"
+          :key="k.key"
+          :label="k.label"
+          :value="k.value"
+          :unit="k.unit"
+          :delta="k.delta"
+          :delta-unit="k.key === 'tickets' || k.key === 'alerts' ? ' 件' : k.key === 'availability' ? ' pt' : '%'"
+          :trend="k.trend"
+          :tone="k.tone"
+          :icon="KPI_ICON[k.key]"
+          :invert="k.key === 'latency' || k.key === 'tickets' || k.key === 'alerts'"
+          :hint="k.hint"
+        />
+      </template>
+      <template v-else>
+        <GCard v-for="i in 5" :key="i" padding="sm"><GSkeleton :lines="3" /></GCard>
+      </template>
+    </div>
 
-      <div class="grid grid-3">
-        <GCard class="span-2" title="今日 API 流量" subtitle="每小時請求數與錯誤數" icon="activity">
-          <template #actions><GBadge tone="info">開發中</GBadge></template>
-          <GAreaChart v-if="data && (data.traffic?.length ?? 0) > 0" :labels="traffic.labels" :series="traffic.series" :height="250" />
-          <GEmpty v-else-if="data" compact icon="activity" title="開發中" description="API 流量監控功能開發中，尚未接入即時指標來源" />
-          <GSkeleton v-else height="250px" />
-        </GCard>
-        <GCard title="系統告警" icon="bell" tone="neutral">
-          <template #actions><GBadge tone="info">開發中</GBadge></template>
-          <ul v-if="data && data.alerts.length" class="alerts">
-            <li v-for="a in data.alerts" :key="a.title" :class="`tone-${a.level}`">
-              <span class="al-ic"><GIcon :name="ALERT[a.level] ?? 'info'" :size="16" /></span>
-              <div>
-                <strong>{{ a.title }}</strong>
-                <span class="faint xs">{{ fromNow(a.at) }}</span>
-              </div>
-            </li>
-          </ul>
-          <GEmpty v-else-if="data" compact icon="bell" title="開發中" description="系統告警模組開發中" />
-          <GSkeleton v-else :lines="5" />
-        </GCard>
-      </div>
+    <div class="grid grid-3">
+      <GCard class="span-2" title="今日 API 流量" subtitle="每小時請求數與錯誤數" icon="activity">
+        <template #actions><GBadge tone="info">開發中</GBadge></template>
+        <GAreaChart v-if="data && (data.traffic?.length ?? 0) > 0" :labels="traffic.labels" :series="traffic.series" :height="250" />
+        <GEmpty v-else-if="data || error" compact icon="activity" title="開發中" description="API 流量監控功能開發中，尚未接入即時指標來源" />
+        <GSkeleton v-else height="250px" />
+      </GCard>
+      <GCard title="系統告警" icon="bell" tone="neutral">
+        <template #actions><GBadge tone="info">開發中</GBadge></template>
+        <ul v-if="data && data.alerts.length" class="alerts">
+          <li v-for="a in data.alerts" :key="a.title" :class="`tone-${a.level}`">
+            <span class="al-ic"><GIcon :name="ALERT[a.level] ?? 'info'" :size="16" /></span>
+            <div>
+              <strong>{{ a.title }}</strong>
+              <span class="faint xs">{{ fromNow(a.at) }}</span>
+            </div>
+          </li>
+        </ul>
+        <GEmpty v-else-if="data || error" compact icon="bell" title="開發中" description="系統告警模組開發中" />
+        <GSkeleton v-else :lines="5" />
+      </GCard>
+    </div>
 
-      <GLazy min-height="360px">
-        <WorkSection :refresh-key="refreshKey" />
-        <template #placeholder>
-          <div class="grid grid-3">
-            <GCard class="span-2"><GSkeleton :lines="7" /></GCard>
-            <GCard><GSkeleton :lines="7" /></GCard>
-          </div>
-        </template>
-      </GLazy>
-    </template>
+    <GLazy min-height="360px">
+      <WorkSection :refresh-key="refreshKey" />
+      <template #placeholder>
+        <div class="grid grid-3">
+          <GCard class="span-2"><GSkeleton :lines="7" /></GCard>
+          <GCard><GSkeleton :lines="7" /></GCard>
+        </div>
+      </template>
+    </GLazy>
   </div>
 </template>
 

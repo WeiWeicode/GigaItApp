@@ -11,17 +11,17 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 做什麼 | IT 部門自己的管理系統:儀表板、Gateway BFF 的服務 / 路由 / 權限視覺化與設定、IT 人員(職級 × 部門)與按鈕權限 |
+| 做什麼 | IT 部門自己的管理系統:儀表板、Gateway BFF 的服務 / 路由 / 權限視覺化與設定、Gateway 使用者 / 部門 / 角色與各應用的選單、Tab、按鈕權限、稽核 |
 | 子路徑 | `/it/`(取代 Gateway 原本的範例 IT 頁面,Nginx 對應 `/srv/www/it-admin/current`) |
-| API | `/it/api/*`,Nginx **直接**轉給 `itapp-api:51291`,**不經 BFF 路由表** |
-| 登入 | 目前為**自有帳號與登入頁,不共用 Gateway 單一入口**(FRONTEND-GUIDE §7.1 的例外)。**2026-09-26 需求方決定改用 Gateway 單一入口**(`../giga-Portal/docs/PRD.md` D2、Gateway PRD v0.7):API 改為 `/api/it/*` 經 BFF、權限改用 BFF、新增應用切換與路由守衛(無 `it.app.access` 導回員工入口網 `/`)。**頂列應用切換已先實作**(2026-09-26,讀使用者的 Gateway 登入 `/api/auth/me`,元件與 giga-Portal 同步);單一入口、權限改 BFF、路由守衛**尚未實作**,動手前先讀該 PRD §9.2(I1–I5) |
-| 與 BFF 的關係 | `itapp-api` 以 **BFF 服務帳號** 呼叫 BFF 管理 API 取得資料(`BFF_MODE=live`),或使用內建快照(`BFF_MODE=mock`) |
-| 端點管理 | 前端直接呼叫 `/api/endpoint/*`,經 BFF 到 Go Endpoint Server,**權限以 BFF 為準**、身分是使用者的 Gateway 登入(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8);`itapp-api` **只負責選單、Tab、按鈕是否顯示**,不轉送端點 API、不持有能呼叫 Endpoint Server 的帳號 |
-| 工作區 | 與 `../giga-api-gateway-bff/`(上位規範、本機 Gateway 環境、開發用憑證)、`../giga-Portal/`(員工入口網:單一入口與應用切換起點;**本系統負責設定其選單 / Tab / 按鈕權限**)、`../giga-endpoint/`(Go Endpoint Server,W6)同層;規則見 Gateway `AGENT.md` §10 |
-| 權限設定(規劃) | 設定各應用(員工入口網、本系統…)的應用 / 選單 / Tab / 按鈕權限,依角色、部門(含下層)、職級(職稱選配);資料存在 BFF(Gateway PRD §8.3.1–§8.3.3),改單一入口後以**使用者身分**呼叫 BFF 管理 API |
+| API | **`/api/*` 經 Gateway BFF**:管理資料直接呼叫 BFF 管理 API `/api/admin/*`(以使用者本人身分);本系統自己的資料 `/api/it/*` 由 BFF 依路由表轉給 `itapp-api:51291`(只驗證 `X-Internal-Token`,`backend/src/gateway/plugin.ts`)。舊的 `/it/api/*`(Nginx 直通、自有登入)**過渡期保留**,前端已不使用,測試區驗收後移除 |
+| 登入 | **Gateway 單一入口**(2026-10-02 實作,giga-Portal PRD D2、§9.2 I1–I3):前端以 `@giganexus/web-kit` 取得 `/api/auth/me`,未登入導向入口網 `/login?redirect=/it/...`,沒有 `it.app.access` 導回入口網 `/`;不再有自有登入頁、Session、CSRF |
+| 權限 | 選單權限 `it.*`(kind `menu`,上層 `it.app.access`)登記在 `deploy/gateway-rbac.yaml`,角色 `it-admin`;資料與按鈕權限直接用 BFF 的 `gw.admin.*`(按鈕 = API)。頁面 / 選單可見 = 選單權限 ∩ 該頁需要的 BFF 讀取權限(`frontend/src/api/auth.ts`) |
+| 端點管理 | 前端直接呼叫 `/api/endpoint/*`,經 BFF 到 Endpoint Server,**權限以 BFF 為準**(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8) |
+| 工作區 | 與 `../giga-api-gateway-bff/`(上位規範、web-kit、開發用憑證)、`../giga-Portal/`(員工入口網:單一入口與應用切換起點;**本系統負責設定其選單 / Tab / 按鈕權限**)同層;規則見 Gateway `AGENT.md` §10 |
+| 權限設定 | 「角色與按鈕權限」畫面設定各應用(員工入口網、本系統…)的應用 / 選單 / Tab / 按鈕 × 角色、角色指派規則(公司 / 部門〔含下層〕/ 職級 / 職稱)、權限試算;以使用者身分寫入 BFF(需 `gw.admin.rbac.write`) |
 | 目錄 | `backend/`(Fastify,itapp-api)、`frontend/`(Vue 3 + Vite)、`deploy/`(compose)、`docs/DevelopmentProcess/`(修正紀錄);**各目錄與檔案職責見專案地圖 `docs/PROJECT-MAP.md`** |
 
-因為不經 Gateway 單一入口,下游樣本中「只信任 `X-Internal-Token`」「自動註冊為 Gateway 草稿」**不適用**本專案;其餘原則(錯誤格式、機密、部署區、port 登記)照舊。
+`/api/it/*` 依下游樣本「只信任 `X-Internal-Token`」;路由以 `deploy/gateway-routes.yaml`(CLI apply)或「服務與路由」畫面登記,尚未採用 OpenAPI 自動註冊。過渡期保留的 `/it/api/*` 仍為自有登入,只供舊測試使用。
 
 ---
 
@@ -130,7 +130,7 @@
 | 玻璃擬態 | 面板用 `.glass` / `.glass-edge`(或 `GCard`),圖表色取 `ui/charts/palette.ts` |
 | 圖示 | `<GIcon name="...">`,新圖示在 `GIcon.vue` 的 `ICONS` 登記,頁面不直接 import `lucide-vue-next` |
 | 權限 | 按鈕 `v-can="'權限代碼'"`,頁面 `meta.permission`,Tab `permission`;這些只是體驗,**後端一定要再檢查** |
-| HTTP | 本系統 API 一律 `src/api/http.ts`(同網域 `/it/api`、CSRF、401 導回登入頁、錯誤含 `requestId`);Gateway BFF(`/api/*`,端點管理)一律 `src/api/gateway.ts`(目前只有唯讀 GET;加入寫入時改用 `@giganexus/web-kit`);頁面不直接呼叫 `fetch` |
+| HTTP | 一律經 `src/api/http.ts`(包裝 `@giganexus/web-kit`:同網域 `/api/*`、CSRF、401 先 Refresh 再導向入口網登入、錯誤含 `requestId`);BFF 管理 API 的呼叫與型別集中在 `src/api/admin.ts`;頁面不直接呼叫 `fetch` |
 | 回饋 | `toast.*` / `await confirm({...})`(`@/ui`),錯誤顯示 `describeError(e)`(含 requestId) |
 | 頁面結構 | 兩層選單 → `TabbedPage`(路由 meta:`title`、`tabs`)→ Tab 子路由;頁面動作按鈕 `<Teleport to="#page-actions" defer>` |
 | 版面 | 手機寬度(375px)不可出現整頁水平捲動;表格在卡片內捲動 |
@@ -170,8 +170,7 @@
 | `backend/` | `npm run dev` | 本機開發(讀 `.env`;預設 `BFF_MODE=mock`) |
 | `backend/` | `npm test` / `npm run typecheck` / `npm run build` | 測試(`app.test.ts` 基本行為、`scenarios.test.ts` 對應 Gherkin `@auto` 場景)/ 型別 / 建置 |
 | 根目錄 | `sh deploy/e2e-smoke.sh`(`STOP_API=1` 另驗 502) | 經 Gateway Nginx 的 `@e2e` 檢查 |
-| `frontend/` | `npm run dev` | http://localhost:5177/it/,proxy `/it/api` → `localhost:51291` |
-| `frontend/` | `npm run dev:gw` | http://localhost:5178/it/,proxy 經本機 Gateway(`https://localhost`) |
+| `frontend/` | `npm run dev` | http://localhost:5177/it/;`/api` 與入口網登入頁 proxy 到測試區 Gateway(`GATEWAY_TARGET` 可改),以自己的帳號登入後操作的是**測試區真實資料** |
 | `frontend/` | `npm run typecheck` / `npm run build` | 型別 / 建置 |
 | 根目錄 | `sh deploy/gen-secrets.sh` → `docker compose -f deploy/docker-compose.yml up -d --build --wait itapp-api` | 部署後端到本機 Gateway 網路 |
 | 根目錄 | `docker compose -f deploy/docker-compose.yml run --rm --build spa-it` | 發佈前端到 `/it/`(`... run --rm spa-it rollback it-admin` 回滾) |
@@ -203,7 +202,7 @@
 
 ## 11. 修正紀錄
 
-每次修正都要留紀錄,**新紀錄加在檔案最上方**。有畫面或使用者操作流程的修改,完成後要用瀏覽器實際操作確認(`npm run dev` 或 `npm run dev:gw`),並在紀錄說明操作步驟與結果;型別檢查、測試、建置仍需執行並回報。
+每次修正都要留紀錄,**新紀錄加在檔案最上方**。有畫面或使用者操作流程的修改,完成後要用瀏覽器實際操作確認(`npm run dev`),並在紀錄說明操作步驟與結果;型別檢查、測試、建置仍需執行並回報。
 
 | 文件 | 路徑 | 說明 |
 | --- | --- | --- |

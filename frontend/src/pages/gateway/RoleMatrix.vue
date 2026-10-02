@@ -1,8 +1,12 @@
 <script setup lang="ts">
-/** BFF 角色 × 權限矩陣:點角色欄位的「編輯」進入設定模式(需 bff.rbac.edit) */
+/**
+ * BFF 角色 × 權限矩陣:點角色欄位的「編輯」進入設定模式(PUT /api/admin/roles/:role/permissions,需 gw.admin.rbac.write)。
+ * 內建超級管理員 gw-super-admin 不開放以 API 修改(Gateway PRD §8.7);寫入會遞增全體使用者權限版本,下次請求即生效。
+ */
 import { computed, ref } from 'vue';
-import { ApiError, describeError, http } from '@/api/http';
-import SourceTag from '@/components/SourceTag.vue';
+import { rbac } from '@/api/admin';
+import { GW } from '@/api/auth';
+import { describeError } from '@/api/http';
 import { useBffRbac } from '@/composables/bffRbac';
 import { confirm, toast } from '@/ui';
 
@@ -45,13 +49,12 @@ async function save() {
   if (!ok) return;
   saving.value = true;
   try {
-    await http.put(`/bff/rbac/roles/${encodeURIComponent(role)}/permissions`, { permissions: [...draft.value] });
-    toast.success('已儲存角色權限');
+    await rbac.setRolePermissions(role, [...draft.value]);
+    toast.success('已儲存角色權限', '擁有此角色的使用者下次請求即生效');
     editing.value = null;
     await reload();
   } catch (e) {
-    if (e instanceof ApiError && e.code === 'ITAPP_BFF_NOT_SUPPORTED') toast.warning('BFF 尚未開放編輯 API', e.message);
-    else toast.fromError(e, '儲存失敗');
+    toast.fromError(e, '儲存失敗');
   } finally {
     saving.value = false;
   }
@@ -63,7 +66,6 @@ const roleCount = (role: string) => (editing.value === role ? draft.value.size :
 <template>
   <div class="stack" style="--gap: 16px">
     <Teleport to="#page-actions" defer>
-      <SourceTag :source="data?.source" :fetched-at="data?.fetchedAt" />
       <GButton icon="refresh" :loading="loading" @click="reload">重新整理</GButton>
     </Teleport>
 
@@ -105,7 +107,15 @@ const roleCount = (role: string) => (editing.value === role ? draft.value.size :
                       <GBadge v-if="r.isSystem" tone="danger">內建</GBadge>
                       <GBadge tone="primary">{{ roleCount(r.code) }}</GBadge>
                     </span>
-                    <GButton v-if="!editing" v-can="'bff.rbac.edit'" size="sm" variant="ghost" icon="edit" @click="startEdit(r.code)">編輯</GButton>
+                    <GButton
+                      v-if="!editing && r.code !== 'gw-super-admin'"
+                      v-can="GW.rbacWrite"
+                      size="sm"
+                      variant="ghost"
+                      icon="edit"
+                      @click="startEdit(r.code)"
+                      >編輯</GButton
+                    >
                   </div>
                 </th>
               </tr>

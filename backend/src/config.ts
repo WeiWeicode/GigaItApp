@@ -20,6 +20,13 @@ export interface Config {
   sessionTtlSec: number;
   /** 首次啟動建立種子帳號用的密碼(資料檔已存在時不使用) */
   seedPassword: string | null;
+  /** 經 Gateway BFF 轉入的 /api/it/*(giga-Portal PRD I1、G5):驗證 X-Internal-Token 用 */
+  gateway: {
+    /** 服務代碼 = Gateway 上游代碼 = 內部 Token 的 aud */
+    serviceCode: string;
+    /** BFF JWKS;未設定時 /api/it/* 一律回 401(無法驗證) */
+    jwksUrl: string | null;
+  };
   bff: {
     mode: BffMode;
     baseUrl: string | null;
@@ -73,6 +80,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     cookieSecure: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : itEnv !== 'dev',
     sessionTtlSec: Number(env.SESSION_TTL_SEC ?? 8 * 3600),
     seedPassword: readSecret(env, 'ITAPP_SEED_PASSWORD', itEnv) ?? (itEnv === 'dev' ? 'Passw0rd!' : null),
+    gateway: {
+      serviceCode: env.SERVICE_CODE ?? 'itapp-api',
+      jwksUrl: env.GW_JWKS_URL || null,
+    },
     bff: {
       mode,
       baseUrl,
