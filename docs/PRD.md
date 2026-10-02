@@ -10,7 +10,7 @@
 | 項目 | 內容 |
 | --- | --- |
 | 產品名稱 | GigaNexus IT 管理系統(GigaItApp) |
-| 文件版本 | **v0.1.5** |
+| 文件版本 | **v0.1.6** |
 | 建立日期 | 2026-09-25 |
 | 技術棧 | Vue 3 + Vite(前端)/ Node.js 22 + Fastify 5 + TypeScript(後端 itapp-api)/ 經 Gateway Nginx 對外(詳見 [ARCHITECTURE.md](ARCHITECTURE.md)) |
 | 相關文件 | [ARCHITECTURE.md](ARCHITECTURE.md)(架構與技術)、[API.md](API.md)(API 規格)、[UI-GUIDE.md](UI-GUIDE.md)(前端 UI 規範)、[Gherkin/](Gherkin/README.md)(驗收場景)、[../AGENT.md](../AGENT.md)(AI 協作準則)、Gateway 專案 `giga-api-gateway-bff/docs/`(上位規範) |
@@ -21,6 +21,7 @@
 
 | 版本 | 日期 | 變更內容 |
 | --- | --- | --- |
+| v0.1.6 | 2026-10-01 | **建議(待確認,尚未實作)**:部門改綁 Gateway 的 BPM 部門樹(`gw.department`),以 Gateway 角色規則依部門指派 IT 管理系統權限,不在本系統複製部門資料(§5.2.1);新增 Q9–Q11。測試區 / 正式區已不保留示範帳號(後端修改紀錄 2026-10-01) |
 | v0.1.5 | 2026-09-26 | 頂列**應用切換**(giga-Portal PRD FR-2.3、I3 的一部分):列出使用者有權限的應用並整頁導向,資料取自使用者的 Gateway 登入(`/api/auth/me`;沒有 Gateway 登入時不顯示);Gateway `me.apps`(G3)前暫以 `*.app.access` 推導。文件版本欄對齊修訂紀錄(原誤為 v0.1.2) |
 | v0.1.4 | 2026-09-26 | **決策紀錄(尚未實作)**:需求方決定本系統**改用 Gateway 單一入口**,取消自有帳號與「職級 × 部門」權限;權限(含應用 / 選單 / Tab / 按鈕)以 BFF 為唯一來源,本系統提供各應用的權限設定畫面;新增應用切換與路由守衛(無 `it.app.access` 導回員工入口網)。詳見 `../giga-Portal/docs/PRD.md` D2、§9.2(I1–I5)與 Gateway PRD v0.7;本文件 FR-1.x、FR-2.x 將於實作時改寫。Q4 由此定案 |
 | v0.1.3 | 2026-09-26 | API 路由新增「開發專案」欄(下游 repo 資料夾名稱,取自 Gateway `gw.upstream.project` / OpenAPI `x-gateway.project`,Gateway PRD v0.6)與明細的 **Gherkin 行為規格**(OpenAPI `x-gherkin`);關鍵字搜尋與匯出 CSV 含開發專案(FR-4.3) |
@@ -77,6 +78,21 @@
 | `SYS` | 系統課 | 伺服器、虛擬化、AD、Gateway 維運 |
 | `DEV` | 程式開發課 | MES、HRM、入口網與內部系統開發 |
 | `SEC` | 資安課 | 弱點掃描、端點防護、稽核 |
+
+> 上表為 v0.1 的**虛構**部門(示範帳號用);測試區 / 正式區新資料檔的部門主管為未指定。實際組織見 §5.2.1。
+
+#### 5.2.1 改綁 Gateway 部門(v0.1.6 建議,待確認)
+
+依 v0.1.4 決策(改用 Gateway 單一入口、權限以 BFF 為唯一來源),部門**不在本系統維護**,改綁 Gateway:
+
+| 項目 | 現況(Gateway 已實作) | 本系統的做法 |
+| --- | --- | --- |
+| 部門資料 | `gw.department`:worker 每小時自 BPM 同步部門樹(例:`S1800` 資訊服務部 → `S1810` 網路通訊課、`S1820` 資訊應用課) | 不複製;需要顯示時呼叫 BFF `GET /api/admin/departments`(**不可直連 BFF 資料庫**,AGENT.md §6) |
+| 誰能進 `/it/` | `gw.role_rule` 依 `dept_code` + `include_sub_depts` 自動指派角色 | 在 Gateway 建 IT 管理系統角色(含 `it.app.access` 與功能權限),規則 `dept_code = S1800`、含下層部門 |
+| 課別差異(取代「部門限制」) | 同一角色可有多條規則;不同角色各自規則 | 對 `S1810`、`S1820` 各加規則對應不同角色(例:發佈權限只給特定課) |
+| 人員異動 | 到職 / 調動由 BPM 同步,一小時內生效 | 不再手動建帳號、指定部門 |
+
+不採用的做法:在本系統「部門」頁手動新增 `S1810` / `S1820`(兩份資料,且此頁在改用單一入口後移除);本系統直連 `gw.department`(違反 AGENT.md §6)。改用單一入口前,現有 4 個虛構部門維持不動。待確認事項見 Q9–Q11。
 
 ### 5.3 使用者故事(總覽)
 
@@ -287,3 +303,6 @@
 | Q6 | 儀表板真實資料來源(監控、工單系統) | Nginx JSON 日誌 / Prometheus;工單待確認系統 | 待決 |
 | Q7 | 稽核保存期限 | 至少 1 年,改資料庫後實作 | 待決 |
 | Q8 | 何時改用 `@giganexus/web-kit` 呼叫 Gateway(目前 web-kit 只在 Gateway repo 內,尚未發佈) | 加入端點寫入功能(FR-8.5)前:複製一份到本 repo 或等公司 Package Registry | 待決 |
+| Q9 | 虛構的 4 課(網管 / 系統 / 程式開發 / 資安)如何對應實際組織(只有 `S1810` 網路通訊課、`S1820` 資訊應用課)?系統、資安工作歸屬哪個單位 | 決定 Gateway 角色規則怎麼切(§5.2.1) | 待決 |
+| Q10 | 子公司 IT 人員的部門代碼不同時,是否也能進 IT 管理系統 | 需要的話每家公司各加一條角色規則 | 待決 |
+| Q11 | 何時實作 v0.1.4 改用單一入口(含 §5.2.1 部門綁定) | 先出實作計畫再排入甘特圖 | 待決 |
