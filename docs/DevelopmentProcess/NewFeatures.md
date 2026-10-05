@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-05 權限查詢(唯讀)與權限設定分工
+- 內容:「BFF 權限」改名**權限查詢**(Gateway 管理,唯讀):角色權限總覽移除編輯並連到權限設定;誰能存取補上直接授予的部門 / 個人;關係圖左欄加入部門(× 職級門檻)與個人(BFF `GET /api/admin/direct-grants`)。「角色與按鈕權限」改名**權限設定**(系統管理),為唯一的權限編輯入口。選單權限名稱同步(`deploy/gateway-rbac.yaml`)。
+- 修正(web-kit,Gateway repo):`/api/auth/me` 遇 401 未先 Refresh,Access Token 過期或權限版本遞增後換頁會被導回登入頁;本系統重新建置後套用。
+- 檔案:`frontend/src/router.ts`、`frontend/src/api/{auth,admin}.ts`、`frontend/src/pages/gateway/{RoleMatrix,WhoCanAccess,RbacGraph}.vue`、`frontend/src/pages/{Forbidden,dashboard/GatewaySummary}.vue`、`deploy/gateway-rbac.yaml`、`AGENT.md`、`docs/PROJECT-MAP.md`
+
 ## 2026-10-05 部門權限 / 個人權限 Tab(Gateway PRD §8.3.4 v0.12)
 - 內容:「角色與按鈕權限」新增兩個 Tab,選單 / Tab / 按鈕權限可直接授予部門與個人,不必建角色或規則。
   - **部門權限**:左側部門樹(只列開放公司,● = 此應用直接設定數),右側權限樹 × 職級門檻(全員 / 課級 ≤7 / 理級 ≤6 / 處級 ≤4);含下層部門開關;◐ = 自上層部門繼承(不能取消)、「含」= 已由較寬門檻涵蓋。
