@@ -4,6 +4,7 @@
 > - 管理資料直接呼叫 Gateway BFF 管理 API `/api/admin/*`(Gateway PRD §8.7;呼叫與型別集中在 `frontend/src/api/admin.ts`),不再經 itapp-api。
 > - 本系統自己的資料為 **§0 `/api/it/*`**,經 BFF 路由表轉給 itapp-api。
 > - §1 之後的 `/it/api/*`(自有登入)為**過渡期保留**,前端已不使用,測試區驗收後移除。
+> - **權限(2026-10-05 起)**:選單 / Tab / 按鈕改為 Gateway BFF 的權限節點並綁定 API(Gateway PRD §8.3.2、FRONTEND-GUIDE §7.5),設定在「選單管理」「權限設定」(BFF `/api/admin/permissions`、`/dept-permissions`、`/user-permissions`)。本文件 §1 之後的職級 × 部門權限 API(`/it/api/rbac/*` 等)同屬**過渡期**,僅供參考。
 >
 > 行為驗收見 [Gherkin/](Gherkin/README.md)。
 

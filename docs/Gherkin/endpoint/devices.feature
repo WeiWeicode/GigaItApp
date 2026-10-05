@@ -1,4 +1,5 @@
 # language: zh-TW
+# 過渡期(2026-10-05):本檔描述 v0.1 自有登入 / 自有權限(/it/api/*、職級 × 部門),前端已改用 Gateway 單一入口與畫面權限模型(Gateway PRD §8.3.2),測試區驗收後隨 /it/api/* 一併移除。現行行為見 auth/gateway-sso.feature。
 @v0.1
 功能: 端點管理 — 電腦清單(經 Gateway BFF)
   為了在 IT 管理系統查看使用者電腦上 Agent 的連線狀況
