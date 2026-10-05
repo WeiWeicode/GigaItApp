@@ -52,7 +52,8 @@
 | 端點管理 | 前端直接呼叫 `/api/endpoint/*`,經 BFF 到 Endpoint Server,**權限以 BFF 為準**(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8) |
 | 工作區 | 與 `../giga-api-gateway-bff/`(上位規範、web-kit、開發用憑證)、`../giga-Portal/`(員工入口網:單一入口與應用切換起點;**本系統負責設定其選單 / Tab / 按鈕權限**)同層;規則見 Gateway `AGENT.md` §10 |
 | 權限查詢 | 「權限查詢」畫面(Gateway 管理,**唯讀**):角色權限總覽、誰能存取(含部門 / 個人直接授予)、關係圖(角色 / 部門 / 個人 → 權限 → API);不提供編輯 |
-| 權限設定 | 「權限設定」畫面(系統管理,唯一的權限編輯入口)設定各應用(員工入口網、本系統…)的應用 / 選單 / Tab / 按鈕 × 角色、角色指派規則(公司 / 部門〔含下層〕/ 職級 / 職稱)、**部門權限**(含下層、職級門檻)與**個人權限**(直接授予,不經角色)、權限試算;以使用者身分寫入 BFF(需 `gw.admin.rbac.write`) |
+| 選單管理 | 「選單管理」畫面(系統管理):各應用的選單 / Tab / 按鈕清單改名稱、上層、排序,新增或刪除;`gateway-rbac.yaml` 只負責首次登記。側欄與頁首名稱以 BFF 名稱(`/api/auth/me` 的 `menus`)為準 |
+| 權限設定 | 「權限設定」畫面(系統管理,唯一的權限編輯入口;含 **API 權限** Tab:純 API 權限 × 角色)設定各應用(員工入口網、本系統…)的應用 / 選單 / Tab / 按鈕 × 角色、角色指派規則(公司 / 部門〔含下層〕/ 職級 / 職稱)、**部門權限**(含下層、職級門檻)與**個人權限**(直接授予,不經角色)、權限試算;以使用者身分寫入 BFF(需 `gw.admin.rbac.write`) |
 | 目錄 | `backend/`(Fastify,itapp-api)、`frontend/`(Vue 3 + Vite)、`deploy/`(compose)、`docs/DevelopmentProcess/`(修正紀錄);**各目錄與檔案職責見專案地圖 `docs/PROJECT-MAP.md`** |
 
 `/api/it/*` 依下游樣本「只信任 `X-Internal-Token`」;路由以 `deploy/gateway-routes.yaml`(CLI apply)或「服務與路由」畫面登記,尚未採用 OpenAPI 自動註冊。過渡期保留的 `/it/api/*` 仍為自有登入,只供舊測試使用。

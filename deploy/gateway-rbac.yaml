@@ -4,6 +4,7 @@
 #
 # 內容:
 #   ① 本系統的選單權限(系統代碼 it,kind / parent / sort 供「權限設定 › 應用權限」樹狀設定)
+#      只負責首次登記:已存在的權限不覆寫名稱、上層與排序,之後在「系統管理 › 選單管理」調整(2026-10-05)
 #      資料與按鈕權限直接使用 BFF 管理 API 的 gw.admin.*(按鈕 = API),不在此重複登記
 #   ② 角色 it-admin:IT 管理系統全部選單;成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
 #      (此處不寫 adGroups / companies,套用時不會覆蓋 IT 在畫面上的設定;permissions 會整組取代,新增選單請改此檔)
@@ -19,6 +20,7 @@ permissions:
   - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.app.access, sort: 40 }
   - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.app.access, sort: 50 }
   - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.app.access, sort: 60 }
+  - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.app.access, sort: 65 }
   - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.app.access, sort: 70 }
 
 roles:
@@ -33,4 +35,5 @@ roles:
       - it.endpoint-device.read
       - it.sys-user.read
       - it.sys-role.read
+      - it.sys-menu.read
       - it.sys-audit.read

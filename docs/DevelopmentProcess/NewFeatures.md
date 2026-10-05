@@ -2,6 +2,13 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-05 選單管理、API 權限 Tab
+- 內容:
+  - **選單管理**(系統管理,新選單 `it.sys-menu.read`):各應用「應用 → 選單 → Tab → 按鈕」清單的改名稱、上層、排序、說明,新增與刪除;原「權限設定 › 應用權限」的新增功能移到此頁。程式(`gateway-rbac.yaml` / OpenAPI)只負責首次登記,BFF `apply` 不再覆寫已存在權限的上層與排序(名稱本來就不覆寫)。
+  - **側欄 / 頁首名稱以 BFF 為準**:`/api/auth/me` 的 `menus` 回傳擁有的畫面權限與名稱,`menuTitle()` 優先使用,沒有時用前端預設文字。
+  - **權限設定 › API 權限**:沒有畫面的純 API 權限(kind = api)× 角色,可編輯(保留角色的其他權限)。
+- 檔案:`frontend/src/pages/system/{MenuManage,ApiPermissions,AppPermissions}.vue`、`frontend/src/api/{auth,admin}.ts`、`frontend/src/layouts/TabbedPage.vue`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`AGENT.md`
+
 ## 2026-10-05 權限查詢(唯讀)與權限設定分工
 - 內容:「BFF 權限」改名**權限查詢**(Gateway 管理,唯讀):角色權限總覽移除編輯並連到權限設定;誰能存取補上直接授予的部門 / 個人;關係圖左欄加入部門(× 職級門檻)與個人(BFF `GET /api/admin/direct-grants`)。「角色與按鈕權限」改名**權限設定**(系統管理),為唯一的權限編輯入口。選單權限名稱同步(`deploy/gateway-rbac.yaml`)。
 - 修正(web-kit,Gateway repo):`/api/auth/me` 遇 401 未先 Refresh,Access Token 過期或權限版本遞增後換頁會被導回登入頁;本系統重新建置後套用。

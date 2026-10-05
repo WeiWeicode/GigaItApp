@@ -5,10 +5,15 @@
  */
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { menuTitle } from '@/api/auth';
 import type { TabItem } from '@/ui/components/GTabs.vue';
 
 const route = useRoute();
-const page = computed(() => route.matched[1]!.meta as { title: string; description?: string; icon?: string; tabs?: TabItem[]; eyebrow?: string });
+const page = computed(() => {
+  const m = route.matched[1]!.meta as { title: string; permission?: string; description?: string; icon?: string; tabs?: TabItem[]; eyebrow?: string };
+  // 頁首標題與側欄一致:以 BFF 的選單權限名稱為準
+  return { ...m, title: menuTitle(m.permission, m.title) };
+});
 </script>
 
 <template>

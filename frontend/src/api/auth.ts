@@ -25,6 +25,7 @@ export const IT = {
   endpointDevice: 'it.endpoint-device.read',
   sysUser: 'it.sys-user.read',
   sysRole: 'it.sys-role.read',
+  sysMenu: 'it.sys-menu.read',
   sysAudit: 'it.sys-audit.read',
 } as const;
 
@@ -64,6 +65,10 @@ export function can(code: string): boolean {
 }
 export function canAll(codes: readonly string[] | undefined): boolean {
   return !codes || codes.every((c) => kit.can(c));
+}
+/** 選單 / 頁面名稱:以 BFF 的權限名稱為準(「選單管理」可改名),沒有時用前端預設文字 */
+export function menuTitle(permission: string | undefined, fallback: string): string {
+  return kit.nameOf(permission) ?? fallback;
 }
 
 export interface MenuItem {
@@ -107,6 +112,7 @@ const MENU: readonly MenuGroup[] = [
     children: [
       { key: 'users', title: '人員與部門', path: '/system/users', permission: IT.sysUser, requires: [GW.userRead] },
       { key: 'permissions', title: '權限設定', path: '/system/permissions', permission: IT.sysRole, requires: [GW.rbacRead] },
+      { key: 'menus', title: '選單管理', path: '/system/menus', permission: IT.sysMenu, requires: [GW.rbacRead] },
       { key: 'audit', title: '稽核紀錄', path: '/system/audit', permission: IT.sysAudit, requires: [GW.auditRead] },
     ],
   },
@@ -118,7 +124,10 @@ export function useAuth() {
     user: kit.user,
     permissions: kit.permissions,
     menus: computed(() =>
-      MENU.map((g) => ({ ...g, children: g.children.filter((c) => can(c.permission) && canAll(c.requires)) })).filter((g) => g.children.length),
+      MENU.map((g) => ({
+        ...g,
+        children: g.children.filter((c) => can(c.permission) && canAll(c.requires)).map((c) => ({ ...c, title: menuTitle(c.permission, c.title) })),
+      })).filter((g) => g.children.length),
     ),
     can,
     canAll,

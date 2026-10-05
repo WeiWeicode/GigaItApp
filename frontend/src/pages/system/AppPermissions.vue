@@ -2,11 +2,11 @@
 /**
  * 應用權限(giga-Portal PRD I4、Gateway PRD §8.3.2):選一個應用,以樹狀「應用 → 選單 → Tab → 按鈕」× 角色矩陣檢視與設定。
  *   資料:GET /api/admin/apps、/api/admin/permissions?tree=1&app=、角色與角色權限(composables/bffRbac)
- *   設定:點角色欄的「編輯」勾選後儲存(PUT /api/admin/roles/:role/permissions,會保留該角色在其他應用的權限);
- *        新增選單 / Tab / 按鈕權限(POST /api/admin/permissions)。寫入需 gw.admin.rbac.write。
+ *   設定:點角色欄的「編輯」勾選後儲存(PUT /api/admin/roles/:role/permissions,會保留該角色在其他應用的權限)。寫入需 gw.admin.rbac.write。
+ *   新增 / 改名 / 排序選單、Tab、按鈕在「系統管理 › 選單管理」。
  * 應用與其 app 權限由各應用的 gateway-rbac.yaml(CLI apply)登記;按鈕權限通常等於 API 權限,由後端 OpenAPI x-permissions 匯入。
  */
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { rbac, type PermNode } from '@/api/admin';
 import { can, GW } from '@/api/auth';
 import { describeError } from '@/api/http';
@@ -96,36 +96,6 @@ async function save() {
 const has = (role: string, code: string) => (editing.value === role ? draft.value.has(code) : !!grants.value.get(role)?.has(code));
 const countIn = (role: string) => flat.value.filter((f) => has(role, f.node.code)).length;
 
-// ---- 新增權限節點 ----
-const addOpen = ref(false);
-const form = reactive({ code: '', name: '', kind: 'menu', parentCode: '', sort: '' });
-const adding = ref(false);
-const parentOptions = computed(() => flat.value.map((f) => ({ label: `${'　'.repeat(f.depth)}${f.node.name}(${f.node.code})`, value: f.node.code })));
-function openAdd(parent?: PermNode) {
-  const p = parent ?? flat.value[0]?.node;
-  const prefix = p ? p.code.split('.')[0] : app.value;
-  Object.assign(form, { code: `${prefix}.`, name: '', kind: p?.kind === 'menu' ? 'button' : 'menu', parentCode: p?.code ?? '', sort: '' });
-  addOpen.value = true;
-}
-async function add() {
-  adding.value = true;
-  try {
-    await rbac.createPermission({
-      code: form.code.trim(),
-      name: form.name.trim(),
-      kind: form.kind,
-      parentCode: form.parentCode || null,
-      sort: form.sort ? Number(form.sort) : null,
-    });
-    toast.success('已新增權限', form.code);
-    addOpen.value = false;
-    await Promise.all([tree.reload(), reload()]);
-  } catch (e) {
-    toast.fromError(e, '新增失敗');
-  } finally {
-    adding.value = false;
-  }
-}
 const canWrite = computed(() => can(GW.rbacWrite));
 </script>
 
@@ -139,7 +109,6 @@ const canWrite = computed(() => can(GW.rbacWrite));
       </template>
       <template v-else>
         <GButton icon="refresh" @click="(tree.reload(), reload())">重新整理</GButton>
-        <GButton v-if="canWrite" variant="primary" icon="plus" :disabled="!flat.length" @click="openAdd()">新增權限</GButton>
       </template>
     </Teleport>
 
@@ -148,7 +117,7 @@ const canWrite = computed(() => can(GW.rbacWrite));
         <span class="muted small">應用</span>
         <GSelect v-model="app" :options="appOptions" icon="apps" :disabled="!!editing" />
         <span class="spacer" />
-        <span class="faint xs">勾選子項會自動勾選上層;取消上層會一併取消子項</span>
+        <span class="faint xs">勾選子項會自動勾選上層;取消上層會一併取消子項 · 新增或改名請到<RouterLink to="/system/menus">選單管理</RouterLink></span>
       </div>
     </GCard>
 
@@ -184,7 +153,6 @@ const canWrite = computed(() => can(GW.rbacWrite));
                     <span>{{ f.node.name }}</span>
                     <code>{{ f.node.code }}</code>
                   </div>
-                  <GButton v-if="canWrite && !editing" size="sm" variant="ghost" square icon="plus" title="新增下層權限" class="add" @click="openAdd(f.node)" />
                 </div>
               </th>
               <td v-for="r in roles" :key="r.code" class="cell" :class="{ editing: editing === r.code }">
@@ -202,33 +170,6 @@ const canWrite = computed(() => can(GW.rbacWrite));
         </table>
       </div>
     </GCard>
-
-    <GModal v-model:open="addOpen" title="新增權限" icon="key" width="520px">
-      <form id="perm-form" class="stack" style="--gap: 14px" @submit.prevent="add">
-        <GSelect v-model="form.parentCode" label="上層" :options="parentOptions" required />
-        <div class="grid" style="grid-template-columns: 1fr 140px; --gap: 12px">
-          <GInput v-model="form.code" label="權限代碼" placeholder="例:it.report.export" required hint="{系統}.{資源}.{動作},建立後不可改" />
-          <GSelect
-            v-model="form.kind"
-            label="類型"
-            :options="[
-              { label: '選單', value: 'menu' },
-              { label: 'Tab', value: 'tab' },
-              { label: '按鈕', value: 'button' },
-            ]"
-          />
-        </div>
-        <div class="grid" style="grid-template-columns: 1fr 120px; --gap: 12px">
-          <GInput v-model="form.name" label="名稱" required />
-          <GInput v-model="form.sort" label="排序" type="number" />
-        </div>
-        <p class="faint xs" style="margin: 0">新權限不會自動授予任何角色;建立後在矩陣中勾選。前端需以同一代碼控制選單 / Tab / 按鈕顯示才有作用。</p>
-      </form>
-      <template #footer>
-        <GButton variant="ghost" @click="addOpen = false">取消</GButton>
-        <GButton variant="primary" icon="save" type="submit" form="perm-form" :loading="adding">新增</GButton>
-      </template>
-    </GModal>
   </div>
 </template>
 
@@ -305,13 +246,6 @@ const canWrite = computed(() => can(GW.rbacWrite));
 .pn code {
   font-size: var(--fs-xs);
   color: var(--text-3);
-}
-.add {
-  margin-left: auto;
-  opacity: 0;
-}
-tr:hover .add {
-  opacity: 1;
 }
 .cell {
   text-align: center;
