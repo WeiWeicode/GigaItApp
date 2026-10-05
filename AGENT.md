@@ -48,7 +48,7 @@
 | 子路徑 | `/it/`(取代 Gateway 原本的範例 IT 頁面,Nginx 對應 `/srv/www/it-admin/current`) |
 | API | **`/api/*` 經 Gateway BFF**:管理資料直接呼叫 BFF 管理 API `/api/admin/*`(以使用者本人身分);本系統自己的資料 `/api/it/*` 由 BFF 依路由表轉給 `itapp-api:51291`(只驗證 `X-Internal-Token`,`backend/src/gateway/plugin.ts`)。舊的 `/it/api/*`(Nginx 直通、自有登入)**過渡期保留**,前端已不使用,測試區驗收後移除 |
 | 登入 | **Gateway 單一入口**(2026-10-02 實作,giga-Portal PRD D2、§9.2 I1–I3):前端以 `@giganexus/web-kit` 取得 `/api/auth/me`,未登入導向入口網 `/login?redirect=/it/...`,沒有 `it.app.access` 導回入口網 `/`;不再有自有登入頁、Session、CSRF |
-| 權限 | 選單權限 `it.*`(kind `menu`,上層 `it.app.access`)登記在 `deploy/gateway-rbac.yaml`,角色 `it-admin`;資料與按鈕權限直接用 BFF 的 `gw.admin.*`(按鈕 = API)。頁面 / 選單可見 = 選單權限 ∩ 該頁需要的 BFF 讀取權限(`frontend/src/api/auth.ts`) |
+| 權限 | 目錄 / 選單 / Tab / 按鈕權限 `it.*` 登記在 `deploy/gateway-rbac.yaml`(首次登記,之後以「選單管理」為準),各節點以 `includes` 綁定用到的 BFF API(`gw.admin.*`;按鈕綁寫入),授予節點即一併取得;角色 `it-admin` 擁有全部。前端:選單 `IT.*`、Tab / 按鈕 `UI.*`(`frontend/src/api/auth.ts`);頁面 / 選單可見 = 選單權限 ∩ 該頁需要的 BFF 讀取權限 |
 | 端點管理 | 前端直接呼叫 `/api/endpoint/*`,經 BFF 到 Endpoint Server,**權限以 BFF 為準**(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8) |
 | 工作區 | 與 `../giga-api-gateway-bff/`(上位規範、web-kit、開發用憑證)、`../giga-Portal/`(員工入口網:單一入口與應用切換起點;**本系統負責設定其選單 / Tab / 按鈕權限**)同層;規則見 Gateway `AGENT.md` §10 |
 | 權限查詢 | 「權限查詢」畫面(Gateway 管理,**唯讀**):角色權限總覽、誰能存取(含部門 / 個人直接授予)、關係圖(角色 / 部門 / 個人 → 權限 → API);不提供編輯 |

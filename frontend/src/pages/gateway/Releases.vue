@@ -6,10 +6,14 @@
  */
 import { computed, ref } from 'vue';
 import { gw, type Release } from '@/api/admin';
+import { can, UI } from '@/api/auth';
 import { describeError } from '@/api/http';
 import { fmtTime, fromNow } from '@/api/format';
 import { useAsync } from '@/composables/useAsync';
 import { confirm, toast } from '@/ui';
+
+/** 發佈 / 回滾按鈕(it.gw-service.publish,綁定 gw.admin.release) */
+const canPublish = computed(() => can(UI.svcPublish));
 
 const { data, loading, error, reload } = useAsync(() => gw.releases());
 const items = computed(() => data.value?.items ?? []);
@@ -66,7 +70,7 @@ const pv = computed(() => preview.data.value);
   <div class="stack" style="--gap: 16px">
     <Teleport to="#page-actions" defer>
       <GButton icon="refresh" :loading="loading" @click="refresh">重新整理</GButton>
-      <GButton variant="primary" icon="rocket" @click="openPublish">發佈草稿{{ pv?.drafts.length ? `(${pv.drafts.length})` : '' }}</GButton>
+      <GButton v-if="canPublish" variant="primary" icon="rocket" @click="openPublish">發佈草稿{{ pv?.drafts.length ? `(${pv.drafts.length})` : '' }}</GButton>
     </Teleport>
 
     <GCard v-if="error">
@@ -83,7 +87,7 @@ const pv = computed(() => preview.data.value);
         <GBadge v-if="pv.diff.upstreamsChanged" tone="violet">上游變更</GBadge>
         <GBadge v-if="pv.diff.policiesChanged" tone="warning">限流變更</GBadge>
         <span class="spacer" />
-        <GButton size="sm" variant="primary" icon="rocket" @click="openPublish">檢視並發佈</GButton>
+        <GButton v-if="canPublish" size="sm" variant="primary" icon="rocket" @click="openPublish">檢視並發佈</GButton>
       </div>
     </GCard>
 
@@ -99,7 +103,7 @@ const pv = computed(() => preview.data.value);
               <GBadge v-if="r.rolledBackFrom" tone="warning" icon="undo">回滾自 v{{ r.rolledBackFrom }}</GBadge>
               <span class="spacer" />
               <span class="faint xs" :title="fmtTime(r.publishedAt)">{{ fromNow(r.publishedAt) }}</span>
-              <GButton v-if="i > 0" size="sm" variant="ghost" icon="undo" @click="rollback(r)">回滾到此版</GButton>
+              <GButton v-if="canPublish && i > 0" size="sm" variant="ghost" icon="undo" @click="rollback(r)">回滾到此版</GButton>
             </div>
             <p class="note">{{ r.note ?? '(無說明)' }}</p>
             <div class="row meta" style="--gap: 6px">

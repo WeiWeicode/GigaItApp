@@ -7,7 +7,7 @@
 #      只負責首次登記:已存在的權限不覆寫名稱、上層與排序,之後在「系統管理 › 選單管理」調整(2026-10-05)
 #      includes = 此頁需要的 API 讀取權限(隨附:擁有選單即一併擁有),與 frontend/src/api/auth.ts 的 requires 一致
 #      資料與按鈕權限直接使用 BFF 管理 API 的 gw.admin.*(按鈕 = API),不在此重複登記
-#   ② 角色 it-admin:IT 管理系統全部選單;成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
+#   ② 角色 it-admin:IT 管理系統全部選單、Tab、按鈕;成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
 #      (此處不寫 adGroups / companies,套用時不會覆蓋 IT 在畫面上的設定;permissions 會整組取代,新增選單請改此檔)
 #   上游 itapp-api 與 /api/it/* 路由在 gateway-routes.yaml(apply 會把路由設回草稿,不隨 CI 每次套用)
 # 測試區與正式區設定不互通(Gateway PRD Q3),兩區各自套用;正式區的上游位址於 2026-12 建置時調整 targets.prod。
@@ -29,10 +29,43 @@ permissions:
   - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.group.system, sort: 65, includes: [gw.admin.rbac.read] }
   - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.group.system, sort: 70, includes: [gw.admin.audit.read] }
 
+  # Tab / 按鈕(kind tab / button,掛在所屬選單下;includes = 用到的 API,授予即一併取得)
+  - { code: it.dashboard.overview, name: 營運總覽, kind: tab, parent: it.dashboard.read, sort: 10 }
+  - { code: it.dashboard.gateway, name: Gateway 概況, kind: tab, parent: it.dashboard.read, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read] }
+  - { code: it.dashboard.team, name: 團隊工作, kind: tab, parent: it.dashboard.read, sort: 30, includes: [gw.admin.rbac.read] }
+  - { code: it.gw-service.upstreams, name: 上游服務, kind: tab, parent: it.gw-service.read, sort: 10, includes: [gw.admin.upstream.read] }
+  - { code: it.gw-service.upstream-edit, name: 新增 / 編輯上游, kind: button, parent: it.gw-service.upstreams, sort: 10, includes: [gw.admin.upstream.write] }
+  - { code: it.gw-service.routes, name: API 路由, kind: tab, parent: it.gw-service.read, sort: 20, includes: [gw.admin.route.read] }
+  - { code: it.gw-service.route-edit, name: 新增 / 編輯 / 停用路由, kind: button, parent: it.gw-service.routes, sort: 10, includes: [gw.admin.route.write] }
+  - { code: it.gw-service.releases, name: 發佈版本, kind: tab, parent: it.gw-service.read, sort: 30, includes: [gw.admin.release] }
+  - { code: it.gw-service.publish, name: 發佈 / 回滾, kind: button, parent: it.gw-service.releases, sort: 10, includes: [gw.admin.release] }
+  - { code: it.gw-rbac.matrix, name: 角色權限總覽, kind: tab, parent: it.gw-rbac.read, sort: 10 }
+  - { code: it.gw-rbac.who, name: 誰能存取, kind: tab, parent: it.gw-rbac.read, sort: 20, includes: [gw.admin.route.read] }
+  - { code: it.gw-rbac.graph, name: 關係圖, kind: tab, parent: it.gw-rbac.read, sort: 30, includes: [gw.admin.route.read] }
+  - { code: it.endpoint-device.list, name: 電腦清單, kind: tab, parent: it.endpoint-device.read, sort: 10 }
+  - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
+  - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
+  - { code: it.sys-user.revoke, name: 強制登出, kind: button, parent: it.sys-user.users, sort: 20, includes: [gw.admin.user.write] }
+  - { code: it.sys-user.disable, name: 停用 / 啟用, kind: button, parent: it.sys-user.users, sort: 30, includes: [gw.admin.user.write] }
+  - { code: it.sys-user.depts, name: 部門, kind: tab, parent: it.sys-user.read, sort: 20, includes: [gw.admin.rbac.read] }
+  - { code: it.sys-role.role-perm, name: 角色權限, kind: tab, parent: it.sys-role.read, sort: 10 }
+  - { code: it.sys-role.role-perm-edit, name: 編輯角色權限, kind: button, parent: it.sys-role.role-perm, sort: 10, includes: [gw.admin.rbac.write] }
+  - { code: it.sys-role.rules, name: 角色與指派規則, kind: tab, parent: it.sys-role.read, sort: 20 }
+  - { code: it.sys-role.rules-edit, name: 編輯角色 / 規則 / AD 群組, kind: button, parent: it.sys-role.rules, sort: 10, includes: [gw.admin.rbac.write] }
+  - { code: it.sys-role.dept, name: 部門權限, kind: tab, parent: it.sys-role.read, sort: 30 }
+  - { code: it.sys-role.dept-edit, name: 編輯部門權限, kind: button, parent: it.sys-role.dept, sort: 10, includes: [gw.admin.rbac.write] }
+  - { code: it.sys-role.user, name: 個人權限, kind: tab, parent: it.sys-role.read, sort: 40, includes: [gw.admin.user.read] }
+  - { code: it.sys-role.user-edit, name: 編輯個人權限, kind: button, parent: it.sys-role.user, sort: 10, includes: [gw.admin.rbac.write] }
+  - { code: it.sys-role.preview, name: 權限試算, kind: tab, parent: it.sys-role.read, sort: 50 }
+  - { code: it.sys-menu.list, name: 選單 / Tab / 按鈕, kind: tab, parent: it.sys-menu.read, sort: 10 }
+  - { code: it.sys-menu.edit, name: 新增 / 編輯 / 刪除, kind: button, parent: it.sys-menu.list, sort: 10, includes: [gw.admin.rbac.write] }
+  - { code: it.sys-audit.ops, name: 操作紀錄, kind: tab, parent: it.sys-audit.read, sort: 10 }
+  - { code: it.sys-audit.logins, name: 登入紀錄, kind: tab, parent: it.sys-audit.read, sort: 20 }
+
 roles:
   - code: it-admin
     name: IT 管理系統管理員
-    description: IT 管理系統全部選單;實際可讀寫的資料依 gw.admin.* 權限(gw-it-admin / gw-super-admin)
+    description: IT 管理系統全部畫面與操作(選單、Tab、按鈕;按鈕綁定的寫入 API 一併取得)
     permissions:
       - it.app.access
       - it.dashboard.read
@@ -43,3 +76,34 @@ roles:
       - it.sys-role.read
       - it.sys-menu.read
       - it.sys-audit.read
+      - it.dashboard.overview
+      - it.dashboard.gateway
+      - it.dashboard.team
+      - it.gw-service.upstreams
+      - it.gw-service.upstream-edit
+      - it.gw-service.routes
+      - it.gw-service.route-edit
+      - it.gw-service.releases
+      - it.gw-service.publish
+      - it.gw-rbac.matrix
+      - it.gw-rbac.who
+      - it.gw-rbac.graph
+      - it.endpoint-device.list
+      - it.sys-user.users
+      - it.sys-user.roles
+      - it.sys-user.revoke
+      - it.sys-user.disable
+      - it.sys-user.depts
+      - it.sys-role.role-perm
+      - it.sys-role.role-perm-edit
+      - it.sys-role.rules
+      - it.sys-role.rules-edit
+      - it.sys-role.dept
+      - it.sys-role.dept-edit
+      - it.sys-role.user
+      - it.sys-role.user-edit
+      - it.sys-role.preview
+      - it.sys-menu.list
+      - it.sys-menu.edit
+      - it.sys-audit.ops
+      - it.sys-audit.logins

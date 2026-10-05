@@ -4,7 +4,7 @@
  * 新增 / 編輯上游需 gw.admin.upstream.write;位址只管理本區(測試區 test / 正式區 prod),修改在下次發佈時生效。
  */
 import { computed, reactive, ref } from 'vue';
-import { GW } from '@/api/auth';
+import { UI } from '@/api/auth';
 import { gw, type Upstream } from '@/api/admin';
 import { describeError } from '@/api/http';
 import { fromNow } from '@/api/format';
@@ -123,7 +123,7 @@ const KEY_BY: Record<string, string> = { user: '每位使用者', ip: '每個 IP
     <Teleport to="#page-actions" defer>
       <GBadge v-if="data" tone="info" icon="globe">本區位址:{{ data.environment }}</GBadge>
       <GButton icon="refresh" :loading="loading" @click="refresh">重新整理</GButton>
-      <GButton v-can="GW.upstreamWrite" variant="primary" icon="plus" @click="openCreate">新增上游</GButton>
+      <GButton v-can="UI.svcUpstreamEdit" variant="primary" icon="plus" @click="openCreate">新增上游</GButton>
     </Teleport>
 
     <GCard v-if="error">
@@ -169,7 +169,7 @@ const KEY_BY: Record<string, string> = { user: '每位使用者', ip: '每個 IP
                 >
                 <span class="spacer" />
                 <GButton size="sm" variant="ghost" icon="activity" :loading="checking === u.upstreamId" title="健康檢查" @click="check(u)" />
-                <GButton v-can="GW.upstreamWrite" size="sm" variant="ghost" icon="edit" @click="openEdit(u)">編輯</GButton>
+                <GButton v-can="UI.svcUpstreamEdit" size="sm" variant="ghost" icon="edit" @click="openEdit(u)">編輯</GButton>
                 <GButton
                   size="sm"
                   variant="ghost"

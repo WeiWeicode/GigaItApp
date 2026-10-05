@@ -8,7 +8,7 @@
  */
 import { computed, reactive, ref, watch } from 'vue';
 import { rbac, type Permission } from '@/api/admin';
-import { can, GW } from '@/api/auth';
+import { can, UI } from '@/api/auth';
 import { describeError } from '@/api/http';
 import { KIND } from '@/composables/appPermTree';
 import { ICON_NAMES } from '@/ui/icons';
@@ -55,7 +55,7 @@ const KIND_OPTIONS = [
   { label: 'Tab', value: 'tab' },
   { label: '按鈕', value: 'button' },
 ];
-const canWrite = computed(() => can(GW.rbacWrite));
+const canWrite = computed(() => can(UI.menuEdit));
 const reload = () => Promise.all([perms.reload(), apps.reload()]);
 
 // ---- 新增 / 編輯 ----
@@ -65,13 +65,29 @@ const form = reactive({ code: '', name: '', kind: 'menu', parentCode: '', sort: 
 /** 圖示用於應用 / 目錄 / 選單(Tab、按鈕不顯示圖示) */
 const ICON_OPTIONS = [{ label: '(不設定)', value: '' }, ...ICON_NAMES.map((n) => ({ label: n, value: n }))];
 const showIcon = computed(() => ['app', 'group', 'menu'].includes(form.kind));
-// ---- 隨附的 API 讀取權限(只限選單 / Tab;擁有此選單即一併擁有,不必另外授予) ----
+// ---- 綁定的 API 權限(擁有此節點即一併擁有;選單只能綁讀取,Tab / 按鈕不限) ----
 const includes = ref<Set<string>>(new Set());
-const showIncludes = computed(() => ['menu', 'tab'].includes(form.kind));
+const showIncludes = computed(() => ['menu', 'tab', 'button'].includes(form.kind));
 const incQ = ref('');
+const allSystems = ref(false);
+const systemOf = (code: string) => code.split('.')[0]!;
+/** 此應用相關的系統:應用本身的系統,加上此應用其他節點已綁定的 API 所屬系統(例:IT 管理系統 → it、gw) */
+const relatedSystems = computed(() => {
+  const out = new Set<string>();
+  if (rows.value[0]) out.add(systemOf(rows.value[0].p.code));
+  for (const r of rows.value) for (const c of r.p.includes ?? []) out.add(systemOf(c));
+  return out;
+});
+/** 已綁定此 API 的其他節點(顯示用) */
+const boundBy = computed(() => {
+  const m = new Map<string, string[]>();
+  for (const r of rows.value) for (const c of r.p.includes ?? []) if (r.p.code !== editing.value?.code) m.set(c, [...(m.get(c) ?? []), r.p.name]);
+  return m;
+});
 const readApis = computed(() =>
   (perms.data.value?.items ?? [])
-    .filter((p) => p.kind === 'api' && p.code.endsWith('.read'))
+    .filter((p) => p.kind === 'api' && (form.kind !== 'menu' || p.code.endsWith('.read')))
+    .filter((p) => allSystems.value || relatedSystems.value.has(p.systemCode) || includes.value.has(p.code))
     .filter((p) => !incQ.value.trim() || p.code.includes(incQ.value.trim()) || p.name.includes(incQ.value.trim()))
     .sort((a, b) => a.code.localeCompare(b.code)),
 );
@@ -108,6 +124,7 @@ function openAdd(parent?: Permission) {
   });
   includes.value = new Set();
   incQ.value = '';
+  allSystems.value = false;
   modal.value = 'add';
 }
 function openEdit(p: Permission) {
@@ -123,6 +140,7 @@ function openEdit(p: Permission) {
   });
   includes.value = new Set(p.includes ?? []);
   incQ.value = '';
+  allSystems.value = false;
   modal.value = 'edit';
 }
 async function submit() {
@@ -222,7 +240,7 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
           <tr>
             <th>名稱 / 代碼</th>
             <th class="num">排序</th>
-            <th>說明 / 隨附的 API 權限</th>
+            <th>說明 / 綁定的 API</th>
             <th v-if="canWrite" class="ops" />
           </tr>
         </thead>
@@ -239,7 +257,7 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
             <td class="num">{{ r.p.sort ?? '—' }}</td>
             <td class="desc muted small">
               {{ r.p.description ?? '' }}
-              <span v-if="r.p.includes?.length" class="incl-chips" :title="'隨附的 API 讀取權限:' + r.p.includes.join('、')">
+              <span v-if="r.p.includes?.length" class="incl-chips" :title="'綁定的 API:' + r.p.includes.join('、')">
                 <GBadge v-for="c in r.p.includes" :key="c" tone="neutral">{{ c }}</GBadge>
               </span>
             </td>
@@ -285,29 +303,43 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
           </div>
         </div>
         <div v-if="showIncludes" class="incl-box">
-          <div class="row" style="--gap: 8px">
-            <span class="small"><b>此頁需要的 API 讀取權限</b>(隨附:擁有此選單即一併擁有)</span>
+          <div class="row" style="--gap: 8px; flex-wrap: wrap">
+            <span class="small"
+              ><b>{{ form.kind === 'menu' ? '此頁需要的 API 讀取權限' : form.kind === 'tab' ? '此 Tab 用到的 API' : '此按鈕呼叫的 API' }}</b
+              >(綁定:擁有此項即一併擁有)</span
+            >
             <span class="spacer" />
-            <GInput v-model="incQ" icon="search" placeholder="搜尋" clearable style="max-width: 180px" />
+            <GCheckbox v-model="allSystems" label="顯示全部系統" />
+            <GInput v-model="incQ" icon="search" placeholder="搜尋" clearable style="max-width: 160px" />
           </div>
+          <p class="faint xs" style="margin: 0">
+            {{ allSystems ? '列出全部系統的 API 權限' : `只列此應用相關的系統:${[...relatedSystems].join('、')}` }}
+            · 選單只能綁讀取(.read);Tab / 按鈕可綁寫入
+          </p>
           <div class="incl-list">
-            <GCheckbox
-              v-for="a in readApis"
-              :key="a.code"
-              :model-value="includes.has(a.code)"
-              :label="`${a.name}(${a.code})`"
-              @update:model-value="toggleInclude(a.code, $event)"
-            />
-            <p v-if="!readApis.length" class="faint xs" style="margin: 0">沒有符合的 API 讀取權限</p>
+            <label v-for="a in readApis" :key="a.code" class="incl-item">
+              <GCheckbox :model-value="includes.has(a.code)" :aria-label="a.code" @update:model-value="toggleInclude(a.code, $event)" />
+              <span class="incl-text">
+                <span
+                  >{{ a.name }} <code class="faint xs">{{ a.code }}</code></span
+                >
+                <span v-if="a.routes?.length" class="routes">
+                  <code v-for="r in a.routes.slice(0, 4)" :key="r.method + r.publicPath">{{ r.method }} {{ r.publicPath }}</code>
+                  <span v-if="a.routes.length > 4" class="faint xs">等 {{ a.routes.length }} 支</span>
+                </span>
+                <span v-else class="faint xs">(尚無路由使用)</span>
+                <span v-if="boundBy.get(a.code)" class="faint xs">已綁定於:{{ boundBy.get(a.code)!.join('、') }}</span>
+              </span>
+            </label>
+            <p v-if="!readApis.length" class="faint xs" style="margin: 0">沒有符合的 API 權限</p>
           </div>
-          <p class="faint xs" style="margin: 0">只能選讀取權限;寫入(按鈕)權限仍需在權限設定另外授予。</p>
         </div>
         <p class="faint xs" style="margin: 0">
           {{
             form.kind === 'group'
               ? '目錄只用來把選單分組(名稱、排序、圖示),不需授予;底下有任一頁可見時才顯示。'
               : modal === 'add'
-                ? '新權限不會自動授予任何人,建立後到「權限設定」勾選。'
+                ? '新權限不會自動授予任何人,建立後到「權限設定」勾選;綁定的 API 隨此項一併授予。'
                 : '改名稱、圖示後,權限設定與使用 BFF 名稱的選單(例如本系統側欄)會跟著更新。'
           }}
         </p>
@@ -332,9 +364,34 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
 .incl-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 200px;
+  gap: 8px;
+  max-height: 260px;
   overflow: auto;
+}
+.incl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+.incl-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+.routes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.routes code {
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--glass);
+  color: var(--text-2);
 }
 .incl-chips {
   display: inline-flex;

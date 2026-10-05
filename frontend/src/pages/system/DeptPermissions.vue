@@ -10,9 +10,9 @@
  */
 import { computed, ref, watch } from 'vue';
 import { rbac, type DeptNode } from '@/api/admin';
-import { can, GW } from '@/api/auth';
+import { can, UI } from '@/api/auth';
 import { describeError } from '@/api/http';
-import { isGroup, KIND, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
+import { isGroup, KIND, tabsUnder, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
 import { useAsync } from '@/composables/useAsync';
 import { confirm, toast } from '@/ui';
 
@@ -20,6 +20,9 @@ const { apps, app, appOptions, tree, flat } = useAppPermTree();
 const tiers = useAsync(() => rbac.jobTiers());
 const tierList = computed(() => tiers.data.value?.items ?? []);
 const depts = useAsync(() => rbac.departments());
+/** 畫面節點綁定的 API 權限(授予節點即一併取得) */
+const allPerms = useAsync(() => rbac.permissions());
+const includesOf = computed(() => new Map((allPerms.data.value?.items ?? []).map((p) => [p.code, p.includes ?? []])));
 const counts = useAsync(() => rbac.deptPermissionCounts(app.value), { immediate: false });
 const countOf = computed(() => new Map((counts.data.value?.items ?? []).map((c) => [c.deptCode, c.count])));
 
@@ -98,7 +101,7 @@ function startEdit() {
 /** 勾選子項時一併勾選同門檻的上層;取消上層時一併取消同門檻的子項 */
 function toggle(f: FlatPerm, tier: string, on: boolean) {
   const s = new Set(draft.value);
-  if (on) [f.node.code, ...f.ancestors].forEach((c) => s.add(key(c, tier)));
+  if (on) [f.node.code, ...f.ancestors, ...(f.node.kind === 'menu' ? tabsUnder(f.node) : [])].forEach((c) => s.add(key(c, tier)));
   else [f.node.code, ...f.descendants].forEach((c) => s.delete(key(c, tier)));
   draft.value = s;
 }
@@ -152,7 +155,7 @@ function cell(code: string, tierIdx: number): { state: Cell; title: string } {
   }
   return { state: 'none', title: '' };
 }
-const canWrite = computed(() => can(GW.rbacWrite));
+const canWrite = computed(() => can(UI.roleDeptEdit));
 const loadError = computed(() => apps.error.value ?? tree.error.value ?? tiers.error.value ?? depts.error.value);
 </script>
 
@@ -248,6 +251,9 @@ const loadError = computed(() => apps.error.value ?? tree.error.value ?? tiers.e
                       <div class="pn">
                         <span>{{ f.node.name }}</span>
                         <code>{{ f.node.code }}</code>
+                        <span v-if="includesOf.get(f.node.code)?.length" class="api-chips" title="綁定的 API:授予此項即一併取得">
+                          <GBadge v-for="c in includesOf.get(f.node.code)" :key="c" tone="neutral">{{ c }}</GBadge>
+                        </span>
                       </div>
                     </div>
                   </th>
@@ -275,6 +281,17 @@ const loadError = computed(() => apps.error.value ?? tree.error.value ?? tiers.e
 </template>
 
 <style scoped>
+.api-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+.api-chips :deep(.g-badge) {
+  font-size: 10px;
+  padding: 0 6px;
+  opacity: 0.8;
+}
 .layout {
   display: grid;
   grid-template-columns: minmax(260px, 340px) 1fr;

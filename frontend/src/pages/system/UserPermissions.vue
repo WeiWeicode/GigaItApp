@@ -10,9 +10,9 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { rbac, users, type EffectivePermissions, type UserRow } from '@/api/admin';
-import { can, GW } from '@/api/auth';
+import { can, UI } from '@/api/auth';
 import { describeError } from '@/api/http';
-import { isGroup, KIND, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
+import { isGroup, KIND, tabsUnder, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
 import { useAsync } from '@/composables/useAsync';
 import { confirm, toast } from '@/ui';
 
@@ -114,6 +114,13 @@ function toggle(f: FlatPerm, on: boolean) {
   if (on) {
     draft.set(f.node.code, draft.get(f.node.code) ?? { validTo: '', reason: null });
     autoAdded.delete(f.node.code);
+    // 勾選單時一併勾它底下的 Tab(按鈕仍需個別勾選)
+    if (f.node.kind === 'menu')
+      for (const t of tabsUnder(f.node))
+        if (!draft.has(t)) {
+          draft.set(t, { validTo: draft.get(f.node.code)?.validTo ?? '', reason: null });
+          autoAdded.add(t);
+        }
     for (const a of f.ancestors)
       if (!draft.has(a)) {
         draft.set(a, { validTo: '', reason: null });
@@ -166,7 +173,7 @@ async function save() {
     saving.value = false;
   }
 }
-const canWrite = computed(() => can(GW.rbacWrite));
+const canWrite = computed(() => can(UI.roleUserEdit));
 const pageError = computed(() => apps.error.value ?? tree.error.value ?? loadError.value ?? personal.error.value);
 const u = computed(() => personal.data.value?.user ?? null);
 </script>

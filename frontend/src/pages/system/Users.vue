@@ -6,7 +6,7 @@
  */
 import { computed, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { can, GW, useAuth } from '@/api/auth';
+import { can, GW, UI, useAuth } from '@/api/auth';
 import { rbac, users, type UserDetail, type UserRow } from '@/api/admin';
 import { describeError } from '@/api/http';
 import { fmtTime, fromNow } from '@/api/format';
@@ -39,7 +39,10 @@ const list = usePaged<UserRow>(
 const AUTH: Record<string, { label: string; tone: string }> = { ad: { label: 'AD', tone: 'primary' }, local: { label: '本機帳號', tone: 'cyan' } };
 const EMPLOYMENT: Record<string, string> = { active: '在職', resigned: '離職' };
 const LOCAL: Record<string, string> = { pending: '待審核', active: '已啟用', locked: '已鎖定', disabled: '已停用', invited: '待啟用' };
-const canWrite = computed(() => can(GW.userWrite));
+/** 按鈕權限:調整角色 / 強制登出 / 停用(各自綁定 gw.admin.user.write) */
+const canRoles = computed(() => can(UI.userRoles));
+const canRevoke = computed(() => can(UI.userRevoke));
+const canDisable = computed(() => can(UI.userDisable));
 
 // ---- 明細 ----
 const detail = ref<UserDetail | null>(null);
@@ -249,7 +252,7 @@ async function saveRoles(u: UserDetail) {
           <div class="row">
             <p class="faint xs strong" style="margin: 0">個別指派角色</p>
             <span class="spacer" />
-            <GButton v-if="canWrite && !roleEdit" size="sm" variant="ghost" icon="edit" @click="startRoleEdit(detail)">調整</GButton>
+            <GButton v-if="canRoles && !roleEdit" size="sm" variant="ghost" icon="edit" @click="startRoleEdit(detail)">調整</GButton>
           </div>
           <template v-if="!roleEdit">
             <div class="row" style="--gap: 6px">
@@ -293,9 +296,14 @@ async function saveRoles(u: UserDetail) {
           有效權限
         </GButton>
         <span class="spacer" />
-        <template v-if="canWrite && detail && !isSelf">
-          <GButton variant="ghost" icon="logout" @click="revoke(detail)">強制登出</GButton>
-          <GButton :variant="detail.isDisabled ? 'primary' : 'danger'" :icon="detail.isDisabled ? 'user-check' : 'user-x'" @click="toggleDisable(detail)">
+        <template v-if="detail && !isSelf">
+          <GButton v-if="canRevoke" variant="ghost" icon="logout" @click="revoke(detail)">強制登出</GButton>
+          <GButton
+            v-if="canDisable"
+            :variant="detail.isDisabled ? 'primary' : 'danger'"
+            :icon="detail.isDisabled ? 'user-check' : 'user-x'"
+            @click="toggleDisable(detail)"
+          >
             {{ detail.isDisabled ? '啟用' : '停用' }}
           </GButton>
         </template>

@@ -2,6 +2,13 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-05 Tab / 按鈕登記為權限並綁定 API;角色權限合併
+- 內容:
+  - 本系統 21 個 Tab、10 個按鈕登記為 `kind tab / button`(`api/auth.ts` 的 `UI`、`deploy/gateway-rbac.yaml`),各自綁定用到的 BFF API(按鈕綁寫入,如「停用 / 啟用」→ `gw.admin.user.write`);路由 Tab、Tab 名稱(以 BFF 為準)、各頁按鈕改用這些代碼。`it-admin` 擁有全部。
+  - 「應用權限」+「API 權限」合併為**角色權限**:每列標示綁定的 API;應用選「未綁定畫面的 API」設定沒綁到畫面的 API。部門 / 個人權限同樣標示綁定的 API。勾選單時自動勾它底下的 Tab(按鈕需個別勾)。
+  - 選單管理綁定 API:選單只能選讀取,Tab / 按鈕可選寫入;只列此應用相關系統(可切換顯示全部),每個 API 列出它保護的路由與已綁定的節點。
+- 檔案:`frontend/src/api/{auth,admin}.ts`、`frontend/src/router.ts`、`frontend/src/layouts/TabbedPage.vue`、`frontend/src/composables/appPermTree.ts`、`frontend/src/pages/system/{AppPermissions,DeptPermissions,UserPermissions,MenuManage,RoleRules,Users}.vue`、`frontend/src/pages/gateway/{Upstreams,Routes,Releases}.vue`;移除 `ApiPermissions.vue`;`deploy/gateway-rbac.yaml`
+
 ## 2026-10-05 API 權限也能給部門 / 個人
 - 內容:「部門權限」「個人權限」的應用下拉新增「API 權限(無畫面,含寫入)」,依系統分組列出純 API 權限(BFF `app = '@api'`),部門可依職級門檻、個人可設到期日;「API 權限」Tab 仍授予角色。個人權限的來源欄新增「隨選單」。
 - 檔案:`frontend/src/composables/appPermTree.ts`、`frontend/src/pages/system/{DeptPermissions,UserPermissions,ApiPermissions}.vue`

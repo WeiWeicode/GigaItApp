@@ -20,13 +20,19 @@ export const KIND: Record<string, { label: string; tone: string }> = {
 export type FlatPerm = { node: PermNode; depth: number; ancestors: string[]; descendants: string[] };
 /** 選單目錄只用來分組與命名,不可授予(Gateway PRD §8.3.4) */
 export const isGroup = (n: { kind: string }) => n.kind === 'group';
+/** 勾選選單時一併勾選的下層 Tab(只沿 Tab 往下,按鈕仍需個別勾選) */
+export function tabsUnder(n: PermNode): string[] {
+  return n.children.filter((c) => c.kind === 'tab').flatMap((c) => [c.code, ...tabsUnder(c)]);
+}
 
 /** app 的特殊值:純 API 權限(BFF grants API 同值) */
 export const API_SCOPE = '@api';
 
-/** 純 API 權限依系統分組成樹:系統為分組列(kind = group,不可授予) */
+/** 未綁定畫面的純 API 權限依系統分組成樹(已綁定的隨畫面節點授予):系統為分組列(kind = group,不可授予) */
 async function apiTree(): Promise<{ items: PermNode[] }> {
-  const items = (await rbac.permissions()).items.filter((p) => p.kind === 'api');
+  const all = (await rbac.permissions()).items;
+  const bound = new Set(all.flatMap((p) => p.includes ?? []));
+  const items = all.filter((p) => p.kind === 'api' && !bound.has(p.code));
   const bySys = new Map<string, PermNode[]>();
   for (const p of items.sort((a, b) => a.code.localeCompare(b.code)))
     bySys.set(p.systemCode, [...(bySys.get(p.systemCode) ?? []), { code: p.code, name: p.name, kind: 'api', sort: null, children: [] }]);
@@ -48,7 +54,7 @@ export function useAppPermTree() {
   );
   const appOptions = computed(() => [
     ...(apps.data.value?.items ?? []).map((a) => ({ label: `${a.name}(${a.basePath})`, value: a.code })),
-    { label: 'API 權限(無畫面,含寫入)', value: API_SCOPE },
+    { label: '未綁定畫面的 API', value: API_SCOPE },
   ]);
   const tree = useAsync(() => (app.value === API_SCOPE ? apiTree() : rbac.permissionTree(app.value)), { immediate: false });
   watch(app, (v) => v && tree.reload());

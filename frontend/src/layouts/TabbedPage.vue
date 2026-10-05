@@ -12,7 +12,13 @@ const route = useRoute();
 const page = computed(() => {
   const m = route.matched[1]!.meta as { title: string; permission?: string; description?: string; icon?: string; tabs?: TabItem[]; eyebrow?: string };
   // 頁首標題與側欄一致:以 BFF 的選單權限名稱為準
-  return { ...m, title: menuTitle(m.permission, m.title), icon: m.icon ? menuIcon(m.permission, m.icon) : m.icon };
+  return {
+    ...m,
+    title: menuTitle(m.permission, m.title),
+    icon: m.icon ? menuIcon(m.permission, m.icon) : m.icon,
+    // Tab 名稱同樣以 BFF 為準(「選單管理」可改名)
+    tabs: m.tabs?.map((t) => ({ ...t, label: menuTitle(t.permission, t.label) })),
+  };
 });
 </script>
 

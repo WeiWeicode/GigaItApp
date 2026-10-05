@@ -8,7 +8,7 @@
  */
 import { computed, reactive, ref, watch } from 'vue';
 import { rbac, type Role, type RoleRule } from '@/api/admin';
-import { can, GW } from '@/api/auth';
+import { can, UI } from '@/api/auth';
 import { describeError } from '@/api/http';
 import { fromNow } from '@/api/format';
 import { useAsync } from '@/composables/useAsync';
@@ -24,7 +24,7 @@ watch(
     if (!selectedCode.value && d?.items.length) selectedCode.value = d.items.find((r) => r.code === 'it-admin')?.code ?? d.items[0]!.code;
   },
 );
-const canWrite = computed(() => can(GW.rbacWrite));
+const canWrite = computed(() => can(UI.roleRulesEdit));
 const companyName = (id: number | null) => (id === null ? null : (depts.data.value?.companies.find((c) => c.companyId === id)?.name ?? `#${id}`));
 const companyOptions = computed(() => [
   { label: '不限公司', value: '' },

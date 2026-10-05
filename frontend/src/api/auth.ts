@@ -30,6 +30,44 @@ export const IT = {
   sysAudit: 'it.sys-audit.read',
 } as const;
 
+/**
+ * 本系統的 Tab / 按鈕權限(kind tab / button,掛在所屬選單下;登記在 deploy/gateway-rbac.yaml,名稱可在「選單管理」修改)。
+ * 每個節點綁定它用到的 BFF API 權限(includes):授予 Tab / 按鈕即一併取得,BFF 仍會檢查 API 權限。
+ */
+export const UI = {
+  dashOverview: 'it.dashboard.overview',
+  dashGateway: 'it.dashboard.gateway',
+  dashTeam: 'it.dashboard.team',
+  svcUpstreams: 'it.gw-service.upstreams',
+  svcUpstreamEdit: 'it.gw-service.upstream-edit',
+  svcRoutes: 'it.gw-service.routes',
+  svcRouteEdit: 'it.gw-service.route-edit',
+  svcReleases: 'it.gw-service.releases',
+  svcPublish: 'it.gw-service.publish',
+  rbacMatrix: 'it.gw-rbac.matrix',
+  rbacWho: 'it.gw-rbac.who',
+  rbacGraph: 'it.gw-rbac.graph',
+  devList: 'it.endpoint-device.list',
+  userList: 'it.sys-user.users',
+  userRoles: 'it.sys-user.roles',
+  userRevoke: 'it.sys-user.revoke',
+  userDisable: 'it.sys-user.disable',
+  userDepts: 'it.sys-user.depts',
+  roleRolePerm: 'it.sys-role.role-perm',
+  roleRolePermEdit: 'it.sys-role.role-perm-edit',
+  roleRules: 'it.sys-role.rules',
+  roleRulesEdit: 'it.sys-role.rules-edit',
+  roleDept: 'it.sys-role.dept',
+  roleDeptEdit: 'it.sys-role.dept-edit',
+  roleUser: 'it.sys-role.user',
+  roleUserEdit: 'it.sys-role.user-edit',
+  rolePreview: 'it.sys-role.preview',
+  menuList: 'it.sys-menu.list',
+  menuEdit: 'it.sys-menu.edit',
+  auditOps: 'it.sys-audit.ops',
+  auditLogins: 'it.sys-audit.logins',
+} as const;
+
 /** BFF 管理 API 的權限(Gateway PRD §8.7;按鈕 = API) */
 export const GW = {
   upstreamRead: 'gw.admin.upstream.read',

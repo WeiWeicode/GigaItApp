@@ -1,48 +1,26 @@
 <script setup lang="ts">
 /**
- * 應用權限(giga-Portal PRD I4、Gateway PRD §8.3.2):選一個應用,以樹狀「應用 → 選單 → Tab → 按鈕」× 角色矩陣檢視與設定。
+ * 角色權限(giga-Portal PRD I4、Gateway PRD §8.3.2、§8.3.4):選一個應用,以樹狀「應用 → 目錄 → 選單 → Tab → 按鈕」× 角色矩陣檢視與設定;
+ *   每列標示綁定的 API(授予節點即一併取得)。應用選「未綁定畫面的 API」可設定沒有綁到畫面的 API 權限(系統用 / 特殊用途)。
  *   資料:GET /api/admin/apps、/api/admin/permissions?tree=1&app=、角色與角色權限(composables/bffRbac)
  *   設定:點角色欄的「編輯」勾選後儲存(PUT /api/admin/roles/:role/permissions,會保留該角色在其他應用的權限)。寫入需 gw.admin.rbac.write。
  *   新增 / 改名 / 排序選單、Tab、按鈕在「系統管理 › 選單管理」。
- * 應用與其 app 權限由各應用的 gateway-rbac.yaml(CLI apply)登記;按鈕權限通常等於 API 權限,由後端 OpenAPI x-permissions 匯入。
+ * 應用與其畫面權限由各應用的 gateway-rbac.yaml(CLI apply)首次登記;API 權限由後端 OpenAPI x-permissions 註冊,在選單管理綁到畫面節點。
  */
-import { computed, ref, watch } from 'vue';
-import { rbac, type PermNode } from '@/api/admin';
-import { can, GW } from '@/api/auth';
+import { computed, ref } from 'vue';
+import { rbac } from '@/api/admin';
+import { can, UI } from '@/api/auth';
 import { describeError } from '@/api/http';
+import { KIND, tabsUnder, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
 import { useBffRbac } from '@/composables/bffRbac';
-import { useAsync } from '@/composables/useAsync';
 import { confirm, toast } from '@/ui';
 
-const apps = useAsync(() => rbac.apps());
-const app = ref('');
-watch(
-  () => apps.data.value,
-  (a) => {
-    if (!app.value && a?.items[0]) app.value = a.items.find((x) => x.code === 'it')?.code ?? a.items[0].code;
-  },
-);
-const appOptions = computed(() => (apps.data.value?.items ?? []).map((a) => ({ label: `${a.name}(${a.basePath})`, value: a.code })));
-const tree = useAsync(() => rbac.permissionTree(app.value), { immediate: false });
-watch(app, (v) => v && tree.reload());
-
+const { apps, app, appOptions, tree, flat } = useAppPermTree();
 const { data, grants, reload } = useBffRbac();
 const roles = computed(() => data.value?.roles ?? []);
-
-const KIND: Record<string, { label: string; tone: string }> = {
-  app: { label: '應用', tone: 'success' },
-  menu: { label: '選單', tone: 'primary' },
-  tab: { label: 'Tab', tone: 'cyan' },
-  button: { label: '按鈕', tone: 'violet' },
-  api: { label: 'API', tone: 'neutral' },
-};
-type Flat = { node: PermNode; depth: number };
-const flat = computed<Flat[]>(() => {
-  const out: Flat[] = [];
-  const walk = (l: PermNode[], d: number) => l.forEach((n) => (out.push({ node: n, depth: d }), walk(n.children, d + 1)));
-  walk(tree.data.value?.items ?? [], 0);
-  return out;
-});
+/** 畫面節點綁定的 API 權限(選單管理設定;授予節點即一併取得) */
+const includesOf = computed(() => new Map((data.value?.permissions ?? []).map((p) => [p.code, p.includes ?? []])));
+type Flat = FlatPerm;
 
 // ---- 編輯某角色在此應用的權限 ----
 const editing = ref<string | null>(null);
@@ -52,21 +30,11 @@ function startEdit(role: string) {
   editing.value = role;
   draft.value = new Set(grants.value.get(role) ?? []);
 }
-/** 勾選子項時一併勾選上層(沒有上層權限,選單 / Tab 不會顯示);取消上層時一併取消子項 */
+/** 勾選時一併勾選上層(略過目錄)與選單底下的 Tab;取消時一併取消下層 */
 function toggle(f: Flat, on: boolean) {
   const s = new Set(draft.value);
-  const desc = (n: PermNode): string[] => [n.code, ...n.children.flatMap(desc)];
-  if (on) {
-    s.add(f.node.code);
-    const i = flat.value.indexOf(f);
-    let depth = f.depth;
-    for (let j = i - 1; j >= 0 && depth > 0; j--)
-      if (flat.value[j]!.depth < depth) {
-        // 選單目錄不可授予
-        if (flat.value[j]!.node.kind !== 'group') s.add(flat.value[j]!.node.code);
-        depth = flat.value[j]!.depth;
-      }
-  } else desc(f.node).forEach((c) => s.delete(c));
+  if (on) [f.node.code, ...f.ancestors, ...(f.node.kind === 'menu' ? tabsUnder(f.node) : [])].forEach((c) => s.add(c));
+  else [f.node.code, ...f.descendants].forEach((c) => s.delete(c));
   draft.value = s;
 }
 const diff = computed(() => {
@@ -97,7 +65,7 @@ async function save() {
 const has = (role: string, code: string) => (editing.value === role ? draft.value.has(code) : !!grants.value.get(role)?.has(code));
 const countIn = (role: string) => flat.value.filter((f) => has(role, f.node.code)).length;
 
-const canWrite = computed(() => can(GW.rbacWrite));
+const canWrite = computed(() => can(UI.roleRolePermEdit));
 </script>
 
 <template>
@@ -153,6 +121,9 @@ const canWrite = computed(() => can(GW.rbacWrite));
                   <div class="pn">
                     <span>{{ f.node.name }}</span>
                     <code>{{ f.node.code }}</code>
+                    <span v-if="includesOf.get(f.node.code)?.length" class="api-chips" title="綁定的 API:授予此項即一併取得">
+                      <GBadge v-for="c in includesOf.get(f.node.code)" :key="c" tone="neutral">{{ c }}</GBadge>
+                    </span>
                   </div>
                 </div>
               </th>
@@ -176,6 +147,17 @@ const canWrite = computed(() => can(GW.rbacWrite));
 </template>
 
 <style scoped>
+.api-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+.api-chips :deep(.g-badge) {
+  font-size: 10px;
+  padding: 0 6px;
+  opacity: 0.8;
+}
 .matrix-wrap {
   overflow: auto;
   max-height: calc(100vh - 300px);

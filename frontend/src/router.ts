@@ -9,7 +9,7 @@
  */
 import { redirectToLogin } from '@giganexus/web-kit';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { can, canAll, GW, IT, loadMe } from './api/auth';
+import { can, canAll, GW, IT, loadMe, UI } from './api/auth';
 import { hasCurrentApp } from './composables/apps';
 import AppLayout from './layouts/AppLayout.vue';
 import TabbedPage from './layouts/TabbedPage.vue';
@@ -46,19 +46,19 @@ const routes: RouteRecordRaw[] = [
           description: '服務健康、Gateway 設定與團隊工作的即時概況',
           icon: 'dashboard',
           tabs: [
-            { label: '營運總覽', to: '/dashboard', icon: 'activity' },
-            { label: 'Gateway 概況', to: '/dashboard/gateway', icon: 'gateway', permission: GW.routeRead },
-            { label: '團隊工作', to: '/dashboard/team', icon: 'users', permission: GW.rbacRead },
+            { label: '營運總覽', to: '/dashboard', icon: 'activity', permission: UI.dashOverview },
+            { label: 'Gateway 概況', to: '/dashboard/gateway', icon: 'gateway', permission: UI.dashGateway },
+            { label: '團隊工作', to: '/dashboard/team', icon: 'users', permission: UI.dashTeam },
           ],
         },
         children: [
-          { path: '', component: () => import('./pages/dashboard/Overview.vue'), meta: { tab: '營運總覽' } },
+          { path: '', component: () => import('./pages/dashboard/Overview.vue'), meta: { tab: '營運總覽', permission: UI.dashOverview } },
           {
             path: 'gateway',
             component: () => import('./pages/dashboard/GatewaySummary.vue'),
-            meta: { tab: 'Gateway 概況', requires: [GW.upstreamRead, GW.routeRead] },
+            meta: { tab: 'Gateway 概況', permission: UI.dashGateway, requires: [GW.upstreamRead, GW.routeRead] },
           },
-          { path: 'team', component: () => import('./pages/dashboard/Team.vue'), meta: { tab: '團隊工作', requires: [GW.rbacRead] } },
+          { path: 'team', component: () => import('./pages/dashboard/Team.vue'), meta: { tab: '團隊工作', permission: UI.dashTeam, requires: [GW.rbacRead] } },
         ],
       },
       {
@@ -72,15 +72,19 @@ const routes: RouteRecordRaw[] = [
           description: 'Gateway BFF 的上游服務、API 路由、限流政策與發佈版本;修改後於「發佈版本」發佈才生效',
           icon: 'route',
           tabs: [
-            { label: '上游服務', to: '/gateway/services', icon: 'server' },
-            { label: 'API 路由', to: '/gateway/services/routes', icon: 'route' },
-            { label: '發佈版本', to: '/gateway/services/releases', icon: 'release', permission: GW.release },
+            { label: '上游服務', to: '/gateway/services', icon: 'server', permission: UI.svcUpstreams },
+            { label: 'API 路由', to: '/gateway/services/routes', icon: 'route', permission: UI.svcRoutes },
+            { label: '發佈版本', to: '/gateway/services/releases', icon: 'release', permission: UI.svcReleases },
           ],
         },
         children: [
-          { path: '', component: () => import('./pages/gateway/Upstreams.vue'), meta: { tab: '上游服務' } },
-          { path: 'routes', component: () => import('./pages/gateway/Routes.vue'), meta: { tab: 'API 路由' } },
-          { path: 'releases', component: () => import('./pages/gateway/Releases.vue'), meta: { tab: '發佈版本', requires: [GW.release] } },
+          { path: '', component: () => import('./pages/gateway/Upstreams.vue'), meta: { tab: '上游服務', permission: UI.svcUpstreams } },
+          { path: 'routes', component: () => import('./pages/gateway/Routes.vue'), meta: { tab: 'API 路由', permission: UI.svcRoutes } },
+          {
+            path: 'releases',
+            component: () => import('./pages/gateway/Releases.vue'),
+            meta: { tab: '發佈版本', permission: UI.svcReleases, requires: [GW.release] },
+          },
         ],
       },
       {
@@ -94,15 +98,15 @@ const routes: RouteRecordRaw[] = [
           description: '查看誰擁有哪些權限、某條 API 誰能呼叫(角色、部門、個人);只能查看,設定請到「系統管理 › 權限設定」',
           icon: 'eye',
           tabs: [
-            { label: '角色權限總覽', to: '/gateway/rbac', icon: 'grid' },
-            { label: '誰能存取', to: '/gateway/rbac/who-can-access', icon: 'search' },
-            { label: '關係圖', to: '/gateway/rbac/graph', icon: 'graph' },
+            { label: '角色權限總覽', to: '/gateway/rbac', icon: 'grid', permission: UI.rbacMatrix },
+            { label: '誰能存取', to: '/gateway/rbac/who-can-access', icon: 'search', permission: UI.rbacWho },
+            { label: '關係圖', to: '/gateway/rbac/graph', icon: 'graph', permission: UI.rbacGraph },
           ],
         },
         children: [
-          { path: '', component: () => import('./pages/gateway/RoleMatrix.vue'), meta: { tab: '角色權限總覽' } },
-          { path: 'who-can-access', component: () => import('./pages/gateway/WhoCanAccess.vue'), meta: { tab: '誰能存取' } },
-          { path: 'graph', component: () => import('./pages/gateway/RbacGraph.vue'), meta: { tab: '關係圖' } },
+          { path: '', component: () => import('./pages/gateway/RoleMatrix.vue'), meta: { tab: '角色權限總覽', permission: UI.rbacMatrix } },
+          { path: 'who-can-access', component: () => import('./pages/gateway/WhoCanAccess.vue'), meta: { tab: '誰能存取', permission: UI.rbacWho } },
+          { path: 'graph', component: () => import('./pages/gateway/RbacGraph.vue'), meta: { tab: '關係圖', permission: UI.rbacGraph } },
         ],
       },
       {
@@ -114,9 +118,9 @@ const routes: RouteRecordRaw[] = [
           eyebrow: 'Endpoint',
           description: '經 Gateway BFF 取得的 Agent 基本資料;資料權限以 Gateway 為準',
           icon: 'monitor',
-          tabs: [{ label: '電腦清單', to: '/endpoint/devices', icon: 'monitor' }],
+          tabs: [{ label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList }],
         },
-        children: [{ path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單' } }],
+        children: [{ path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單', permission: UI.devList } }],
       },
       {
         path: 'system/users',
@@ -129,13 +133,17 @@ const routes: RouteRecordRaw[] = [
           description: 'Gateway 使用者(人員同步自 BPM / LOS)、個別指派角色與部門樹',
           icon: 'users',
           tabs: [
-            { label: '人員', to: '/system/users', icon: 'users' },
-            { label: '部門', to: '/system/users/departments', icon: 'building', permission: GW.rbacRead },
+            { label: '人員', to: '/system/users', icon: 'users', permission: UI.userList },
+            { label: '部門', to: '/system/users/departments', icon: 'building', permission: UI.userDepts },
           ],
         },
         children: [
-          { path: '', component: () => import('./pages/system/Users.vue'), meta: { tab: '人員' } },
-          { path: 'departments', component: () => import('./pages/system/Departments.vue'), meta: { tab: '部門', requires: [GW.rbacRead] } },
+          { path: '', component: () => import('./pages/system/Users.vue'), meta: { tab: '人員', permission: UI.userList } },
+          {
+            path: 'departments',
+            component: () => import('./pages/system/Departments.vue'),
+            meta: { tab: '部門', permission: UI.userDepts, requires: [GW.rbacRead] },
+          },
         ],
       },
       {
@@ -149,21 +157,19 @@ const routes: RouteRecordRaw[] = [
           description: '設定各應用的選單 / Tab / 按鈕權限給誰:角色(依公司、部門、職級、職稱自動指派)、部門(含職級門檻)或個人',
           icon: 'key',
           tabs: [
-            { label: '應用權限', to: '/system/permissions', icon: 'grid' },
-            { label: '角色與指派規則', to: '/system/permissions/roles', icon: 'shield' },
-            { label: '部門權限', to: '/system/permissions/departments', icon: 'building' },
-            { label: '個人權限', to: '/system/permissions/users', icon: 'user' },
-            { label: 'API 權限', to: '/system/permissions/api', icon: 'code' },
-            { label: '權限試算', to: '/system/permissions/preview', icon: 'eye' },
+            { label: '角色權限', to: '/system/permissions', icon: 'grid', permission: UI.roleRolePerm },
+            { label: '角色與指派規則', to: '/system/permissions/roles', icon: 'shield', permission: UI.roleRules },
+            { label: '部門權限', to: '/system/permissions/departments', icon: 'building', permission: UI.roleDept },
+            { label: '個人權限', to: '/system/permissions/users', icon: 'user', permission: UI.roleUser },
+            { label: '權限試算', to: '/system/permissions/preview', icon: 'eye', permission: UI.rolePreview },
           ],
         },
         children: [
-          { path: '', component: () => import('./pages/system/AppPermissions.vue'), meta: { tab: '應用權限' } },
-          { path: 'roles', component: () => import('./pages/system/RoleRules.vue'), meta: { tab: '角色與指派規則' } },
-          { path: 'departments', component: () => import('./pages/system/DeptPermissions.vue'), meta: { tab: '部門權限' } },
-          { path: 'users', component: () => import('./pages/system/UserPermissions.vue'), meta: { tab: '個人權限' } },
-          { path: 'api', component: () => import('./pages/system/ApiPermissions.vue'), meta: { tab: 'API 權限' } },
-          { path: 'preview', component: () => import('./pages/system/PermissionPreview.vue'), meta: { tab: '權限試算' } },
+          { path: '', component: () => import('./pages/system/AppPermissions.vue'), meta: { tab: '角色權限', permission: UI.roleRolePerm } },
+          { path: 'roles', component: () => import('./pages/system/RoleRules.vue'), meta: { tab: '角色與指派規則', permission: UI.roleRules } },
+          { path: 'departments', component: () => import('./pages/system/DeptPermissions.vue'), meta: { tab: '部門權限', permission: UI.roleDept } },
+          { path: 'users', component: () => import('./pages/system/UserPermissions.vue'), meta: { tab: '個人權限', permission: UI.roleUser } },
+          { path: 'preview', component: () => import('./pages/system/PermissionPreview.vue'), meta: { tab: '權限試算', permission: UI.rolePreview } },
         ],
       },
       {
@@ -176,9 +182,9 @@ const routes: RouteRecordRaw[] = [
           eyebrow: 'System · 編輯',
           description: '各應用的選單 / Tab / 按鈕清單:改名稱、排序、上層,新增或刪除;要授予誰請到「權限設定」',
           icon: 'list',
-          tabs: [{ label: '選單 / Tab / 按鈕', to: '/system/menus', icon: 'list' }],
+          tabs: [{ label: '選單 / Tab / 按鈕', to: '/system/menus', icon: 'list', permission: UI.menuList }],
         },
-        children: [{ path: '', component: () => import('./pages/system/MenuManage.vue'), meta: { tab: '選單 / Tab / 按鈕' } }],
+        children: [{ path: '', component: () => import('./pages/system/MenuManage.vue'), meta: { tab: '選單 / Tab / 按鈕', permission: UI.menuList } }],
       },
       {
         path: 'system/audit',
@@ -191,13 +197,18 @@ const routes: RouteRecordRaw[] = [
           description: 'Gateway 的管理操作與登入紀錄(預設最近 30 天)',
           icon: 'audit',
           tabs: [
-            { label: '操作紀錄', to: '/system/audit', icon: 'audit' },
-            { label: '登入紀錄', to: '/system/audit/logins', icon: 'login' },
+            { label: '操作紀錄', to: '/system/audit', icon: 'audit', permission: UI.auditOps },
+            { label: '登入紀錄', to: '/system/audit/logins', icon: 'login', permission: UI.auditLogins },
           ],
         },
         children: [
-          { path: '', component: () => import('./pages/system/Audit.vue'), props: { type: 'operation' }, meta: { tab: '操作紀錄' } },
-          { path: 'logins', component: () => import('./pages/system/Audit.vue'), props: { type: 'login' }, meta: { tab: '登入紀錄' } },
+          { path: '', component: () => import('./pages/system/Audit.vue'), props: { type: 'operation' }, meta: { tab: '操作紀錄', permission: UI.auditOps } },
+          {
+            path: 'logins',
+            component: () => import('./pages/system/Audit.vue'),
+            props: { type: 'login' },
+            meta: { tab: '登入紀錄', permission: UI.auditLogins },
+          },
         ],
       },
       { path: '403', component: () => import('./pages/Forbidden.vue'), meta: { title: '沒有權限' } },

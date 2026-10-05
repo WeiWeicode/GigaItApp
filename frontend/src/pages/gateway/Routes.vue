@@ -6,7 +6,7 @@
  */
 import { computed, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { can, GW } from '@/api/auth';
+import { can, GW, UI } from '@/api/auth';
 import { gw, type RouteDetail, type RouteInput, type RouteRow, type RouteTestResult } from '@/api/admin';
 import { describeError } from '@/api/http';
 import { AUTH_MODE, fromNow, METHOD_TONE, ROUTE_STATUS } from '@/api/format';
@@ -243,7 +243,7 @@ async function exportCsv() {
   }
 }
 
-const canWrite = computed(() => can(GW.routeWrite));
+const canWrite = computed(() => can(UI.svcRouteEdit));
 </script>
 
 <template>

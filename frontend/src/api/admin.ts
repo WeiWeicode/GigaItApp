@@ -190,8 +190,10 @@ export interface Permission {
   sort: number | null;
   /** 選單圖示名稱(ui/icons.ts) */
   icon: string | null;
-  /** 選單 / Tab 隨附的 API 讀取權限(擁有此選單即一併擁有) */
+  /** 畫面節點綁定的 API 權限(擁有此節點即一併擁有;選單只能綁讀取) */
   includes?: string[];
+  /** 此權限保護的 API 路由(未停用;清單模式) */
+  routes?: { method: string; publicPath: string }[];
   rowVer: string;
 }
 export interface PermNode {
