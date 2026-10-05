@@ -94,15 +94,41 @@ const editing = ref(false);
 /** code → 到期日(yyyy-mm-dd,空字串 = 永久) */
 const draft = reactive(new Map<string, { validTo: string; reason: string | null }>());
 const saving = ref(false);
+/** 本次編輯自動補上的上層:到期日跟著下層走(取最晚者,任一永久 = 永久) */
+const autoAdded = new Set<string>();
 function startEdit() {
   draft.clear();
+  autoAdded.clear();
   for (const g of personal.data.value?.grants ?? []) draft.set(g.code, { validTo: g.validTo ? dateOf(g.validTo) : '', reason: g.reason });
   editing.value = true;
 }
 /** 勾選子項時一併勾選上層;取消上層時一併取消子項 */
 function toggle(f: FlatPerm, on: boolean) {
-  if (on) [f.node.code, ...f.ancestors].forEach((c) => draft.has(c) || draft.set(c, { validTo: draft.get(f.node.code)?.validTo ?? '', reason: null }));
-  else [f.node.code, ...f.descendants].forEach((c) => draft.delete(c));
+  if (on) {
+    draft.set(f.node.code, draft.get(f.node.code) ?? { validTo: '', reason: null });
+    autoAdded.delete(f.node.code);
+    for (const a of f.ancestors)
+      if (!draft.has(a)) {
+        draft.set(a, { validTo: '', reason: null });
+        autoAdded.add(a);
+      }
+  } else
+    [f.node.code, ...f.descendants].forEach((c) => {
+      draft.delete(c);
+      autoAdded.delete(c);
+    });
+  syncAncestors(f);
+}
+function syncAncestors(f: FlatPerm) {
+  const byCode = new Map(flat.value.map((x) => [x.node.code, x]));
+  for (const a of [...f.ancestors].reverse()) {
+    if (!autoAdded.has(a) || !draft.has(a)) continue;
+    const dates = byCode
+      .get(a)!
+      .descendants.filter((c) => draft.has(c) && !autoAdded.has(c))
+      .map((c) => draft.get(c)!.validTo);
+    draft.get(a)!.validTo = !dates.length || dates.includes('') ? '' : dates.sort().at(-1)!;
+  }
 }
 const diff = computed(() => {
   const cur = mine.value;
@@ -229,6 +255,7 @@ const u = computed(() => personal.data.value?.user ?? null);
                     v-if="draft.has(f.node.code)"
                     v-model="draft.get(f.node.code)!.validTo"
                     type="date"
+                    @change="syncAncestors(f)"
                     class="date"
                     :min="today"
                     :aria-label="`${f.node.name} 到期日(空白 = 永久)`"

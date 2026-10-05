@@ -16,7 +16,10 @@ const expanded = ref<Set<string>>(new Set());
 
 const companies = computed(() => [
   { label: '全部公司', value: '' },
-  ...(data.value?.companies ?? []).map((c) => ({ label: c.name, value: String(c.companyId) })),
+  // 只列有部門的公司(LOS 名稱如「碩禾」在部門樹以 BPM 名稱「碩禾電子材料」出現)
+  ...(data.value?.companies ?? [])
+    .filter((c) => (data.value?.items ?? []).some((d) => d.companyId === c.companyId))
+    .map((c) => ({ label: c.name, value: String(c.companyId) })),
 ]);
 const roots = computed(() => (data.value?.items ?? []).filter((d) => !company.value || String(d.companyId) === company.value));
 
