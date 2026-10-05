@@ -2,6 +2,14 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-05 部門權限 / 個人權限 Tab(Gateway PRD §8.3.4 v0.12)
+- 內容:「角色與按鈕權限」新增兩個 Tab,選單 / Tab / 按鈕權限可直接授予部門與個人,不必建角色或規則。
+  - **部門權限**:左側部門樹(只列開放公司,● = 此應用直接設定數),右側權限樹 × 職級門檻(全員 / 課級 ≤7 / 理級 ≤6 / 處級 ≤4);含下層部門開關;◐ = 自上層部門繼承(不能取消)、「含」= 已由較寬門檻涵蓋。
+  - **個人權限**:搜尋人員,列出此應用的有效權限與來源(角色 / 部門 / 個人),可直接加給個人權限,預設永久、可設到期日。
+  - 勾選子項自動勾選上層、取消上層一併取消子項(BFF 儲存時也會補上層)。
+- 檔案:`frontend/src/api/admin.ts`、`frontend/src/router.ts`、`frontend/src/composables/appPermTree.ts`、`frontend/src/pages/system/{DeptPermissions,UserPermissions}.vue`、`AGENT.md`
+- BFF:`GET /api/admin/job-tiers`、`GET/PUT /api/admin/dept-permissions[/:deptCode]`、`GET/PUT /api/admin/user-permissions/:id`(giga-api-gateway-bff v0.12)
+
 ## 2026-10-02 改用 Gateway 單一入口,管理頁接 BFF 管理 API(giga-Portal PRD I1–I4、Gateway P2-3a)
 - 內容:
   - **前端單一入口(I1、I3)**:改用 `@giganexus/web-kit`(`api/http.ts` 包裝、`api/auth.ts` 讀 `/api/auth/me`),移除自有登入頁、變更密碼、`it_csrf`;未登入導向入口網 `/login?redirect=/it/...`,沒有 `it.app.access` 導回 `/`,BFF 無法連線顯示 `Unavailable` 頁;首次導覽前顯示載入畫面。

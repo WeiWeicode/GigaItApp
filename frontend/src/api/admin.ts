@@ -235,7 +235,46 @@ export interface WhoCanAccess {
     rules: { ruleId: number; company: string | null; deptCode: string | null; includeSubDepts: boolean; jobLevels: string[] | null; title: string | null }[];
     users: { employeeNo: string; name: string; validTo: string | null }[];
   }[];
+  /** 直接授予的部門 / 個人(v0.12) */
+  direct?: {
+    departments: { deptCode: string; name: string; jobTier: string; includeSubDepts: boolean }[];
+    users: { employeeNo: string; name: string; validTo: string | null; reason: string | null }[];
+  };
   apiClients: { code: string; name: string; active: boolean }[];
+}
+/** 職級門檻(GET /api/admin/job-tiers):全員 / 課級 / 理級 / 處級以上;maxLevel = 職級上限(含),null = 不限 */
+export interface JobTier {
+  code: string;
+  name: string;
+  maxLevel: number | null;
+}
+export interface DeptPermissions {
+  deptCode: string;
+  name: string;
+  includeSubDepts: boolean;
+  direct: { code: string; jobTier: string }[];
+  /** 自上層部門(含下層)繼承,不能在此取消 */
+  inherited: { code: string; jobTier: string; fromDept: string; fromName: string }[];
+}
+export interface UserPermissionGrant {
+  code: string;
+  /** null = 永久 */
+  validTo: string | null;
+  reason: string | null;
+  createdBy?: string;
+  createdAt?: string;
+}
+export interface UserPermissions {
+  user: {
+    userId: number;
+    employeeNo: string;
+    displayName: string;
+    deptCode: string | null;
+    department: string | null;
+    title: string | null;
+    jobLevel: string | null;
+  };
+  grants: UserPermissionGrant[];
 }
 export interface AppReg {
   code: string;
@@ -306,6 +345,17 @@ export const rbac = {
   departments: () => http.get<{ companies: { companyId: number; name: string }[]; items: DeptNode[]; syncedAt: string | null }>('/api/admin/departments'),
   preview: (body: { employeeNo?: string; company?: string; deptCode?: string; jobLevel?: string; title?: string }) =>
     http.post<RbacPreview>('/api/admin/rbac/preview', body),
+  // 部門 / 個人權限(v0.12):直接授予,不經角色
+  jobTiers: () => http.get<{ items: JobTier[] }>('/api/admin/job-tiers'),
+  deptPermissionCounts: (app: string) => http.get<{ items: { deptCode: string; count: number }[] }>('/api/admin/dept-permissions', { query: { app } }),
+  deptPermissions: (deptCode: string, app: string) =>
+    http.get<DeptPermissions>(`/api/admin/dept-permissions/${encodeURIComponent(deptCode)}`, { query: { app } }),
+  setDeptPermissions: (deptCode: string, body: { app: string; includeSubDepts: boolean; grants: { code: string; jobTier: string }[] }) =>
+    http.put<DeptPermissions>(`/api/admin/dept-permissions/${encodeURIComponent(deptCode)}`, body),
+  userPermissions: (id: string | number, app: string) =>
+    http.get<UserPermissions>(`/api/admin/user-permissions/${encodeURIComponent(String(id))}`, { query: { app } }),
+  setUserPermissions: (id: string | number, body: { app: string; grants: { code: string; validTo?: string | null; reason?: string | null }[] }) =>
+    http.put<UserPermissions>(`/api/admin/user-permissions/${encodeURIComponent(String(id))}`, body),
 };
 
 // ───────── 使用者 / 公司 ─────────
@@ -338,7 +388,17 @@ export interface UserDetail extends Omit<UserRow, 'localStatus'> {
 }
 export interface EffectivePermissions {
   roles: RoleSource[];
-  permissions: { code: string; roles?: string[] }[];
+  permissions: {
+    code: string;
+    name?: string;
+    kind?: string;
+    /** 授予此權限的角色 */
+    grantedBy?: string[];
+    /** 直接授予的部門(v0.12) */
+    depts?: { deptCode: string; jobTier: string; includeSubDepts: boolean }[];
+    /** 個人權限(v0.12) */
+    personal?: { validTo: string | null; reason: string | null } | null;
+  }[];
   apps: { code: string; name: string }[];
 }
 
