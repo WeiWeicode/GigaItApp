@@ -327,7 +327,7 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
                   <code v-for="r in a.routes.slice(0, 4)" :key="r.method + r.publicPath">{{ r.method }} {{ r.publicPath }}</code>
                   <span v-if="a.routes.length > 4" class="faint xs">等 {{ a.routes.length }} 支</span>
                 </span>
-                <span v-else class="faint xs">(尚無路由使用)</span>
+                <span v-else class="faint xs">{{ a.code.startsWith('gw.admin.') ? '(BFF 內建管理 API,不在路由表)' : '(尚無路由使用)' }}</span>
                 <span v-if="boundBy.get(a.code)" class="faint xs">已綁定於:{{ boundBy.get(a.code)!.join('、') }}</span>
               </span>
             </label>

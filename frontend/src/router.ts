@@ -9,7 +9,7 @@
  */
 import { redirectToLogin } from '@giganexus/web-kit';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { can, canAll, GW, IT, loadMe, UI } from './api/auth';
+import { can, canAll, GW, IT, loadMe, setPageHasTab, UI } from './api/auth';
 import { hasCurrentApp } from './composables/apps';
 import AppLayout from './layouts/AppLayout.vue';
 import TabbedPage from './layouts/TabbedPage.vue';
@@ -223,11 +223,32 @@ export const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 });
 
-/** 第一個可見的功能頁(首頁沒有權限時改到這裡) */
+type TabMeta = { to: string; permission?: string };
+/** 功能頁中第一個有權限的 Tab(Tab 權限 ∩ 該 Tab 子路由需要的讀取權限);沒有 Tab 定義時回頁面本身 */
+function firstTab(page: RouteRecordRaw): string | null {
+  const tabs = (page.meta?.tabs as TabMeta[] | undefined) ?? [];
+  if (!tabs.length) return `/${page.path}`;
+  for (const t of tabs) {
+    if (t.permission && !can(t.permission)) continue;
+    const child = (page.children ?? []).find((c) => `/${page.path}${c.path ? `/${c.path}` : ''}` === t.to);
+    if (!child || canAll(child.meta?.requires)) return t.to;
+  }
+  return null;
+}
+
+setPageHasTab((path) => {
+  const rec = (routes[1]!.children ?? []).find((r) => `/${r.path}` === path);
+  return !rec || firstTab(rec) !== null;
+});
+
+/** 第一個可見的功能頁與 Tab(首頁沒有權限時改到這裡) */
 function firstAllowed(): string | null {
   for (const r of routes[1]!.children ?? []) {
     if (!r.meta?.permission || r.path === '403') continue;
-    if (can(r.meta.permission) && canAll(r.meta.requires)) return `/${r.path}`;
+    if (can(r.meta.permission) && canAll(r.meta.requires)) {
+      const t = firstTab(r);
+      if (t) return t;
+    }
   }
   return null;
 }
@@ -253,6 +274,14 @@ router.beforeEach(async (to) => {
   // 頁面守衛:任一層缺少選單權限或 BFF 讀取權限 → 403
   const denied = to.matched.some((r) => (r.meta.permission && !can(r.meta.permission)) || !canAll(r.meta.requires));
   if (denied) {
+    // 有此功能頁、只是目前的 Tab 沒權限:改到同頁第一個有權限的 Tab
+    const page = to.matched[1];
+    const pageOk = page && (!page.meta.permission || can(page.meta.permission)) && canAll(page.meta.requires);
+    if (pageOk) {
+      const rec = (routes[1]!.children ?? []).find((r) => `/${r.path}` === page.path);
+      const t = rec ? firstTab(rec) : null;
+      if (t && t !== to.path) return t;
+    }
     if (to.path === '/dashboard') {
       const first = firstAllowed();
       if (first && first !== '/dashboard') return first;

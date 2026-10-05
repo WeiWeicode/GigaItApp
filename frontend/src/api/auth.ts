@@ -176,13 +176,19 @@ const MENU: readonly MenuGroup[] = [
   },
 ];
 
-/** 依 BFF 的目錄、名稱、排序組出側欄(可見 = 選單權限 ∩ 該頁的 BFF 讀取權限) */
+/** 功能頁是否至少有一個可看的 Tab(由 router.ts 註冊;避免側欄出現點進去卻 403 的頁面) */
+let pageHasTab: (path: string) => boolean = () => true;
+export function setPageHasTab(fn: (path: string) => boolean): void {
+  pageHasTab = fn;
+}
+
+/** 依 BFF 的目錄、名稱、排序組出側欄(可見 = 選單權限 ∩ 該頁的 BFF 讀取權限 ∩ 至少一個可看的 Tab) */
 function buildMenus(): MenuGroup[] {
   const defaults = new Map(MENU.map((g, i) => [g.code, { g, i }]));
   const buckets = new Map<string, (MenuItem & { sort: number | null; order: number })[]>();
   MENU.forEach((g, gi) =>
     g.children.forEach((c, ci) => {
-      if (!can(c.permission) || !canAll(c.requires)) return;
+      if (!can(c.permission) || !canAll(c.requires) || !pageHasTab(c.path)) return;
       const m = kit.menuOf(c.permission);
       const parent = m?.parentCode ?? null;
       // 頁面在 BFF 掛到某個目錄(group)時歸到該目錄;否則用預設大項
