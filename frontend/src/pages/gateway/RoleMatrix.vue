@@ -1,14 +1,11 @@
 <script setup lang="ts">
 /**
- * BFF 角色 × 權限矩陣:點角色欄位的「編輯」進入設定模式(PUT /api/admin/roles/:role/permissions,需 gw.admin.rbac.write)。
- * 內建超級管理員 gw-super-admin 不開放以 API 修改(Gateway PRD §8.7);寫入會遞增全體使用者權限版本,下次請求即生效。
+ * 權限查詢 › 角色權限總覽(唯讀):BFF 全部權限(含純 API 權限)依系統分組 × 角色。
+ * 設定一律在「系統管理 › 權限設定」(角色、部門、個人);此頁只用來查看與排查。
  */
 import { computed, ref } from 'vue';
-import { rbac } from '@/api/admin';
-import { GW } from '@/api/auth';
 import { describeError } from '@/api/http';
 import { useBffRbac } from '@/composables/bffRbac';
-import { confirm, toast } from '@/ui';
 
 const { data, loading, error, grants, bySystem, reload } = useBffRbac();
 
@@ -20,47 +17,8 @@ const roles = computed(() => data.value?.roles ?? []);
 const hoverRole = ref<string | null>(null);
 const hoverPerm = ref<string | null>(null);
 
-// ---- 編輯 ----
-const editing = ref<string | null>(null);
-const draft = ref<Set<string>>(new Set());
-const saving = ref(false);
-function startEdit(role: string) {
-  editing.value = role;
-  draft.value = new Set(grants.value.get(role) ?? []);
-}
-function toggle(perm: string, on: boolean) {
-  const s = new Set(draft.value);
-  if (on) s.add(perm);
-  else s.delete(perm);
-  draft.value = s;
-}
-const diff = computed(() => {
-  if (!editing.value) return { add: [], remove: [] };
-  const cur = grants.value.get(editing.value) ?? new Set<string>();
-  return { add: [...draft.value].filter((p) => !cur.has(p)), remove: [...cur].filter((p) => !draft.value.has(p)) };
-});
-async function save() {
-  const role = editing.value!;
-  const ok = await confirm({
-    title: `儲存「${roles.value.find((r) => r.code === role)?.name}」的權限?`,
-    message: `新增 ${diff.value.add.length} 項、移除 ${diff.value.remove.length} 項。擁有此角色的使用者在下次請求時生效。`,
-    confirmText: '儲存',
-  });
-  if (!ok) return;
-  saving.value = true;
-  try {
-    await rbac.setRolePermissions(role, [...draft.value]);
-    toast.success('已儲存角色權限', '擁有此角色的使用者下次請求即生效');
-    editing.value = null;
-    await reload();
-  } catch (e) {
-    toast.fromError(e, '儲存失敗');
-  } finally {
-    saving.value = false;
-  }
-}
-const has = (role: string, perm: string) => (editing.value === role ? draft.value.has(perm) : !!grants.value.get(role)?.has(perm));
-const roleCount = (role: string) => (editing.value === role ? draft.value.size : (grants.value.get(role)?.size ?? 0));
+const has = (role: string, perm: string) => !!grants.value.get(role)?.has(perm);
+const roleCount = (role: string) => grants.value.get(role)?.size ?? 0;
 </script>
 
 <template>
@@ -70,12 +28,21 @@ const roleCount = (role: string) => (editing.value === role ? draft.value.size :
     </Teleport>
 
     <GCard v-if="error">
-      <GEmpty tone="danger" icon="shield" title="無法取得 BFF 權限" :description="describeError(error)"
+      <GEmpty tone="danger" icon="shield" title="無法取得權限資料" :description="describeError(error)"
         ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
       >
     </GCard>
 
     <template v-else>
+      <GCard padding="sm" class="readonly-note">
+        <div class="row">
+          <GBadge tone="info" icon="eye">唯讀</GBadge>
+          <span class="small muted">只顯示透過<b>角色</b>取得的權限;直接授予部門 / 個人的權限見「誰能存取」。要調整請到權限設定。</span>
+          <span class="spacer" />
+          <RouterLink to="/system/permissions" class="small">前往權限設定 →</RouterLink>
+        </div>
+      </GCard>
+
       <GCard padding="sm">
         <div class="row">
           <span class="muted small">系統</span>
@@ -96,7 +63,7 @@ const roleCount = (role: string) => (editing.value === role ? draft.value.size :
                   v-for="r in roles"
                   :key="r.code"
                   class="role"
-                  :class="{ hl: hoverRole === r.code, editing: editing === r.code }"
+                  :class="{ hl: hoverRole === r.code }"
                   @mouseenter="hoverRole = r.code"
                   @mouseleave="hoverRole = null"
                 >
@@ -107,15 +74,6 @@ const roleCount = (role: string) => (editing.value === role ? draft.value.size :
                       <GBadge v-if="r.isSystem" tone="danger">內建</GBadge>
                       <GBadge tone="primary">{{ roleCount(r.code) }}</GBadge>
                     </span>
-                    <GButton
-                      v-if="!editing && r.code !== 'gw-super-admin'"
-                      v-can="GW.rbacWrite"
-                      size="sm"
-                      variant="ghost"
-                      icon="edit"
-                      @click="startEdit(r.code)"
-                      >編輯</GButton
-                    >
                   </div>
                 </th>
               </tr>
@@ -134,14 +92,8 @@ const roleCount = (role: string) => (editing.value === role ? draft.value.size :
                     <code>{{ p.code }}</code>
                   </div>
                 </th>
-                <td v-for="r in roles" :key="r.code" class="cell" :class="{ hl: hoverRole === r.code, editing: editing === r.code }">
-                  <GCheckbox
-                    v-if="editing === r.code"
-                    :model-value="draft.has(p.code)"
-                    :aria-label="`${r.name} ${p.name}`"
-                    @update:model-value="toggle(p.code, $event)"
-                  />
-                  <span v-else-if="has(r.code, p.code)" class="yes" :title="`${r.name} 擁有 ${p.code}`"><GIcon name="check" :size="14" :stroke="3" /></span>
+                <td v-for="r in roles" :key="r.code" class="cell" :class="{ hl: hoverRole === r.code }">
+                  <span v-if="has(r.code, p.code)" class="yes" :title="`${r.name} 擁有 ${p.code}`"><GIcon name="check" :size="14" :stroke="3" /></span>
                   <span v-else class="no" />
                 </td>
               </tr>
@@ -150,20 +102,6 @@ const roleCount = (role: string) => (editing.value === role ? draft.value.size :
         </div>
       </GCard>
     </template>
-
-    <Transition name="page">
-      <div v-if="editing" class="savebar glass glass-edge">
-        <GIcon name="edit" />
-        <span
-          >正在編輯 <b>{{ roles.find((r) => r.code === editing)?.name }}</b></span
-        >
-        <GBadge tone="success">+{{ diff.add.length }}</GBadge>
-        <GBadge tone="danger">−{{ diff.remove.length }}</GBadge>
-        <span class="spacer" />
-        <GButton variant="ghost" @click="editing = null">取消</GButton>
-        <GButton variant="primary" icon="save" :loading="saving" :disabled="!diff.add.length && !diff.remove.length" @click="save">儲存</GButton>
-      </div>
-    </Transition>
   </div>
 </template>
 
@@ -272,10 +210,6 @@ tr.hl .cell,
 tr.hl .perm {
   color: var(--c-primary);
 }
-.cell.editing,
-.role.editing {
-  background: color-mix(in srgb, var(--c-warning) 10%, transparent);
-}
 .yes {
   display: inline-grid;
   place-items: center;
@@ -292,17 +226,5 @@ tr.hl .perm {
   height: 24px;
   border-radius: 8px;
   border: 1px dashed var(--line-strong);
-}
-.savebar {
-  position: sticky;
-  bottom: 16px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: var(--radius-lg);
-  background: var(--glass-strong);
-  box-shadow: var(--shadow-lg);
 }
 </style>

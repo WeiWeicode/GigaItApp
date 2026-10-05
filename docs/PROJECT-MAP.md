@@ -28,7 +28,7 @@ GigaItApp/
 ├─ frontend/                      Vue 3 + Vite(base /it/)
 │  ├─ src/
 │  │  ├─ main.ts、App.vue、router.ts   進入點與路由(兩層選單 → TabbedPage → Tab 子路由,懶加載)
-│  │  ├─ pages/                   畫面:dashboard/、gateway/(上游、路由、發佈、BFF 權限)、endpoint/、system/(人員、部門、應用權限、角色與規則、試算、稽核)、403、404、Unavailable
+│  │  ├─ pages/                   畫面:dashboard/、gateway/(上游、路由、發佈、權限查詢〔唯讀〕)、endpoint/、system/(人員、部門、權限設定:應用權限、角色與規則、部門權限、個人權限、試算;稽核)、403、404、Unavailable
 │  │  ├─ layouts/                 AppLayout(選單、頁首、應用切換)、TabbedPage
 │  │  ├─ ui/                      全域 UI 套件:G* 元件(components/)、圖表(charts/)、tokens.css、feedback(toast / confirm)
 │  │  ├─ components/              本專案專用的小元件(非全域):GherkinView(行為規格顯示)

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * 權限反查(GET /api/admin/permissions/:code/who-can-access,P2-6):選一個 BFF 權限,列出擁有它的角色,
- * 以及角色如何被指派(所有登入者 / AD 群組 / 公司預設 / 指派規則 / 個別使用者)與具備此權限的 API Key。
+ * 權限查詢 › 誰能存取(唯讀,GET /api/admin/permissions/:code/who-can-access,P2-6):選一個權限,列出擁有它的角色
+ * 與角色如何被指派(所有登入者 / AD 群組 / 公司預設 / 指派規則 / 個別使用者)、直接授予的部門與個人(v0.12),
+ * 以及具備此權限的 API Key。設定請到「系統管理 › 權限設定」。
  */
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -13,6 +14,8 @@ import { useAsync } from '@/composables/useAsync';
 const route = useRoute();
 const router = useRouter();
 const { data: rbac, bySystem } = useBffRbac();
+const tiers = useAsync(() => rbacApi.jobTiers());
+const tierName = (code: string) => tiers.data.value?.items.find((t) => t.code === code)?.name ?? code;
 
 const q = ref('');
 const selected = ref<string>(typeof route.query.permission === 'string' ? route.query.permission : '');
@@ -102,14 +105,30 @@ watch(
       </GCard>
 
       <GCard v-if="error">
-        <GEmpty tone="danger" icon="alert" title="反查失敗" :description="describeError(error)" />
+        <GEmpty tone="danger" icon="alert" title="查詢失敗" :description="describeError(error)" />
       </GCard>
       <GCard v-else-if="loading"><GSkeleton :lines="6" /></GCard>
       <template v-else-if="result">
-        <GCard v-if="!result.roles.length">
-          <GEmpty icon="shield" tone="warning" title="沒有任何角色擁有此權限" description="需要此權限的 API 目前沒有人可以呼叫。" />
+        <GCard v-if="!result.roles.length && !result.direct?.departments.length && !result.direct?.users.length">
+          <GEmpty icon="shield" tone="warning" title="沒有任何人擁有此權限" description="沒有角色、部門或個人擁有它;需要此權限的 API 目前沒有人可以呼叫。" />
         </GCard>
-        <div v-else class="grid grid-auto" style="--min: 280px; --gap: 14px">
+        <GCard v-if="result.direct?.departments.length || result.direct?.users.length" title="直接授予(不經角色)" icon="user-check" tone="cyan">
+          <div class="assign">
+            <div v-if="result.direct?.departments.length">
+              <p class="lbl"><GIcon name="building" :size="13" /> 部門</p>
+              <GBadge v-for="d in result.direct.departments" :key="`${d.deptCode}|${d.jobTier}`" tone="info" :title="d.deptCode"
+                >{{ d.name }}({{ tierName(d.jobTier) }}{{ d.includeSubDepts ? ',含下層' : '' }})</GBadge
+              >
+            </div>
+            <div v-if="result.direct?.users.length">
+              <p class="lbl"><GIcon name="user" :size="13" /> 個人</p>
+              <GBadge v-for="u in result.direct.users" :key="u.employeeNo" tone="violet" :title="u.reason ?? ''"
+                >{{ u.name }}({{ u.employeeNo }}){{ u.validTo ? ` 至 ${u.validTo.slice(0, 10)}` : '' }}</GBadge
+              >
+            </div>
+          </div>
+        </GCard>
+        <div v-if="result.roles.length" class="grid grid-auto" style="--min: 280px; --gap: 14px">
           <GCard v-for="r in result.roles" :key="r.code" :title="r.name" :subtitle="r.code" icon="shield" :tone="r.everyone ? 'warning' : 'primary'">
             <template #actions><GBadge v-if="r.everyone" tone="warning" icon="users">所有登入者</GBadge></template>
             <div class="assign">

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * 權限關係圖:角色 → 權限 → API 路由。滑鼠移到任一節點,會亮出上下游整條路徑;點擊可固定。
- * 只畫「需權限」的路由(公開 / 登入即可的路由不經角色控管)。
+ * 權限查詢 › 關係圖(唯讀):角色 / 部門 / 個人 → 權限 → API 路由。滑鼠移到任一節點,會亮出上下游整條路徑;點擊可固定。
+ * 部門與個人為直接授予(v0.12,GET /api/admin/direct-grants);部門節點依職級門檻分開。
+ * 只畫「需權限」的路由(公開 / 登入即可的路由不經權限控管)。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { gw } from '@/api/admin';
+import { gw, rbac as rbacApi } from '@/api/admin';
 import { describeError } from '@/api/http';
 import { useBffRbac } from '@/composables/bffRbac';
 import { useAsync } from '@/composables/useAsync';
@@ -12,6 +13,9 @@ import { useAsync } from '@/composables/useAsync';
 const { data: rbac, error, grants, bySystem, reload } = useBffRbac();
 // 關係圖只畫「需權限」且未停用的路由(BFF 每頁上限 200 支,超過時畫面會提示)
 const routes = useAsync(() => gw.routes({ status: 'draft,published,deprecated', page: 1, pageSize: 200 }));
+const direct = useAsync(() => rbacApi.directGrants());
+const tiers = useAsync(() => rbacApi.jobTiers());
+const tierName = (code: string) => tiers.data.value?.items.find((t) => t.code === code)?.name ?? code;
 
 const system = ref('');
 const systems = computed(() => [{ label: '全部', value: '' }, ...bySystem.value.map((g) => ({ label: g.system, value: g.system }))]);
@@ -38,16 +42,43 @@ const EDGE = 8;
 const colW = computed(() => Math.min(260, (width.value - 2 * EDGE - 160) / 3));
 const colX = computed(() => [EDGE, (width.value - colW.value) / 2, width.value - EDGE - colW.value]);
 
-type Node = { id: string; col: 0 | 1 | 2; label: string; sub: string; y: number };
+type Node = { id: string; col: 0 | 1 | 2; label: string; sub: string; y: number; tone?: string };
+/** 左欄的授予來源:角色、部門(× 職級門檻)、個人 */
+type Source = { id: string; label: string; sub: string; tone: string; perms: Set<string> };
 
 const graph = computed(() => {
   const allPerms = (rbac.value?.permissions ?? []).filter((p) => !system.value || p.systemCode === system.value);
   const permSet = new Set(allPerms.map((p) => p.code));
-  const roles = (rbac.value?.roles ?? []).filter((r) => [...(grants.value.get(r.code) ?? [])].some((p) => permSet.has(p)));
-  // 依連線的平均位置排序(barycenter),減少線條交錯:權限跟著角色、路由跟著權限
-  const roleIdx = new Map(roles.map((r, i) => [r.code, i]));
+  const sources: Source[] = (rbac.value?.roles ?? []).map((r) => ({
+    id: `r:${r.code}`,
+    label: r.name,
+    sub: r.code,
+    tone: 'primary',
+    perms: grants.value.get(r.code) ?? new Set<string>(),
+  }));
+  const bySource = new Map<string, Source>();
+  for (const d of direct.data.value?.departments ?? []) {
+    const id = `d:${d.deptCode}|${d.jobTier}`;
+    if (!bySource.has(id))
+      bySource.set(id, {
+        id,
+        label: `部門 ${d.name}`,
+        sub: `${d.deptCode} · ${tierName(d.jobTier)}${d.includeSubDepts ? ' · 含下層' : ''}`,
+        tone: 'info',
+        perms: new Set(),
+      });
+    bySource.get(id)!.perms.add(d.code);
+  }
+  for (const u of direct.data.value?.users ?? []) {
+    const id = `u:${u.employeeNo}`;
+    if (!bySource.has(id)) bySource.set(id, { id, label: `個人 ${u.name}`, sub: u.employeeNo, tone: 'success', perms: new Set() });
+    bySource.get(id)!.perms.add(u.code);
+  }
+  const roles = [...sources, ...bySource.values()].filter((r) => [...r.perms].some((p) => permSet.has(p)));
+  // 依連線的平均位置排序(barycenter),減少線條交錯:權限跟著來源、路由跟著權限
+  const roleIdx = new Map(roles.map((r, i) => [r.id, i]));
   const center = (p: string) => {
-    const idx = roles.filter((r) => grants.value.get(r.code)?.has(p)).map((r) => roleIdx.get(r.code)!);
+    const idx = roles.filter((r) => r.perms.has(p)).map((r) => roleIdx.get(r.id)!);
     return idx.length ? idx.reduce((s, i) => s + i, 0) / idx.length : roles.length;
   };
   const perms = [...allPerms].sort((a, b) => center(a.code) - center(b.code) || a.code.localeCompare(b.code));
@@ -57,7 +88,7 @@ const graph = computed(() => {
     .sort((a, b) => permIdx.get(a.permissionCode!)! - permIdx.get(b.permissionCode!)! || a.publicPath.localeCompare(b.publicPath));
 
   const edges: { from: string; to: string }[] = [];
-  for (const r of roles) for (const p of grants.value.get(r.code) ?? []) if (permSet.has(p)) edges.push({ from: `r:${r.code}`, to: `p:${p}` });
+  for (const r of roles) for (const p of r.perms) if (permSet.has(p)) edges.push({ from: r.id, to: `p:${p}` });
   for (const rt of rts) edges.push({ from: `p:${rt.permissionCode}`, to: `a:${rt.routeCode}` });
 
   const place = <T,>(items: T[], col: 0 | 1 | 2, f: (x: T) => Omit<Node, 'col' | 'y'>) => items.map((x, i) => ({ ...f(x), col, y: TOP + i * (NODE_H + GAP) }));
@@ -69,7 +100,7 @@ const graph = computed(() => {
     return { id: `a:${r.routeCode}`, col: 2, label: `${r.method} ${r.publicPath}`, sub: r.name, y };
   });
   const nodes: Node[] = [
-    ...place(roles, 0, (r) => ({ id: `r:${r.code}`, label: r.name, sub: r.code })),
+    ...place(roles, 0, (r) => ({ id: r.id, label: r.label, sub: r.sub, tone: r.tone })),
     ...place(perms, 1, (p) => ({ id: `p:${p.code}`, label: p.name, sub: p.code })),
     ...routeNodes,
   ];
@@ -110,14 +141,14 @@ function edgePath(e: { from: string; to: string }) {
   const mx = (x1 + x2) / 2;
   return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
 }
-const COL_TITLES = ['角色', '權限', 'API 路由'];
+const COL_TITLES = ['角色 / 部門 / 個人', '權限', 'API 路由'];
 const COL_TONES = ['primary', 'violet', 'cyan'];
 </script>
 
 <template>
   <div class="stack" style="--gap: 16px">
     <Teleport to="#page-actions" defer>
-      <GButton icon="refresh" @click="(reload(), routes.reload())">重新整理</GButton>
+      <GButton icon="refresh" @click="(reload(), routes.reload(), direct.reload())">重新整理</GButton>
     </Teleport>
 
     <GCard padding="sm">
@@ -128,19 +159,21 @@ const COL_TONES = ['primary', 'violet', 'cyan'];
         <GBadge v-if="routes.data.value && routes.data.value.total > routes.data.value.items.length" tone="warning" icon="alert">
           需權限的路由共 {{ routes.data.value.total }} 支,圖上只顯示前 {{ routes.data.value.items.length }} 支,請依系統篩選
         </GBadge>
-        <span class="faint xs"><GIcon name="info" :size="13" /> 移到節點上查看關聯,點擊固定 / 取消</span>
+        <span class="faint xs"
+          ><GIcon name="eye" :size="13" /> 唯讀 · 移到節點上查看關聯,點擊固定 / 取消 · 設定請到<RouterLink to="/system/permissions">權限設定</RouterLink></span
+        >
       </div>
     </GCard>
 
-    <GCard v-if="error || routes.error.value">
-      <GEmpty tone="danger" icon="graph" title="無法載入關係圖" :description="describeError(error ?? routes.error.value)"
+    <GCard v-if="error || routes.error.value || direct.error.value">
+      <GEmpty tone="danger" icon="graph" title="無法載入關係圖" :description="describeError(error ?? routes.error.value ?? direct.error.value)"
         ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
       >
     </GCard>
 
     <GCard v-else padding="md">
       <div ref="el" class="graph" :style="{ height: `${graph.height}px` }" @click.self="pinned = null">
-        <GSkeleton v-if="!rbac || !routes.data.value" :lines="12" />
+        <GSkeleton v-if="!rbac || !routes.data.value || !direct.data.value" :lines="12" />
         <template v-else>
           <div v-for="(t, i) in COL_TITLES" :key="t" class="col-title" :class="`tone-${COL_TONES[i]}`" :style="{ left: `${colX[i]}px`, width: `${colW}px` }">
             {{ t }} <span class="faint">{{ graph.counts[i] }}</span>
@@ -164,7 +197,7 @@ const COL_TONES = ['primary', 'violet', 'cyan'];
             :key="n.id"
             type="button"
             class="node"
-            :class="[`tone-${COL_TONES[n.col]}`, { on: lit?.has(n.id), off: lit && !lit.has(n.id), pinned: pinned === n.id }]"
+            :class="[`tone-${n.tone ?? COL_TONES[n.col]}`, { on: lit?.has(n.id), off: lit && !lit.has(n.id), pinned: pinned === n.id }]"
             :style="{ left: `${colX[n.col]}px`, top: `${n.y}px`, width: `${colW}px`, height: `${NODE_H}px` }"
             :title="`${n.label}\n${n.sub}`"
             @mouseenter="hover = n.id"

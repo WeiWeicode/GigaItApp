@@ -91,7 +91,7 @@ const MENU: readonly MenuGroup[] = [
     icon: 'gateway',
     children: [
       { key: 'services', title: '服務與路由', path: '/gateway/services', permission: IT.gwService, requires: [GW.upstreamRead, GW.routeRead] },
-      { key: 'rbac', title: 'BFF 權限', path: '/gateway/rbac', permission: IT.gwRbac, requires: [GW.rbacRead] },
+      { key: 'rbac', title: '權限查詢', path: '/gateway/rbac', permission: IT.gwRbac, requires: [GW.rbacRead] },
     ],
   },
   {
@@ -106,7 +106,7 @@ const MENU: readonly MenuGroup[] = [
     icon: 'settings',
     children: [
       { key: 'users', title: '人員與部門', path: '/system/users', permission: IT.sysUser, requires: [GW.userRead] },
-      { key: 'permissions', title: '角色與按鈕權限', path: '/system/permissions', permission: IT.sysRole, requires: [GW.rbacRead] },
+      { key: 'permissions', title: '權限設定', path: '/system/permissions', permission: IT.sysRole, requires: [GW.rbacRead] },
       { key: 'audit', title: '稽核紀錄', path: '/system/audit', permission: IT.sysAudit, requires: [GW.auditRead] },
     ],
   },

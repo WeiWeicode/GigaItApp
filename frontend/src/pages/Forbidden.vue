@@ -4,7 +4,7 @@
       icon="lock"
       tone="warning"
       title="沒有此功能的權限"
-      description="您的 Gateway 角色沒有這個頁面(或其資料)的權限。如需使用,請洽 IT 權限管理人員到「角色與按鈕權限」調整。"
+      description="您的 Gateway 角色沒有這個頁面(或其資料)的權限。如需使用,請洽 IT 權限管理人員到「系統管理 › 權限設定」調整。"
     >
       <GButton variant="primary" icon="dashboard" @click="$router.push('/')">回首頁</GButton>
     </GEmpty>

@@ -354,6 +354,11 @@ export const rbac = {
     http.put<DeptPermissions>(`/api/admin/dept-permissions/${encodeURIComponent(deptCode)}`, body),
   userPermissions: (id: string | number, app: string) =>
     http.get<UserPermissions>(`/api/admin/user-permissions/${encodeURIComponent(String(id))}`, { query: { app } }),
+  directGrants: () =>
+    http.get<{
+      departments: { deptCode: string; name: string; jobTier: string; includeSubDepts: boolean; code: string }[];
+      users: { employeeNo: string; name: string; validTo: string | null; code: string }[];
+    }>('/api/admin/direct-grants'),
   setUserPermissions: (id: string | number, body: { app: string; grants: { code: string; validTo?: string | null; reason?: string | null }[] }) =>
     http.put<UserPermissions>(`/api/admin/user-permissions/${encodeURIComponent(String(id))}`, body),
 };

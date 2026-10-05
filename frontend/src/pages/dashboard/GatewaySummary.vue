@@ -60,7 +60,7 @@ const services = computed(() => [...(data.value?.services ?? [])].sort((a, b) =>
         <GCard title="驗證模式" subtitle="公開 / 登入即可 / 需權限" icon="fingerprint" tone="violet">
           <GBarList v-if="data" :items="byAuth" colorful unit=" 支" />
           <GSkeleton v-else :lines="4" />
-          <p v-if="data" class="faint xs note">公開 API 需 IT 核准;需權限的 API 由角色權限控管(見「BFF 權限」)。</p>
+          <p v-if="data" class="faint xs note">公開 API 需 IT 核准;需權限的 API 由角色權限控管(見「權限查詢」)。</p>
         </GCard>
         <GCard title="線上版本" icon="release" tone="success">
           <div v-if="data" class="version">
