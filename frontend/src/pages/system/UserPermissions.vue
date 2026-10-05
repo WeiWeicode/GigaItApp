@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * 個人權限(Gateway PRD §8.3.4 v0.12):查一個人在某應用「有什麼權限、從哪裡來」,並直接加給個人權限(預設永久,可設到期日)。
+ * 個人權限(Gateway PRD §8.3.4 v0.12):查一個人在某應用「有什麼權限、從哪裡來」,並直接加給個人權限(預設永久,可設到期日);
+ *   應用選「API 權限」可授予純 API 權限(含寫入)。
  *   資料:GET /api/admin/users(搜尋)、/api/admin/users/:id/effective-permissions(有效權限與來源:角色 / 部門 / 個人)、
  *        /api/admin/user-permissions/:id?app=(個人權限)
  *   設定:PUT /api/admin/user-permissions/:id(取代此人在此應用的個人權限;儲存時自動補上層)。寫入需 gw.admin.rbac.write,
@@ -90,6 +91,7 @@ function sources(code: string): Source[] {
       title: d.includeSubDepts ? `${d.deptCode},含下層部門` : d.deptCode,
     });
   if (p.personal) out.push({ label: '個人', tone: 'violet', title: p.personal.validTo ? `到期 ${dateOf(p.personal.validTo)}` : '永久' });
+  if (p.includedBy?.length) out.push({ label: `隨選單 ${p.includedBy.join('、')}`, tone: 'neutral', title: '選單隨附的 API 讀取權限' });
   return out;
 }
 const dateOf = (iso: string) => iso.slice(0, 10);

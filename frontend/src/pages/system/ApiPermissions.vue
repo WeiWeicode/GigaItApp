@@ -104,7 +104,8 @@ const canWrite = computed(() => can(GW.rbacWrite));
         <GSegmented v-model="system" :options="systems" size="sm" />
       </div>
       <p class="faint xs" style="margin: 8px 0 0">
-        只列沒有畫面的 API 權限(kind = api);選單 / Tab / 按鈕在「應用權限」設定。按鈕權限與它呼叫的寫入 API 是同一個代碼。
+        只列沒有畫面的 API 權限(kind = api),此頁授予<b>角色</b>;要直接給部門或個人,請到「部門權限」「個人權限」把應用選為「API 權限」。選單 / Tab /
+        按鈕在「應用權限」設定,按鈕權限與它呼叫的寫入 API 是同一個代碼。
       </p>
     </GCard>
 

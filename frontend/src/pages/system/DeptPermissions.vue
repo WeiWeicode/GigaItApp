@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 部門權限(Gateway PRD §8.3.4 v0.12):直接把選單 / Tab / 按鈕權限授予部門,不必建角色或規則。
+ * 部門權限(Gateway PRD §8.3.4 v0.12):直接把選單 / Tab / 按鈕權限授予部門,不必建角色或規則;應用選「API 權限」可授予純 API 權限(含寫入)。
  *   左:部門樹(只列開放的公司;● = 此應用直接設定的權限數)
  *   右:權限樹 × 職級門檻(全員 / 課級 / 理級 / 處級以上)。◐ = 自上層部門繼承(含下層),不能在此取消;
  *       「含」= 已由較寬的門檻涵蓋。
@@ -210,7 +210,7 @@ const loadError = computed(() => apps.error.value ?? tree.error.value ?? tiers.e
       </GCard>
 
       <GCard padding="none" class="perm-card">
-        <GEmpty v-if="!selected" icon="building" title="選擇左側部門" description="勾選後此部門(可含下層)的人員即擁有該選單 / Tab / 按鈕權限" />
+        <GEmpty v-if="!selected" icon="building" title="選擇左側部門" description="勾選後此部門(可含下層)的人員即擁有該選單 / Tab / 按鈕(或 API)權限" />
         <template v-else>
           <div class="perm-head">
             <div class="ph-title">

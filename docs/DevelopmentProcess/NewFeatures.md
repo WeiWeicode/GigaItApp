@@ -2,6 +2,10 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-05 API 權限也能給部門 / 個人
+- 內容:「部門權限」「個人權限」的應用下拉新增「API 權限(無畫面,含寫入)」,依系統分組列出純 API 權限(BFF `app = '@api'`),部門可依職級門檻、個人可設到期日;「API 權限」Tab 仍授予角色。個人權限的來源欄新增「隨選單」。
+- 檔案:`frontend/src/composables/appPermTree.ts`、`frontend/src/pages/system/{DeptPermissions,UserPermissions,ApiPermissions}.vue`
+
 ## 2026-10-05 選單隨附的 API 讀取權限
 - 內容:授予選單即一併取得該頁需要的 API 讀取權限(BFF `gw.permission_include`),解決「勾了選單、側欄卻不顯示」(側欄可見 = 選單權限 ∩ 該頁讀取權限)。選單管理的編輯視窗可勾選「此頁需要的 API 讀取權限」;權限試算、個人權限標示隨附的權限與是否取得,目錄改顯示「依下層」;誰能存取列出「隨選單取得」;API 權限 Tab 標示被哪些選單隨附。`gateway-rbac.yaml` 以 `includes` 首次登記(與 `api/auth.ts` 的 `requires` 一致)。
 - 檔案:`frontend/src/pages/system/{MenuManage,PermissionPreview,UserPermissions,ApiPermissions}.vue`、`frontend/src/pages/gateway/WhoCanAccess.vue`、`frontend/src/api/admin.ts`、`deploy/gateway-rbac.yaml`
