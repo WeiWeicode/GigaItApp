@@ -14,14 +14,19 @@
 
 permissions:
   - { code: it.app.access, name: IT 管理系統使用權限, kind: app, sort: 20 }
-  - { code: it.dashboard.read, name: 儀表板, kind: menu, parent: it.app.access, sort: 10 }
-  - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.app.access, sort: 20 }
-  - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.app.access, sort: 30 }
-  - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.app.access, sort: 40 }
-  - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.app.access, sort: 50 }
-  - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.app.access, sort: 60 }
-  - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.app.access, sort: 65 }
-  - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.app.access, sort: 70 }
+  # 選單目錄(kind group:側欄大項,只分組命名、不可授予;名稱 / 排序 / 圖示可在「選單管理」修改)
+  - { code: it.group.overview, name: 總覽, kind: group, parent: it.app.access, sort: 10, icon: dashboard }
+  - { code: it.group.gateway, name: Gateway 管理, kind: group, parent: it.app.access, sort: 20, icon: gateway }
+  - { code: it.group.endpoint, name: 端點管理, kind: group, parent: it.app.access, sort: 30, icon: monitor }
+  - { code: it.group.system, name: 系統管理, kind: group, parent: it.app.access, sort: 40, icon: settings }
+  - { code: it.dashboard.read, name: 儀表板, kind: menu, parent: it.group.overview, sort: 10 }
+  - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.group.gateway, sort: 20 }
+  - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.group.gateway, sort: 30 }
+  - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.group.endpoint, sort: 40 }
+  - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50 }
+  - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.group.system, sort: 60 }
+  - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.group.system, sort: 65 }
+  - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.group.system, sort: 70 }
 
 roles:
   - code: it-admin

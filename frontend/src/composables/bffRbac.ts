@@ -25,7 +25,8 @@ async function load(force = false) {
     const grants = await Promise.all(roles.items.map((r) => rbac.rolePermissions(r.code)));
     data.value = {
       roles: roles.items.sort((a, b) => a.roleId - b.roleId),
-      permissions: perms.items,
+      // 選單目錄(group)不可授予,權限查詢不列出
+      permissions: perms.items.filter((p) => p.kind !== 'group'),
       rolePermissions: grants.flatMap((g) => g.permissions.map((permission) => ({ role: g.role, permission }))),
     };
     loadedAt = Date.now();

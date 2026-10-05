@@ -12,7 +12,7 @@ import { computed, ref, watch } from 'vue';
 import { rbac, type DeptNode } from '@/api/admin';
 import { can, GW } from '@/api/auth';
 import { describeError } from '@/api/http';
-import { KIND, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
+import { isGroup, KIND, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
 import { useAsync } from '@/composables/useAsync';
 import { confirm, toast } from '@/ui';
 
@@ -252,7 +252,8 @@ const loadError = computed(() => apps.error.value ?? tree.error.value ?? tiers.e
                     </div>
                   </th>
                   <td v-for="(t, i) in tierList" :key="t.code" class="cell" :class="{ editing }" :title="cell(f.node.code, i).title">
-                    <span v-if="cell(f.node.code, i).state === 'inherited'" class="inh">◐</span>
+                    <span v-if="isGroup(f.node)" class="faint xs" title="選單目錄只用來分組,不需授予">—</span>
+                    <span v-else-if="cell(f.node.code, i).state === 'inherited'" class="inh">◐</span>
                     <GCheckbox
                       v-else-if="editing"
                       :model-value="draft.has(key(f.node.code, t.code))"

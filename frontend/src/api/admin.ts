@@ -184,9 +184,12 @@ export interface Permission {
   name: string;
   systemCode: string;
   description: string | null;
-  kind: 'app' | 'menu' | 'tab' | 'button' | 'api' | string;
+  /** group = 選單目錄(只分組命名,不可授予) */
+  kind: 'app' | 'group' | 'menu' | 'tab' | 'button' | 'api' | string;
   parentCode: string | null;
   sort: number | null;
+  /** 選單圖示名稱(ui/icons.ts) */
+  icon: string | null;
   rowVer: string;
 }
 export interface PermNode {
@@ -194,6 +197,7 @@ export interface PermNode {
   name: string;
   kind: string;
   sort: number | null;
+  icon?: string | null;
   children: PermNode[];
 }
 export interface Role {
@@ -318,12 +322,19 @@ export interface RbacPreview {
 export const rbac = {
   permissions: (query: { system?: string } = {}) => http.get<{ items: Permission[] }>('/api/admin/permissions', { query }),
   permissionTree: (app?: string) => http.get<{ items: PermNode[] }>('/api/admin/permissions', { query: { tree: 1, app } }),
-  createPermission: (body: { code: string; name: string; kind?: string; parentCode?: string | null; sort?: number | null; description?: string | null }) =>
-    http.post<Permission>('/api/admin/permissions', body),
+  createPermission: (body: {
+    code: string;
+    name: string;
+    kind?: string;
+    parentCode?: string | null;
+    sort?: number | null;
+    description?: string | null;
+    icon?: string | null;
+  }) => http.post<Permission>('/api/admin/permissions', body),
   updatePermission: (
     code: string,
     rowVer: string,
-    body: { name?: string; kind?: string; parentCode?: string | null; sort?: number | null; description?: string | null },
+    body: { name?: string; kind?: string; parentCode?: string | null; sort?: number | null; description?: string | null; icon?: string | null },
   ) => http.patch<Permission>(`/api/admin/permissions/${encodeURIComponent(code)}`, { ...body, rowVer }),
   deletePermission: (code: string, rowVer: string) => http.delete(`/api/admin/permissions/${encodeURIComponent(code)}`, { query: { rowVer } }),
   roles: () => http.get<{ items: Role[] }>('/api/admin/roles'),

@@ -62,7 +62,8 @@ function toggle(f: Flat, on: boolean) {
     let depth = f.depth;
     for (let j = i - 1; j >= 0 && depth > 0; j--)
       if (flat.value[j]!.depth < depth) {
-        s.add(flat.value[j]!.node.code);
+        // 選單目錄不可授予
+        if (flat.value[j]!.node.kind !== 'group') s.add(flat.value[j]!.node.code);
         depth = flat.value[j]!.depth;
       }
   } else desc(f.node).forEach((c) => s.delete(c));
@@ -156,8 +157,9 @@ const canWrite = computed(() => can(GW.rbacWrite));
                 </div>
               </th>
               <td v-for="r in roles" :key="r.code" class="cell" :class="{ editing: editing === r.code }">
+                <span v-if="f.node.kind === 'group'" class="faint xs" title="選單目錄只用來分組,不需授予">—</span>
                 <GCheckbox
-                  v-if="editing === r.code"
+                  v-else-if="editing === r.code"
                   :model-value="draft.has(f.node.code)"
                   :aria-label="`${r.name} ${f.node.name}`"
                   @update:model-value="toggle(f, $event)"

@@ -8,13 +8,17 @@ import { useAsync } from './useAsync';
 
 export const KIND: Record<string, { label: string; tone: string }> = {
   app: { label: '應用', tone: 'success' },
+  group: { label: '目錄', tone: 'neutral' },
   menu: { label: '選單', tone: 'primary' },
   tab: { label: 'Tab', tone: 'cyan' },
   button: { label: '按鈕', tone: 'violet' },
   api: { label: 'API', tone: 'neutral' },
 };
 
+/** ancestors:可授予的上層(略過選單目錄 group);descendants:全部下層 */
 export type FlatPerm = { node: PermNode; depth: number; ancestors: string[]; descendants: string[] };
+/** 選單目錄只用來分組與命名,不可授予(Gateway PRD §8.3.4) */
+export const isGroup = (n: { kind: string }) => n.kind === 'group';
 
 export function useAppPermTree() {
   const apps = useAsync(() => rbac.apps());
@@ -35,7 +39,7 @@ export function useAppPermTree() {
     const walk = (l: PermNode[], depth: number, ancestors: string[]) =>
       l.forEach((n) => {
         out.push({ node: n, depth, ancestors, descendants: desc(n) });
-        walk(n.children, depth + 1, [...ancestors, n.code]);
+        walk(n.children, depth + 1, isGroup(n) ? ancestors : [...ancestors, n.code]);
       });
     walk(tree.data.value?.items ?? [], 0, []);
     return out;

@@ -5,6 +5,7 @@
  * 頁面 / 選單可見 = 選單權限 ∩ 該頁需要的 BFF 讀取權限(兩者都有才顯示,避免看得到頁面卻全部 403)。
  */
 import { computed } from 'vue';
+import { hasIcon } from '@/ui/icons';
 import { loadMe as kitLoadMe, logout as kitLogout, useAuth as kitUseAuth, type Me as KitMe } from '@giganexus/web-kit';
 
 /** 應用登記(Gateway PRD §8.3.3) */
@@ -70,6 +71,11 @@ export function canAll(codes: readonly string[] | undefined): boolean {
 export function menuTitle(permission: string | undefined, fallback: string): string {
   return kit.nameOf(permission) ?? fallback;
 }
+/** 選單 / 頁面圖示:以 BFF 為準(須是 ui/icons.ts 登記的名稱),沒有或不認得時用前端預設 */
+export function menuIcon(permission: string | undefined, fallback: string): string {
+  const icon = kit.menuOf(permission)?.icon;
+  return hasIcon(icon) ? icon : fallback;
+}
 
 export interface MenuItem {
   key: string;
@@ -82,16 +88,28 @@ export interface MenuItem {
 }
 export interface MenuGroup {
   key: string;
+  /** BFF 的選單目錄代碼(kind = group,登記在 gateway-rbac.yaml;名稱 / 排序 / 圖示可在「選單管理」修改) */
+  code: string;
   title: string;
   icon: string;
   children: MenuItem[];
 }
 
-/** 兩層選單(第三層 Tab 在 router.ts 的 meta);順序同 gateway-rbac.yaml 的 sort */
+/**
+ * 兩層選單的預設值(第三層 Tab 在 router.ts 的 meta)。實際顯示以 BFF 為準(/api/auth/me 的 menus):
+ * 大項的名稱 / 圖示 / 順序、頁面的名稱 / 順序,以及頁面歸在哪個大項(頁面在 BFF 的上層目錄);BFF 沒有資料時用這裡的值。
+ */
 const MENU: readonly MenuGroup[] = [
-  { key: 'overview', title: '總覽', icon: 'dashboard', children: [{ key: 'dashboard', title: '儀表板', path: '/dashboard', permission: IT.dashboard }] },
+  {
+    key: 'overview',
+    code: 'it.group.overview',
+    title: '總覽',
+    icon: 'dashboard',
+    children: [{ key: 'dashboard', title: '儀表板', path: '/dashboard', permission: IT.dashboard }],
+  },
   {
     key: 'gateway',
+    code: 'it.group.gateway',
     title: 'Gateway 管理',
     icon: 'gateway',
     children: [
@@ -101,12 +119,14 @@ const MENU: readonly MenuGroup[] = [
   },
   {
     key: 'endpoint',
+    code: 'it.group.endpoint',
     title: '端點管理',
     icon: 'monitor',
     children: [{ key: 'devices', title: '電腦清單', path: '/endpoint/devices', permission: IT.endpointDevice }],
   },
   {
     key: 'system',
+    code: 'it.group.system',
     title: '系統管理',
     icon: 'settings',
     children: [
@@ -118,17 +138,48 @@ const MENU: readonly MenuGroup[] = [
   },
 ];
 
+/** 依 BFF 的目錄、名稱、排序組出側欄(可見 = 選單權限 ∩ 該頁的 BFF 讀取權限) */
+function buildMenus(): MenuGroup[] {
+  const defaults = new Map(MENU.map((g, i) => [g.code, { g, i }]));
+  const buckets = new Map<string, (MenuItem & { sort: number | null; order: number })[]>();
+  MENU.forEach((g, gi) =>
+    g.children.forEach((c, ci) => {
+      if (!can(c.permission) || !canAll(c.requires)) return;
+      const m = kit.menuOf(c.permission);
+      const parent = m?.parentCode ?? null;
+      // 頁面在 BFF 掛到某個目錄(group)時歸到該目錄;否則用預設大項
+      const group = parent && (defaults.has(parent) || kit.menuOf(parent)?.kind === 'group') ? parent : g.code;
+      const list = buckets.get(group) ?? [];
+      list.push({ ...c, title: m?.name ?? c.title, sort: m?.sort ?? null, order: gi * 100 + ci });
+      buckets.set(group, list);
+    }),
+  );
+  const bySort = <T extends { sort: number | null; order: number }>(a: T, b: T) =>
+    a.sort !== null && b.sort !== null && a.sort !== b.sort ? a.sort - b.sort : a.order - b.order;
+  return [...buckets.entries()]
+    .map(([code, items]) => {
+      const d = defaults.get(code);
+      const m = kit.menuOf(code);
+      return {
+        key: d?.g.key ?? code,
+        code,
+        title: m?.name ?? d?.g.title ?? code,
+        icon: hasIcon(m?.icon) ? m!.icon! : (d?.g.icon ?? 'layers'),
+        sort: m?.sort ?? null,
+        order: d?.i ?? 999,
+        children: items.sort(bySort).map(({ sort: _s, order: _o, ...c }) => c),
+      };
+    })
+    .sort(bySort)
+    .map(({ sort: _s, order: _o, ...g }) => g);
+}
+
 export function useAuth() {
   return {
     me: computed(() => kit.me.me as Me | null),
     user: kit.user,
     permissions: kit.permissions,
-    menus: computed(() =>
-      MENU.map((g) => ({
-        ...g,
-        children: g.children.filter((c) => can(c.permission) && canAll(c.requires)).map((c) => ({ ...c, title: menuTitle(c.permission, c.title) })),
-      })).filter((g) => g.children.length),
-    ),
+    menus: computed(buildMenus),
     can,
     canAll,
     loadMe,

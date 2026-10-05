@@ -11,6 +11,7 @@ import { rbac, type Permission } from '@/api/admin';
 import { can, GW } from '@/api/auth';
 import { describeError } from '@/api/http';
 import { KIND } from '@/composables/appPermTree';
+import { ICON_NAMES } from '@/ui/icons';
 import { useAsync } from '@/composables/useAsync';
 import { confirm, toast } from '@/ui';
 
@@ -49,6 +50,7 @@ const rows = computed<Row[]>(() => {
 });
 
 const KIND_OPTIONS = [
+  { label: '目錄(只分組,不可授予)', value: 'group' },
   { label: '選單', value: 'menu' },
   { label: 'Tab', value: 'tab' },
   { label: '按鈕', value: 'button' },
@@ -59,15 +61,20 @@ const reload = () => Promise.all([perms.reload(), apps.reload()]);
 // ---- 新增 / 編輯 ----
 const modal = ref<'add' | 'edit' | null>(null);
 const editing = ref<Permission | null>(null);
-const form = reactive({ code: '', name: '', kind: 'menu', parentCode: '', sort: '', description: '' });
+const form = reactive({ code: '', name: '', kind: 'menu', parentCode: '', sort: '', description: '', icon: '' });
+/** 圖示用於應用 / 目錄 / 選單(Tab、按鈕不顯示圖示) */
+const ICON_OPTIONS = [{ label: '(不設定)', value: '' }, ...ICON_NAMES.map((n) => ({ label: n, value: n }))];
+const showIcon = computed(() => ['app', 'group', 'menu'].includes(form.kind));
 const saving = ref(false);
 const isRoot = computed(() => editing.value?.kind === 'app');
 /** 上層選項:不可選自己與自己的下層(避免循環) */
 const parentOptions = computed(() => {
   const self = editing.value ? rows.value.find((r) => r.p.code === editing.value!.code) : null;
   const banned = new Set(self ? [self.p.code, ...self.descendants] : []);
+  // 目錄只能掛在應用或其他目錄底下
+  const allowed = form.kind === 'group' ? ['app', 'group'] : ['app', 'group', 'menu', 'tab'];
   return rows.value
-    .filter((r) => !banned.has(r.p.code) && r.p.kind !== 'button')
+    .filter((r) => !banned.has(r.p.code) && allowed.includes(r.p.kind))
     .map((r) => ({ label: `${'　'.repeat(r.depth)}${r.p.name}(${r.p.code})`, value: r.p.code }));
 });
 function openAdd(parent?: Permission) {
@@ -80,6 +87,7 @@ function openAdd(parent?: Permission) {
     parentCode: p?.code ?? '',
     sort: '',
     description: '',
+    icon: '',
   });
   modal.value = 'add';
 }
@@ -92,6 +100,7 @@ function openEdit(p: Permission) {
     parentCode: p.parentCode ?? '',
     sort: p.sort === null ? '' : String(p.sort),
     description: p.description ?? '',
+    icon: p.icon ?? '',
   });
   modal.value = 'edit';
 }
@@ -100,8 +109,17 @@ async function submit() {
   try {
     const sort = form.sort.trim() === '' ? null : Number(form.sort);
     const description = form.description.trim() || null;
+    const icon = showIcon.value ? form.icon || null : null;
     if (modal.value === 'add') {
-      await rbac.createPermission({ code: form.code.trim(), name: form.name.trim(), kind: form.kind, parentCode: form.parentCode || null, sort, description });
+      await rbac.createPermission({
+        code: form.code.trim(),
+        name: form.name.trim(),
+        kind: form.kind,
+        parentCode: form.parentCode || null,
+        sort,
+        description,
+        icon,
+      });
       toast.success('已新增', form.code.trim());
     } else {
       const p = editing.value!;
@@ -109,6 +127,7 @@ async function submit() {
       if (form.name.trim() !== p.name) body.name = form.name.trim();
       if (description !== (p.description ?? null)) body.description = description;
       if (sort !== p.sort) body.sort = sort;
+      if (icon !== (p.icon ?? null)) body.icon = icon;
       if (!isRoot.value) {
         if (form.kind !== p.kind) body.kind = form.kind;
         if ((form.parentCode || null) !== p.parentCode) body.parentCode = form.parentCode || null;
@@ -186,6 +205,7 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
           <tr v-for="r in rows" :key="r.p.code">
             <td class="name" :style="{ '--depth': r.depth }">
               <GBadge :tone="KIND[r.p.kind]?.tone ?? 'neutral'" variant="outline">{{ KIND[r.p.kind]?.label ?? r.p.kind }}</GBadge>
+              <GIcon v-if="r.p.icon" :name="r.p.icon" :size="16" class="muted" />
               <div class="pn">
                 <span>{{ r.p.name }}</span>
                 <code>{{ r.p.code }}</code>
@@ -227,9 +247,21 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
           <GInput v-model="form.name" label="名稱" required />
           <GInput v-model="form.sort" label="排序" type="number" />
         </div>
-        <GInput v-model="form.description" label="說明" />
+        <div class="grid" style="grid-template-columns: 1fr 1fr; --gap: 12px">
+          <GInput v-model="form.description" label="說明" />
+          <div v-if="showIcon" class="icon-pick">
+            <GSelect v-model="form.icon" label="圖示" :options="ICON_OPTIONS" />
+            <span class="icon-preview" :title="form.icon || '未設定'"><GIcon v-if="form.icon" :name="form.icon" :size="20" /></span>
+          </div>
+        </div>
         <p class="faint xs" style="margin: 0">
-          {{ modal === 'add' ? '新權限不會自動授予任何人,建立後到「權限設定」勾選。' : '改名稱後,權限設定與使用此名稱的選單(例如本系統側欄)會顯示新名稱。' }}
+          {{
+            form.kind === 'group'
+              ? '目錄只用來把選單分組(名稱、排序、圖示),不需授予;底下有任一頁可見時才顯示。'
+              : modal === 'add'
+                ? '新權限不會自動授予任何人,建立後到「權限設定」勾選。'
+                : '改名稱、圖示後,權限設定與使用 BFF 名稱的選單(例如本系統側欄)會跟著更新。'
+          }}
         </p>
       </form>
       <template #footer>
@@ -241,6 +273,22 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
 </template>
 
 <style scoped>
+.icon-pick {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.icon-pick > :first-child {
+  flex: 1;
+}
+.icon-preview {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
 .tbl {
   width: 100%;
   border-collapse: collapse;

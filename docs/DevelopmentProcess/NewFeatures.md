@@ -2,6 +2,10 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-05 側欄大項改由 BFF 管理(選單目錄 group、圖示)
+- 內容:側欄大項(總覽、Gateway 管理、端點管理、系統管理)登記為 BFF 選單目錄(`kind = group`,`it.group.*`,只分組命名、不可授予),頁面掛到所屬目錄。側欄大項的名稱 / 圖示 / 順序、頁面歸屬(頁面在 BFF 的上層目錄)與頁面名稱 / 順序 / 頁首圖示改以 `/api/auth/me` 的 `menus` 為準,沒有時用 `api/auth.ts` 的預設值。選單管理可新增目錄、選圖示(`ui/icons.ts` 登記的名稱);權限勾選畫面的目錄列不顯示勾選框。圖示清單由 `GIcon.vue` 移到 `ui/icons.ts`。
+- 檔案:`frontend/src/api/{auth,admin}.ts`、`frontend/src/ui/{icons.ts,components/GIcon.vue}`、`frontend/src/layouts/TabbedPage.vue`、`frontend/src/composables/{appPermTree,bffRbac}.ts`、`frontend/src/pages/system/{MenuManage,AppPermissions,DeptPermissions,UserPermissions}.vue`、`deploy/gateway-rbac.yaml`
+
 ## 2026-10-05 選單管理、API 權限 Tab
 - 內容:
   - **選單管理**(系統管理,新選單 `it.sys-menu.read`):各應用「應用 → 選單 → Tab → 按鈕」清單的改名稱、上層、排序、說明,新增與刪除;原「權限設定 › 應用權限」的新增功能移到此頁。程式(`gateway-rbac.yaml` / OpenAPI)只負責首次登記,BFF `apply` 不再覆寫已存在權限的上層與排序(名稱本來就不覆寫)。

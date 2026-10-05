@@ -11,7 +11,7 @@ import { useRoute } from 'vue-router';
 import { rbac, users, type EffectivePermissions, type UserRow } from '@/api/admin';
 import { can, GW } from '@/api/auth';
 import { describeError } from '@/api/http';
-import { KIND, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
+import { isGroup, KIND, useAppPermTree, type FlatPerm } from '@/composables/appPermTree';
 import { useAsync } from '@/composables/useAsync';
 import { confirm, toast } from '@/ui';
 
@@ -240,8 +240,9 @@ const u = computed(() => personal.data.value?.user ?? null);
                 <GBadge v-for="(s, i) in sources(f.node.code)" :key="i" :tone="s.tone" :title="s.title">{{ s.label }}</GBadge>
               </td>
               <td class="cell" :class="{ editing }">
+                <span v-if="isGroup(f.node)" class="faint xs" title="選單目錄只用來分組,不需授予">—</span>
                 <GCheckbox
-                  v-if="editing"
+                  v-else-if="editing"
                   :model-value="draft.has(f.node.code)"
                   :aria-label="`個人權限 ${f.node.name}`"
                   @update:model-value="toggle(f, $event)"
