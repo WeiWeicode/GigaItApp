@@ -190,6 +190,8 @@ export interface Permission {
   sort: number | null;
   /** 選單圖示名稱(ui/icons.ts) */
   icon: string | null;
+  /** 選單 / Tab 隨附的 API 讀取權限(擁有此選單即一併擁有) */
+  includes?: string[];
   rowVer: string;
 }
 export interface PermNode {
@@ -244,6 +246,8 @@ export interface WhoCanAccess {
     departments: { deptCode: string; name: string; jobTier: string; includeSubDepts: boolean }[];
     users: { employeeNo: string; name: string; validTo: string | null; reason: string | null }[];
   };
+  /** 隨附此權限的選單(擁有其中任一選單即擁有此權限) */
+  includedBy?: { code: string; name: string }[];
   apiClients: { code: string; name: string; active: boolean }[];
 }
 /** 職級門檻(GET /api/admin/job-tiers):全員 / 課級 / 理級 / 處級以上;maxLevel = 職級上限(含),null = 不限 */
@@ -316,6 +320,8 @@ export interface RbacPreview {
   subject: Record<string, unknown>;
   roles: RoleSource[];
   permissions: string[];
+  /** 隨選單取得的 API 讀取權限:權限代碼 → 選單代碼 */
+  includedBy?: Record<string, string[]>;
   apps: { code: string; name: string; basePath: string; icon: string | null }[];
 }
 
@@ -336,6 +342,8 @@ export const rbac = {
     rowVer: string,
     body: { name?: string; kind?: string; parentCode?: string | null; sort?: number | null; description?: string | null; icon?: string | null },
   ) => http.patch<Permission>(`/api/admin/permissions/${encodeURIComponent(code)}`, { ...body, rowVer }),
+  setIncludes: (code: string, includes: string[]) =>
+    http.put<{ code: string; includes: string[] }>(`/api/admin/permissions/${encodeURIComponent(code)}/includes`, { includes }),
   deletePermission: (code: string, rowVer: string) => http.delete(`/api/admin/permissions/${encodeURIComponent(code)}`, { query: { rowVer } }),
   roles: () => http.get<{ items: Role[] }>('/api/admin/roles'),
   createRole: (body: { code: string; name: string; description?: string | null }) => http.post<Role>('/api/admin/roles', body),
@@ -415,6 +423,8 @@ export interface EffectivePermissions {
     depts?: { deptCode: string; jobTier: string; includeSubDepts: boolean }[];
     /** 個人權限(v0.12) */
     personal?: { validTo: string | null; reason: string | null } | null;
+    /** 隨選單取得(只在沒有其他來源時) */
+    includedBy?: string[];
   }[];
   apps: { code: string; name: string }[];
 }

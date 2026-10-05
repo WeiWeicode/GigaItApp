@@ -2,6 +2,10 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-05 選單隨附的 API 讀取權限
+- 內容:授予選單即一併取得該頁需要的 API 讀取權限(BFF `gw.permission_include`),解決「勾了選單、側欄卻不顯示」(側欄可見 = 選單權限 ∩ 該頁讀取權限)。選單管理的編輯視窗可勾選「此頁需要的 API 讀取權限」;權限試算、個人權限標示隨附的權限與是否取得,目錄改顯示「依下層」;誰能存取列出「隨選單取得」;API 權限 Tab 標示被哪些選單隨附。`gateway-rbac.yaml` 以 `includes` 首次登記(與 `api/auth.ts` 的 `requires` 一致)。
+- 檔案:`frontend/src/pages/system/{MenuManage,PermissionPreview,UserPermissions,ApiPermissions}.vue`、`frontend/src/pages/gateway/WhoCanAccess.vue`、`frontend/src/api/admin.ts`、`deploy/gateway-rbac.yaml`
+
 ## 2026-10-05 側欄大項改由 BFF 管理(選單目錄 group、圖示)
 - 內容:側欄大項(總覽、Gateway 管理、端點管理、系統管理)登記為 BFF 選單目錄(`kind = group`,`it.group.*`,只分組命名、不可授予),頁面掛到所屬目錄。側欄大項的名稱 / 圖示 / 順序、頁面歸屬(頁面在 BFF 的上層目錄)與頁面名稱 / 順序 / 頁首圖示改以 `/api/auth/me` 的 `menus` 為準,沒有時用 `api/auth.ts` 的預設值。選單管理可新增目錄、選圖示(`ui/icons.ts` 登記的名稱);權限勾選畫面的目錄列不顯示勾選框。圖示清單由 `GIcon.vue` 移到 `ui/icons.ts`。
 - 檔案:`frontend/src/api/{auth,admin}.ts`、`frontend/src/ui/{icons.ts,components/GIcon.vue}`、`frontend/src/layouts/TabbedPage.vue`、`frontend/src/composables/{appPermTree,bffRbac}.ts`、`frontend/src/pages/system/{MenuManage,AppPermissions,DeptPermissions,UserPermissions}.vue`、`deploy/gateway-rbac.yaml`

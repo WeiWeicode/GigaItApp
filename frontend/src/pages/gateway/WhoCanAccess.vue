@@ -109,7 +109,13 @@ watch(
       </GCard>
       <GCard v-else-if="loading"><GSkeleton :lines="6" /></GCard>
       <template v-else-if="result">
-        <GCard v-if="!result.roles.length && !result.direct?.departments.length && !result.direct?.users.length">
+        <GCard v-if="result.includedBy?.length" title="隨選單取得" icon="layers" tone="violet">
+          <p class="faint small" style="margin: 0 0 8px">擁有下列任一選單的人,一併擁有此 API 讀取權限(「選單管理」設定的隨附權限)。</p>
+          <div class="row" style="--gap: 6px; flex-wrap: wrap">
+            <GBadge v-for="m in result.includedBy" :key="m.code" tone="violet" :title="m.code">{{ m.name }}</GBadge>
+          </div>
+        </GCard>
+        <GCard v-if="!result.roles.length && !result.direct?.departments.length && !result.direct?.users.length && !result.includedBy?.length">
           <GEmpty icon="shield" tone="warning" title="沒有任何人擁有此權限" description="沒有角色、部門或個人擁有它;需要此權限的 API 目前沒有人可以呼叫。" />
         </GCard>
         <GCard v-if="result.direct?.departments.length || result.direct?.users.length" title="直接授予(不經角色)" icon="user-check" tone="cyan">

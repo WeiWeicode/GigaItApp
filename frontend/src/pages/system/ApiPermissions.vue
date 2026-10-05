@@ -35,6 +35,12 @@ const groups = computed(() => {
     .map(([sys, perms]) => ({ system: sys, perms: perms.sort((a, b) => a.code.localeCompare(b.code)) }));
 });
 const apiCodes = computed(() => new Set(apiPerms.value.map((p) => p.code)));
+/** API 權限 → 隨附它的選單名稱(「選單管理」設定;擁有選單即一併擁有) */
+const includedBy = computed(() => {
+  const m = new Map<string, string[]>();
+  for (const p of data.value?.permissions ?? []) for (const c of p.includes ?? []) m.set(c, [...(m.get(c) ?? []), p.name]);
+  return m;
+});
 
 // ---- 編輯某角色的 API 權限(保留其他權限) ----
 const editing = ref<string | null>(null);
@@ -137,6 +143,9 @@ const canWrite = computed(() => can(GW.rbacWrite));
                 <div class="pn">
                   <span>{{ p.name }}</span>
                   <code>{{ p.code }}</code>
+                  <span v-if="includedBy.get(p.code)" class="faint xs" :title="'擁有這些選單的人也會取得此權限'"
+                    >隨選單:{{ includedBy.get(p.code)!.join('、') }}</span
+                  >
                 </div>
               </th>
               <td v-for="r in roles" :key="r.code" class="cell" :class="{ editing: editing === r.code }">

@@ -68,15 +68,22 @@ const tree = useAsync(() => (app.value ? rbac.permissionTree(app.value) : Promis
 watch(app, () => tree.reload());
 const appOptions = computed(() => (apps.data.value?.items ?? []).map((a) => ({ label: a.name, value: a.code })));
 const granted = computed(() => new Set(result.value?.permissions ?? []));
-const KIND: Record<string, string> = { app: '應用', menu: '選單', tab: 'Tab', button: '按鈕', api: 'API' };
-type Flat = { node: PermNode; depth: number };
+const KIND: Record<string, string> = { app: '應用', group: '目錄', menu: '選單', tab: 'Tab', button: '按鈕', api: 'API' };
+// 選單隨附的 API 讀取權限(選單管理設定)
+const allPerms = useAsync(() => rbac.permissions());
+const includesOf = computed(() => new Map((allPerms.data.value?.items ?? []).map((p) => [p.code, p.includes ?? []])));
+type Flat = { node: PermNode; depth: number; descendants: string[] };
 const flat = computed<Flat[]>(() => {
   const out: Flat[] = [];
-  const walk = (l: PermNode[], d: number) => l.forEach((n) => (out.push({ node: n, depth: d }), walk(n.children, d + 1)));
+  const desc = (n: PermNode): string[] => n.children.flatMap((c) => [c.code, ...desc(c)]);
+  const walk = (l: PermNode[], d: number) => l.forEach((n) => (out.push({ node: n, depth: d, descendants: desc(n) }), walk(n.children, d + 1)));
   walk(tree.data.value?.items ?? [], 0);
   return out;
 });
-const grantedInTree = computed(() => flat.value.filter((f) => granted.value.has(f.node.code)).length);
+/** 目錄(group)不授予:底下有任一項擁有即顯示 */
+const isOn = (f: Flat) => (f.node.kind === 'group' ? f.descendants.some((c) => granted.value.has(c)) : granted.value.has(f.node.code));
+const grantable = computed(() => flat.value.filter((f) => f.node.kind !== 'group'));
+const grantedInTree = computed(() => grantable.value.filter((f) => granted.value.has(f.node.code)).length);
 </script>
 
 <template>
@@ -128,7 +135,12 @@ const grantedInTree = computed(() => flat.value.filter((f) => granted.value.has(
       </GCard>
     </div>
 
-    <GCard title="應用權限樹" :subtitle="result ? `此應用擁有 ${grantedInTree} / ${flat.length} 項` : '先在左側試算'" icon="grid" padding="none">
+    <GCard
+      title="應用權限樹"
+      :subtitle="result ? `此應用擁有 ${grantedInTree} / ${grantable.length} 項(目錄依下層顯示)` : '先在左側試算'"
+      icon="grid"
+      padding="none"
+    >
       <template #actions>
         <GSelect v-model="app" :options="appOptions" icon="apps" />
       </template>
@@ -141,11 +153,28 @@ const grantedInTree = computed(() => flat.value.filter((f) => granted.value.has(
         description="由應用的 gateway-rbac.yaml 或 OpenAPI x-permissions 登記(kind / parent)"
       />
       <ul v-else class="tree">
-        <li v-for="f in flat" :key="f.node.code" :style="{ '--depth': f.depth }" :class="!result ? '' : granted.has(f.node.code) ? 'yes' : 'no'">
-          <span class="st"><GIcon :name="!result ? 'minus' : granted.has(f.node.code) ? 'check' : 'x'" :size="14" :stroke="2.6" /></span>
+        <li
+          v-for="f in flat"
+          :key="f.node.code"
+          :style="{ '--depth': f.depth }"
+          :class="[!result ? '' : isOn(f) ? 'yes' : 'no', { grp: f.node.kind === 'group' }]"
+          :title="f.node.kind === 'group' ? '目錄不需授予:底下有任一項擁有時顯示' : ''"
+        >
+          <span class="st"><GIcon :name="!result ? 'minus' : f.node.kind === 'group' ? 'layers' : isOn(f) ? 'check' : 'x'" :size="14" :stroke="2.6" /></span>
           <GBadge tone="neutral" variant="outline">{{ KIND[f.node.kind] ?? f.node.kind }}</GBadge>
           <span class="name">{{ f.node.name }}</span>
           <code class="faint xs">{{ f.node.code }}</code>
+          <span v-if="f.node.kind === 'group' && result" class="faint xs">{{ isOn(f) ? '依下層:顯示' : '依下層:不顯示' }}</span>
+          <span v-if="includesOf.get(f.node.code)?.length" class="incl">
+            <span class="faint xs">隨附</span>
+            <GBadge
+              v-for="c in includesOf.get(f.node.code)"
+              :key="c"
+              :tone="!result ? 'neutral' : granted.has(c) ? 'success' : 'danger'"
+              :title="result?.includedBy?.[c] ? `隨選單 ${result.includedBy[c].join('、')} 取得` : ''"
+              >{{ c }}</GBadge
+            >
+          </span>
         </li>
       </ul>
     </GCard>
@@ -213,5 +242,19 @@ const grantedInTree = computed(() => flat.value.filter((f) => granted.value.has(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 目錄:不授予,依下層顯示 */
+.grp .st,
+.grp.no .st,
+.grp.yes .st {
+  color: var(--text-3);
+  background: var(--glass-soft);
+}
+.incl {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
 </style>

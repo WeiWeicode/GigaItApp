@@ -65,6 +65,23 @@ const form = reactive({ code: '', name: '', kind: 'menu', parentCode: '', sort: 
 /** 圖示用於應用 / 目錄 / 選單(Tab、按鈕不顯示圖示) */
 const ICON_OPTIONS = [{ label: '(不設定)', value: '' }, ...ICON_NAMES.map((n) => ({ label: n, value: n }))];
 const showIcon = computed(() => ['app', 'group', 'menu'].includes(form.kind));
+// ---- 隨附的 API 讀取權限(只限選單 / Tab;擁有此選單即一併擁有,不必另外授予) ----
+const includes = ref<Set<string>>(new Set());
+const showIncludes = computed(() => ['menu', 'tab'].includes(form.kind));
+const incQ = ref('');
+const readApis = computed(() =>
+  (perms.data.value?.items ?? [])
+    .filter((p) => p.kind === 'api' && p.code.endsWith('.read'))
+    .filter((p) => !incQ.value.trim() || p.code.includes(incQ.value.trim()) || p.name.includes(incQ.value.trim()))
+    .sort((a, b) => a.code.localeCompare(b.code)),
+);
+function toggleInclude(code: string, on: boolean) {
+  const s = new Set(includes.value);
+  if (on) s.add(code);
+  else s.delete(code);
+  includes.value = s;
+}
+const sameSet = (a: Set<string>, b: string[]) => a.size === b.length && b.every((x) => a.has(x));
 const saving = ref(false);
 const isRoot = computed(() => editing.value?.kind === 'app');
 /** 上層選項:不可選自己與自己的下層(避免循環) */
@@ -89,6 +106,8 @@ function openAdd(parent?: Permission) {
     description: '',
     icon: '',
   });
+  includes.value = new Set();
+  incQ.value = '';
   modal.value = 'add';
 }
 function openEdit(p: Permission) {
@@ -102,6 +121,8 @@ function openEdit(p: Permission) {
     description: p.description ?? '',
     icon: p.icon ?? '',
   });
+  includes.value = new Set(p.includes ?? []);
+  incQ.value = '';
   modal.value = 'edit';
 }
 async function submit() {
@@ -120,6 +141,7 @@ async function submit() {
         description,
         icon,
       });
+      if (showIncludes.value && includes.value.size) await rbac.setIncludes(form.code.trim(), [...includes.value]);
       toast.success('已新增', form.code.trim());
     } else {
       const p = editing.value!;
@@ -132,11 +154,14 @@ async function submit() {
         if (form.kind !== p.kind) body.kind = form.kind;
         if ((form.parentCode || null) !== p.parentCode) body.parentCode = form.parentCode || null;
       }
-      if (!Object.keys(body).length) {
+      const includesChanged = showIncludes.value && !sameSet(includes.value, p.includes ?? []);
+      if (!Object.keys(body).length && !includesChanged) {
         modal.value = null;
         return;
       }
-      await rbac.updatePermission(p.code, p.rowVer, body);
+      if (Object.keys(body).length) await rbac.updatePermission(p.code, p.rowVer, body);
+      // 隨附權限變更:擁有此選單的人下次請求即生效(全體權限版本遞增)
+      if (includesChanged) await rbac.setIncludes(p.code, [...includes.value]);
       toast.success('已儲存', body.name ? `${p.name} → ${body.name}(使用者約 5 分鐘內或重新整理後看到新名稱)` : p.code);
     }
     modal.value = null;
@@ -197,7 +222,7 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
           <tr>
             <th>名稱 / 代碼</th>
             <th class="num">排序</th>
-            <th>說明</th>
+            <th>說明 / 隨附的 API 權限</th>
             <th v-if="canWrite" class="ops" />
           </tr>
         </thead>
@@ -212,7 +237,12 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
               </div>
             </td>
             <td class="num">{{ r.p.sort ?? '—' }}</td>
-            <td class="desc muted small">{{ r.p.description ?? '' }}</td>
+            <td class="desc muted small">
+              {{ r.p.description ?? '' }}
+              <span v-if="r.p.includes?.length" class="incl-chips" :title="'隨附的 API 讀取權限:' + r.p.includes.join('、')">
+                <GBadge v-for="c in r.p.includes" :key="c" tone="neutral">{{ c }}</GBadge>
+              </span>
+            </td>
             <td v-if="canWrite" class="ops">
               <GButton size="sm" variant="ghost" icon="edit" @click="openEdit(r.p)">編輯</GButton>
               <GButton v-if="r.p.kind !== 'button'" size="sm" variant="ghost" icon="plus" @click="openAdd(r.p)">下層</GButton>
@@ -254,6 +284,24 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
             <span class="icon-preview" :title="form.icon || '未設定'"><GIcon v-if="form.icon" :name="form.icon" :size="20" /></span>
           </div>
         </div>
+        <div v-if="showIncludes" class="incl-box">
+          <div class="row" style="--gap: 8px">
+            <span class="small"><b>此頁需要的 API 讀取權限</b>(隨附:擁有此選單即一併擁有)</span>
+            <span class="spacer" />
+            <GInput v-model="incQ" icon="search" placeholder="搜尋" clearable style="max-width: 180px" />
+          </div>
+          <div class="incl-list">
+            <GCheckbox
+              v-for="a in readApis"
+              :key="a.code"
+              :model-value="includes.has(a.code)"
+              :label="`${a.name}(${a.code})`"
+              @update:model-value="toggleInclude(a.code, $event)"
+            />
+            <p v-if="!readApis.length" class="faint xs" style="margin: 0">沒有符合的 API 讀取權限</p>
+          </div>
+          <p class="faint xs" style="margin: 0">只能選讀取權限;寫入(按鈕)權限仍需在權限設定另外授予。</p>
+        </div>
         <p class="faint xs" style="margin: 0">
           {{
             form.kind === 'group'
@@ -273,6 +321,27 @@ const loadError = computed(() => apps.error.value ?? perms.error.value);
 </template>
 
 <style scoped>
+.incl-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.incl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow: auto;
+}
+.incl-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
 .icon-pick {
   display: flex;
   align-items: flex-end;

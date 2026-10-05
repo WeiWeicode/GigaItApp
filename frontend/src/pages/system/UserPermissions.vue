@@ -71,6 +71,11 @@ watch(app, (v) => v && userId.value !== null && personal.reload());
 if (q.value) void search();
 
 const eff = computed(() => new Map((effective.value?.permissions ?? []).map((p) => [p.code, p])));
+// 選單隨附的 API 讀取權限(選單管理設定)
+const allPerms = useAsync(() => rbac.permissions());
+const includesOf = computed(() => new Map((allPerms.data.value?.items ?? []).map((p) => [p.code, p.includes ?? []])));
+/** 目錄不授予:底下有任一項有效即顯示 */
+const groupOn = (f: FlatPerm) => f.descendants.some((c) => eff.value.has(c));
 const mine = computed(() => new Map((personal.data.value?.grants ?? []).map((g) => [g.code, g])));
 type Source = { label: string; tone: string; title?: string };
 function sources(code: string): Source[] {
@@ -233,11 +238,24 @@ const u = computed(() => personal.data.value?.user ?? null);
                 </div>
               </th>
               <td class="cell">
-                <span v-if="eff.has(f.node.code)" class="yes"><GIcon name="check" :size="14" :stroke="3" /></span>
+                <span v-if="isGroup(f.node)" class="faint xs" title="目錄不需授予,底下有任一項有效時顯示">{{
+                  groupOn(f) ? '依下層:顯示' : '依下層:不顯示'
+                }}</span>
+                <span v-else-if="eff.has(f.node.code)" class="yes"><GIcon name="check" :size="14" :stroke="3" /></span>
                 <span v-else class="no" />
               </td>
               <td class="cell src">
                 <GBadge v-for="(s, i) in sources(f.node.code)" :key="i" :tone="s.tone" :title="s.title">{{ s.label }}</GBadge>
+                <span v-if="includesOf.get(f.node.code)?.length" class="incl">
+                  <span class="faint xs">隨附</span>
+                  <GBadge
+                    v-for="c in includesOf.get(f.node.code)"
+                    :key="c"
+                    :tone="eff.has(c) ? 'success' : 'neutral'"
+                    :title="eff.has(c) ? '已取得' : '擁有此選單後一併取得'"
+                    >{{ c }}</GBadge
+                  >
+                </span>
               </td>
               <td class="cell" :class="{ editing }">
                 <span v-if="isGroup(f.node)" class="faint xs" title="選單目錄只用來分組,不需授予">—</span>
@@ -393,6 +411,12 @@ const u = computed(() => personal.data.value?.user ?? null);
 }
 .cell.src :deep(.g-badge) {
   margin: 2px 4px 2px 0;
+}
+.incl {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
 }
 .yes {
   display: inline-grid;

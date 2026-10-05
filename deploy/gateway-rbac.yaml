@@ -5,6 +5,7 @@
 # 內容:
 #   ① 本系統的選單權限(系統代碼 it,kind / parent / sort 供「權限設定 › 應用權限」樹狀設定)
 #      只負責首次登記:已存在的權限不覆寫名稱、上層與排序,之後在「系統管理 › 選單管理」調整(2026-10-05)
+#      includes = 此頁需要的 API 讀取權限(隨附:擁有選單即一併擁有),與 frontend/src/api/auth.ts 的 requires 一致
 #      資料與按鈕權限直接使用 BFF 管理 API 的 gw.admin.*(按鈕 = API),不在此重複登記
 #   ② 角色 it-admin:IT 管理系統全部選單;成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
 #      (此處不寫 adGroups / companies,套用時不會覆蓋 IT 在畫面上的設定;permissions 會整組取代,新增選單請改此檔)
@@ -20,13 +21,13 @@ permissions:
   - { code: it.group.endpoint, name: 端點管理, kind: group, parent: it.app.access, sort: 30, icon: monitor }
   - { code: it.group.system, name: 系統管理, kind: group, parent: it.app.access, sort: 40, icon: settings }
   - { code: it.dashboard.read, name: 儀表板, kind: menu, parent: it.group.overview, sort: 10 }
-  - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.group.gateway, sort: 20 }
-  - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.group.gateway, sort: 30 }
+  - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.group.gateway, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read] }
+  - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.group.gateway, sort: 30, includes: [gw.admin.rbac.read] }
   - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.group.endpoint, sort: 40 }
-  - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50 }
-  - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.group.system, sort: 60 }
-  - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.group.system, sort: 65 }
-  - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.group.system, sort: 70 }
+  - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50, includes: [gw.admin.user.read] }
+  - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.group.system, sort: 60, includes: [gw.admin.rbac.read] }
+  - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.group.system, sort: 65, includes: [gw.admin.rbac.read] }
+  - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.group.system, sort: 70, includes: [gw.admin.audit.read] }
 
 roles:
   - code: it-admin
