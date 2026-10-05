@@ -1,6 +1,6 @@
 # 專案地圖 — GigaItApp(IT 管理系統)
 
-> **最後更新:2026-10-02**(改用 Gateway 單一入口、各管理頁直接呼叫 BFF 管理 API(`api/admin.ts`);itapp-api 新增經 BFF 轉入的 `/api/it/*`(`gateway/plugin.ts`);`deploy/gateway-rbac.yaml`、`gateway-routes.yaml`)。
+> **最後更新:2026-10-05**(畫面權限模型範本:目錄 / 選單 / Tab / 按鈕登記為 BFF 權限並綁定 API(`deploy/gateway-rbac.yaml`、`api/auth.ts` 的 `IT` / `UI`);新增選單管理 `pages/system/MenuManage.vue`、部門 / 個人權限 `DeptPermissions.vue` / `UserPermissions.vue`、角色權限 `AppPermissions.vue`;圖示登記 `ui/icons.ts`。2026-10-02:改用 Gateway 單一入口、各管理頁直接呼叫 BFF 管理 API(`api/admin.ts`);itapp-api 新增經 BFF 轉入的 `/api/it/*`(`gateway/plugin.ts`);`deploy/gateway-rbac.yaml`、`gateway-routes.yaml`)。
 > 開發新功能後,在同一個變更內更新本文件(`AGENT.md` §9.1、Gateway `AGENT.md` §10.7)。只寫結構與職責,細節連到 `docs/` 對應章節。
 
 IT 部門的管理系統:`/it/`(Vue 前端)。登入走 Gateway 單一入口(web-kit);Gateway 管理與系統管理頁以使用者身分直接呼叫 BFF 管理 API(`/api/admin/*`);本系統自己的資料 `/api/it/*` 經 BFF 轉給 itapp-api(Fastify,port 51291,驗證內部 Token);端點管理經 BFF(`/api/endpoint/*`)。舊的 `/it/api/*`(自有登入)過渡期保留。
@@ -28,7 +28,7 @@ GigaItApp/
 ├─ frontend/                      Vue 3 + Vite(base /it/)
 │  ├─ src/
 │  │  ├─ main.ts、App.vue、router.ts   進入點與路由(兩層選單 → TabbedPage → Tab 子路由,懶加載)
-│  │  ├─ pages/                   畫面:dashboard/、gateway/(上游、路由、發佈、權限查詢〔唯讀〕)、endpoint/、system/(人員、部門、權限設定:應用權限、角色與規則、部門權限、個人權限、試算;稽核)、403、404、Unavailable
+│  │  ├─ pages/                   畫面:dashboard/、gateway/(上游、路由、發佈、權限查詢〔唯讀〕)、endpoint/、system/(人員、部門、權限設定:角色權限、角色與規則、部門權限、個人權限、試算;選單管理;稽核)、403、404、Unavailable
 │  │  ├─ layouts/                 AppLayout(選單、頁首、應用切換)、TabbedPage
 │  │  ├─ ui/                      全域 UI 套件:G* 元件(components/)、圖表(charts/)、tokens.css、feedback(toast / confirm)
 │  │  ├─ components/              本專案專用的小元件(非全域):GherkinView(行為規格顯示)
@@ -64,7 +64,7 @@ GigaItApp/
 
 | 要做的事 | 位置 |
 | --- | --- |
-| 新增頁面 | `frontend/src/pages/<區>/`、`router.ts`(meta);選單在 `frontend/src/api/auth.ts` 的 `MENU`;選單權限登記到 `deploy/gateway-rbac.yaml`;步驟見 `docs/UI-GUIDE.md` |
+| 新增頁面 / Tab / 按鈕 | `frontend/src/pages/<區>/`、`router.ts`(meta.permission = 選單代碼;Tab 與子路由標 Tab 代碼);選單預設值在 `frontend/src/api/auth.ts` 的 `MENU`,代碼常數 `IT`(選單)/ `UI`(Tab、按鈕);節點與綁定的 API 首次登記到 `deploy/gateway-rbac.yaml`(Gateway FRONTEND-GUIDE §7.5);之後名稱 / 排序 / 圖示 / 綁定在「選單管理」;步驟見 `docs/UI-GUIDE.md` |
 | 新增權限代碼 | 選單 / Tab:`deploy/gateway-rbac.yaml`(CI rbac-test 套用);按鈕 = 呼叫的 API 權限(BFF `gw.admin.*` 或本系統 API 的權限) |
 | 新增本系統 API | `backend/src/routes/<資源>.ts`(`/api/it/*`,`config: { gateway: true }`)、`deploy/gateway-routes.yaml` 登記路由並發佈,同步 `docs/API.md` |
 | 呼叫 BFF 管理 API | `frontend/src/api/admin.ts`(形狀對應 Gateway `bff/src/modules/admin/*.ts`) |

@@ -84,20 +84,21 @@ const list = usePaged<UserRow, UserPage>((page, pageSize) => http.get('/users', 
 
 | 情境 | 寫法 |
 | --- | --- |
-| 按鈕 | `<GButton v-can="'sys.user.create'">`(沒權限隱藏);`v-can:disable` 改為停用並提示 |
-| 條件顯示 | 模板 `$can('sys.audit.read')`;script `import { can } from '@/api/auth'` |
-| 頁面 | 路由 `meta.permission`;缺少時導向 `/403` |
-| Tab | `GTabs` item 的 `permission` |
+| 按鈕 | `<GButton v-can="UI.userDisable">` 或 `v-if="can(UI.xxx)"`(按鈕代碼 `UI.*`,不要直接用 API 代碼);`v-can:disable` 改為停用並提示 |
+| 條件顯示 | 模板 `$can(code)`;script `import { can, UI } from '@/api/auth'` |
+| 頁面 | 路由 `meta.permission` = 選單代碼 `IT.*`(另以 `meta.requires` 列該頁的 BFF 讀取權限);缺少時導向 `/403` |
+| Tab | `meta.tabs` 的 item 與子路由 `meta` 都標 Tab 代碼 `UI.*`;目前 Tab 沒權限時自動改到同頁第一個可看的 Tab |
+| 名稱 / 圖示 | 側欄、頁首、Tab 標籤以 BFF 為準(`menuTitle()` / `menuIcon()`,資料來自 `/api/auth/me` 的 `menus`);前端文字只是預設值 |
 
-前端權限只是體驗,**後端一定要宣告並檢查**(AGENT.md §7.1)。
+每個選單 / Tab / 按鈕都要在 `deploy/gateway-rbac.yaml` 登記並以 `includes` 綁定它用到的 BFF API(Gateway FRONTEND-GUIDE §7.5);前端權限只是體驗,**BFF 一定再以 API 權限檢查**。
 
 ## 7. 新增一個頁面
 
-1. 決定放在哪個選單群組與功能頁;新權限先在 `backend/src/rbac/catalog.ts` 新增(PERMISSIONS、MENUS、預設職級)。
+1. 決定放在哪個目錄(側欄大項)與功能頁;在 `deploy/gateway-rbac.yaml` 登記選單 / Tab / 按鈕(`kind`、`parent`、`sort`、`includes` 綁定的 API),並把代碼加到 `frontend/src/api/auth.ts` 的 `IT` / `UI`、`MENU`;角色 `it-admin` 的清單一併加入。
 2. `router.ts`:功能頁用 `TabbedPage`,`meta` 填 `permission`、`title`、`description`、`icon`、`tabs`;每個 Tab 是子路由(`meta.tab`)。
 3. 頁面:單筆 / 小量資料用 `useAsync(() => http.get(...))`;**清單用 `usePaged`(後端分頁)**;首屏以外的區塊包 `<GLazy>`、由子元件自己載入資料;載入中用 `GSkeleton`,錯誤用 `<GEmpty tone="danger">` + 重試;頁首按鈕 `<Teleport to="#page-actions" defer>`。
 4. 版面只用 `.grid` / `.grid-2|3|4|auto` / `.stack` / `.row` 與 G* 元件;需要新樣式先擴充元件或 token。
-5. 明亮 / 黑暗、1440px / 375px 都用瀏覽器看過;更新 Gherkin(`@manual`)與修正紀錄。
+5. 明亮 / 黑暗、1440px / 375px 都用瀏覽器看過;部署後在「選單管理」確認節點與綁定、在「權限試算」確認授予結果;更新 Gherkin(`@manual`)與修正紀錄。
 
 ## 8. 禁止事項
 

@@ -31,7 +31,7 @@ flowchart LR
 | D2 | 上游以 Nginx 變數 `$itapp_api_upstream`(env `ITAPP_API_UPSTREAM`) | itapp-api 未部署時 Nginx 仍可啟動(同 Endpoint Server 做法) | 變數上游無法使用 upstream keepalive;流量小可接受 |
 | D3 | Session = HS256 JWT(`userId`、`tv`、`jti`),**不含權限** | 權限調整需立即生效;單一 itapp-api 服務簽發與驗證,不需非對稱金鑰 | 每次請求計算權限(資料在記憶體,成本極低) |
 | D4 | `tokenVersion`(`tv`)讓舊 Session 失效;登出以 jti 拒絕清單 | 停用 / 重設密碼要立即生效,不需 Session 表 | 拒絕清單在記憶體,重啟後遺失(v0.2 改 Redis) |
-| D5 | 有效權限 = 職級權限 ∩ 部門限制;admin 固定全部 | 滿足「同職級不同課別」;避免把所有人鎖在外面 | 不支援個人例外權限(需要時再加) |
+| D5 | ~~有效權限 = 職級權限 ∩ 部門限制~~ → 2026-10-05 起改用 Gateway 畫面權限模型:選單 / Tab / 按鈕為 BFF 權限節點並綁定 API,授予角色 / 部門(職級門檻)/ 個人 | 權限只存在 BFF,畫面與 API 一致;IT 不必建角色就能給部門或個人 | 自有權限框架只留在過渡期 `/it/api/*` |
 | D6 | 權限、選單定義在程式(`rbac/catalog.ts`),**對應關係**存資料 | 權限代碼與前端 `v-can` 綁定,新增需改程式;誰有什麼可隨時調整 | 新增權限需部署 |
 | D7 | BFF 資料來源抽象為 `BffSource`:`mock`(快照)/ `live`(服務帳號) | 離線可開發;BFF 管理 API 未完成前可先用既有端點 | live 依賴 BFF dev / test 限定端點(見 §6) |
 | D8 | BFF 尚無的寫入,live 模式回 501 `ITAPP_BFF_NOT_SUPPORTED` | 「失敗要明確說」,不假裝成功 | 畫面上的按鈕在 live 模式暫時只能提示 |
@@ -84,6 +84,8 @@ sequenceDiagram
 多個請求同時需要登入時共用同一次登入(`signingIn` Promise)。BFF 錯誤轉為 502 `ITAPP_BFF_UNAVAILABLE`,`details` 帶 `bffStatus`、`bffCode`、`bffRequestId` 以便到 BFF 日誌追查。
 
 ## 4. 權限模型
+
+> **2026-10-05 起改用 Gateway 畫面權限模型**(Gateway PRD §8.3.2、FRONTEND-GUIDE §7.5):目錄 / 選單 / Tab / 按鈕登記在 `deploy/gateway-rbac.yaml`,每個節點綁定用到的 BFF API;前端以 `api/auth.ts` 的 `IT` / `UI` 代碼控制顯示,名稱 / 圖示 / 順序取自 `/api/auth/me` 的 `menus`;IT 在「選單管理」維護清單、在「權限設定」授予。以下為 v0.1 自有權限框架(過渡期 `/it/api/*`),僅供參考。
 
 ```
 effectivePermissions(user) =

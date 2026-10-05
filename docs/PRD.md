@@ -10,7 +10,7 @@
 | 項目 | 內容 |
 | --- | --- |
 | 產品名稱 | GigaNexus IT 管理系統(GigaItApp) |
-| 文件版本 | **v0.2** |
+| 文件版本 | **v0.3** |
 | 建立日期 | 2026-09-25 |
 | 技術棧 | Vue 3 + Vite(前端)/ Node.js 22 + Fastify 5 + TypeScript(後端 itapp-api)/ 經 Gateway Nginx 對外(詳見 [ARCHITECTURE.md](ARCHITECTURE.md)) |
 | 相關文件 | [ARCHITECTURE.md](ARCHITECTURE.md)(架構與技術)、[API.md](API.md)(API 規格)、[UI-GUIDE.md](UI-GUIDE.md)(前端 UI 規範)、[Gherkin/](Gherkin/README.md)(驗收場景)、[../AGENT.md](../AGENT.md)(AI 協作準則)、Gateway 專案 `giga-api-gateway-bff/docs/`(上位規範) |
@@ -21,6 +21,7 @@
 
 | 版本 | 日期 | 變更內容 |
 | --- | --- | --- |
+| v0.3 | 2026-10-05 | **改用 Gateway 畫面權限模型(Gateway PRD §8.3.2、§8.3.2a、§8.3.4),本系統為範本**:① 側欄大項、選單、Tab、按鈕登記為 BFF 權限(`kind group / menu / tab / button`,`deploy/gateway-rbac.yaml` 首次登記),每個節點綁定用到的 BFF API(按鈕綁寫入);側欄 / 頁首 / Tab 名稱、圖示、順序以 BFF 為準;② 新增**選單管理**(改名稱、排序、上層、圖示、綁定 API,新增 / 刪除);③ **權限設定**:角色權限(原應用權限 + API 權限合併)、角色與指派規則、**部門權限**(含下層、職級門檻)、**個人權限**(預設永久)、權限試算;④「BFF 權限」改為唯讀的**權限查詢**。§6.2 的「職級 × 部門限制」已由上述取代 |
 | v0.2 | 2026-10-02 | **實作 Gateway 單一入口與 BFF 管理(giga-Portal PRD I1–I4、Gateway P2-3a)**:登入改用 Gateway web-kit,移除自有登入;選單權限 `it.*` 與角色 `it-admin` 登記在 Gateway(`deploy/gateway-rbac.yaml`);Gateway 管理與系統管理各頁以使用者身分直接呼叫 BFF 管理 API(可新增 / 編輯 / 發佈 / 回滾、角色權限、指派規則、AD 群組、個別指派、試算、稽核);部門採 Gateway 部門樹(v0.1.6 建議定案);itapp-api 新增經 BFF 轉入的 `/api/it/*`(內部 Token)。「職級 × 部門」權限退場;FR-1.x、FR-2.x 以 [Gherkin/auth/gateway-sso.feature](Gherkin/auth/gateway-sso.feature) 與 [API.md](API.md) §0 為準,其餘章節待改寫 |
 | v0.1.6 | 2026-10-01 | **建議(待確認,尚未實作)**:部門改綁 Gateway 的 BPM 部門樹(`gw.department`),以 Gateway 角色規則依部門指派 IT 管理系統權限,不在本系統複製部門資料(§5.2.1);新增 Q9–Q11。測試區 / 正式區已不保留示範帳號(後端修改紀錄 2026-10-01) |
 | v0.1.5 | 2026-09-26 | 頂列**應用切換**(giga-Portal PRD FR-2.3、I3 的一部分):列出使用者有權限的應用並整頁導向,資料取自使用者的 Gateway 登入(`/api/auth/me`;沒有 Gateway 登入時不顯示);Gateway `me.apps`(G3)前暫以 `*.app.access` 推導。文件版本欄對齊修訂紀錄(原誤為 v0.1.2) |
@@ -130,6 +131,8 @@
 | FR-1.11 | Session 失效時回登入頁並保留原頁面;dev 建置顯示示範帳號 | `auth/session.feature`、`auth/login.feature` |
 
 ### 6.2 權限框架
+
+> **v0.3(2026-10-05)起改用 Gateway 畫面權限模型**:選單 / Tab / 按鈕是 BFF 權限節點並綁定用到的 API,由 IT 在「選單管理」維護清單、在「權限設定」授予角色 / 部門(職級門檻)/ 個人;做法見 Gateway PRD §8.3.2、FRONTEND-GUIDE §7.5,本系統的節點與綁定見 [`deploy/gateway-rbac.yaml`](../deploy/gateway-rbac.yaml) 與 README「選單與權限」。以下為 v0.1 自有權限框架(過渡期 `/it/api/*`),僅供參考。
 
 > **作為** IT 主管,**我要**以「職級 × 權限」加上「部門限制」決定每個人的選單與按鈕,**以便**同職級不同課別能做的事不同。
 

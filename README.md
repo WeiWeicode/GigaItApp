@@ -1,7 +1,7 @@
 # GigaNexus IT 管理系統(GigaItApp)
 
-IT 部門自己的管理系統,掛在 Gateway 的 `/it/`(**取代原本的範例 IT 頁面**),**自有登入,不共用單一入口**。
-這一版完成:登入、全域 UI(玻璃擬態、明亮 / 黑暗切換)、兩層選單 + 頁內 Tab、首頁儀表板、BFF 與 BFF 權限的視覺化與設定、職級 × 部門的按鈕權限。
+IT 部門自己的管理系統,掛在 Gateway 的 `/it/`,**登入走 Gateway 單一入口**(`@giganexus/web-kit`),各管理頁以使用者身分直接呼叫 BFF 管理 API。
+也是**畫面權限模型的範本**:目錄 / 選單 / Tab / 按鈕都登記為 BFF 權限,每個節點綁定它用到的 API(Gateway PRD §8.3.2、FRONTEND-GUIDE §7.5)。
 
 AI 協作準則見 [AGENT.md](AGENT.md)(由 Gateway 根目錄 AGENT.md 與後端樣本 AGENT.md 合併)。
 
@@ -15,9 +15,8 @@ AI 協作準則見 [AGENT.md](AGENT.md)(由 Gateway 根目錄 AGENT.md 與後端
 
 ```
 瀏覽器 ──https──▶ Nginx(Gateway)
-                   ├─ /it/*        ─▶ /srv/www/it-admin/current(frontend,Vue SPA)
-                   ├─ /it/api/*    ─▶ itapp-api:51291(backend,自有登入 / 權限)──服務帳號──▶ BFF /api/admin/*
-                   └─ /api/*       ─▶ BFF(其他系統,不受影響)
+                   ├─ /it/*        ─▶ SPA(frontend)
+                   └─ /api/*       ─▶ BFF:/api/auth/*(單一入口)、/api/admin/*(管理 API)、/api/it/* ─▶ itapp-api:51291(內部 Token)
 ```
 
 | 目錄 | 內容 |
@@ -27,43 +26,31 @@ AI 協作準則見 [AGENT.md](AGENT.md)(由 Gateway 根目錄 AGENT.md 與後端
 | `deploy/` | `docker-compose.yml`(itapp-api 加入 Gateway 網路、spa-it 發佈)、`gen-secrets.sh` |
 | `docs/` | PRD、架構、API、UI 規範、Gherkin、修正紀錄(`DevelopmentProcess/`) |
 
-## 選單
+## 選單與權限
 
-| 第一層 | 第二層 | Tab(第三層) | 權限 |
+側欄大項、選單、Tab、按鈕都是 BFF 的權限節點,首次登記在 [`deploy/gateway-rbac.yaml`](deploy/gateway-rbac.yaml)(CI 套用),之後由 IT 在 **系統管理 › 選單管理** 調整名稱、排序、圖示、上層與綁定的 API;前端代碼常數在 `frontend/src/api/auth.ts`(選單 `IT.*`、Tab / 按鈕 `UI.*`)。
+
+| 目錄(group) | 選單(menu) | Tab | 按鈕(綁定的 API) |
 | --- | --- | --- | --- |
-| 總覽 | 儀表板 | 營運總覽 / Gateway 概況 / 團隊工作 | `dashboard.view` |
-| Gateway 管理 | 服務與路由 | 上游服務 / API 路由 / 發佈版本 | `bff.route.read` |
-| | BFF 權限 | 角色權限矩陣 / 權限反查 / 關係圖 | `bff.rbac.read` |
-| 端點管理 | 電腦清單 | 電腦清單(經 Gateway BFF,需同一工號登入 Gateway) | `endpoint.device.read`(資料另需 Gateway 同名權限) |
-| 系統管理 | 人員與部門 | 人員 / 部門 | `sys.user.read`(部門 Tab `sys.dept.read`) |
-| | 角色與按鈕權限 | 職級權限 / 部門限制 / 權限試算 | `sys.perm.read` |
-| | 稽核紀錄 | 操作紀錄 / 登入紀錄 | `sys.audit.read` |
+| 總覽 | 儀表板 `it.dashboard.read` | 營運總覽 / Gateway 概況 / 團隊工作 | — |
+| Gateway 管理 | 服務與路由 `it.gw-service.read` | 上游服務 / API 路由 / 發佈版本 | 新增 / 編輯上游(`upstream.write`)、新增 / 編輯 / 停用路由(`route.write`)、發佈 / 回滾(`release`) |
+| | 權限查詢 `it.gw-rbac.read`(唯讀) | 角色權限總覽 / 誰能存取 / 關係圖 | — |
+| 端點管理 | 電腦清單 `it.endpoint-device.read` | 電腦清單 | — |
+| 系統管理 | 人員與部門 `it.sys-user.read` | 人員 / 部門 | 調整個別角色、強制登出、停用 / 啟用(`user.write`) |
+| | 權限設定 `it.sys-role.read` | 角色權限 / 角色與指派規則 / 部門權限 / 個人權限 / 權限試算 | 各 Tab 的編輯(`rbac.write`) |
+| | 選單管理 `it.sys-menu.read` | 選單 / Tab / 按鈕 | 新增 / 編輯 / 刪除(`rbac.write`) |
+| | 稽核紀錄 `it.sys-audit.read` | 操作紀錄 / 登入紀錄 | — |
+
+(API 權限為 `gw.admin.*` 的簡寫。)
 
 ## 權限模型
 
-**有效權限 = 職級權限 ∩ 部門限制**,在「角色與按鈕權限」頁即時調整;系統管理員固定擁有全部權限。
-資料範圍:非系統管理員只看得到自己部門,且只能管理**同部門、職級較低**的人員。
+- **授予畫面節點 = 一併取得它綁定的 API**:選單綁該頁的讀取 API,Tab 綁該 Tab 用到的 API,按鈕綁它呼叫的寫入 API。BFF 仍以 API 權限檢查。
+- **授予方式**(系統管理 › 權限設定):角色(可依公司、部門〔含下層〕、職級、職稱、AD 群組自動指派)、部門(含下層、職級門檻:全員 / 課級 / 理級 / 處級以上)、個人(預設永久,可設到期日);有效權限取聯集。
+- **可見規則**:選單 = 選單權限 ∩ 該頁讀取權限 ∩ 至少一個可看的 Tab;Tab = Tab 權限;按鈕 = 按鈕權限;目錄依下層顯示。
+- 角色 `it-admin` 擁有本系統全部節點(yaml 整組管理,畫面上修改會在下次部署被覆寫)。
 
-預設職級權限(✓)與部門限制:
-
-| 權限 | 類型 | 主管 | 高級工程師 | 一般工程師 | 部門限制 |
-| --- | --- | :-: | :-: | :-: | --- |
-| `dashboard.view` 檢視儀表板 | 頁面 | ✓ | ✓ | ✓ | |
-| `bff.route.read` 檢視服務與路由 | 頁面 | ✓ | ✓ | ✓ | |
-| `bff.route.export` 匯出路由清單 | 按鈕 | ✓ | ✓ | | |
-| `bff.route.publish` 發佈 / 回滾 | 按鈕 | ✓ | ✓ | | 程式開發課、系統課 |
-| `bff.upstream.edit` 編輯上游服務 | 按鈕 | | ✓ | | 網管課、系統課 |
-| `bff.rbac.read` 檢視 BFF 權限 | 頁面 | ✓ | ✓ | ✓ | |
-| `bff.rbac.edit` 設定 BFF 角色權限 | 按鈕 | ✓ | | | 系統課、資安課 |
-| `sys.user.read` 檢視人員 | 頁面 | ✓ | ✓ | ✓ | |
-| `sys.user.create` / `edit` / `disable` / `reset-password` | 按鈕 | ✓ | | | |
-| `sys.dept.read` 檢視部門 | 頁面 | ✓ | ✓ | ✓ | |
-| `sys.dept.edit` 編輯部門 | 按鈕 | | | | |
-| `sys.perm.read` 檢視角色與按鈕權限 | 頁面 | ✓ | ✓ | | |
-| `sys.perm.edit` 設定角色與按鈕權限 | 按鈕 | | | | |
-| `sys.audit.read` 檢視稽核紀錄 | 頁面 | ✓ | | | |
-
-## 測試帳號(虛構資料,dev 密碼 `Passw0rd!`)
+## 舊版自有登入的測試帳號(過渡期 `/it/api/*`,虛構資料,dev 密碼 `Passw0rd!`)
 
 下表的示範帳號(`itadmin` 除外)**只在 dev 建立**;測試區、正式區只有 `itadmin` 與實際 IT 人員(`IT_STAFF`),既有資料檔在啟動時會自動移除示範帳號(工號與姓名都和種子相同才移除),指向他們的部門主管改為未指定。
 
