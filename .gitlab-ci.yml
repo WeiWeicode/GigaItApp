@@ -46,10 +46,11 @@ deploy-test:
     - export IMAGE_TAG=$CI_COMMIT_SHORT_SHA RELEASE_SHA=$CI_COMMIT_SHORT_SHA COMPOSE_ENV_FILES="$ITAPP_ENV_FILE" GATEWAY_DIR
     - IT="docker compose -f deploy/docker-compose.yml"
     # 1. 後端:建置並更新,等待 healthcheck(/healthz)
-    - $IT build itapp-api
+    # --pull:一律以官方基底映像建置;主機上的 node:22-alpine 可能被其他專案覆寫(NODE_ENV=production 導致 tsc 不存在,同 Gateway 2026-10-02)
+    - $IT build --pull itapp-api
     - $IT up -d --wait itapp-api
     # 2. 前端:建置並發佈到 gw_www 的 it-admin(保留上一版供回滾)
-    - $IT --profile publish build spa-it
+    - $IT --profile publish build --pull spa-it
     - $IT run --rm spa-it
     # 3. 冒煙測試(經 Gateway Nginx)
     - curl -skf -o /dev/null https://127.0.0.1/it/ && echo "OK   /it/"
