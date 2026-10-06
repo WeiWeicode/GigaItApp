@@ -9,7 +9,7 @@
  */
 import { redirectToLogin } from '@giganexus/web-kit';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { can, canAll, GW, IT, loadMe, setPageHasTab, UI } from './api/auth';
+import { can, canAll, GW, IT, loadMe, OBS, setPageHasTab, UI } from './api/auth';
 import { hasCurrentApp } from './composables/apps';
 import AppLayout from './layouts/AppLayout.vue';
 import TabbedPage from './layouts/TabbedPage.vue';
@@ -107,6 +107,30 @@ const routes: RouteRecordRaw[] = [
           { path: '', component: () => import('./pages/gateway/RoleMatrix.vue'), meta: { tab: '角色權限總覽', permission: UI.rbacMatrix } },
           { path: 'who-can-access', component: () => import('./pages/gateway/WhoCanAccess.vue'), meta: { tab: '誰能存取', permission: UI.rbacWho } },
           { path: 'graph', component: () => import('./pages/gateway/RbacGraph.vue'), meta: { tab: '關係圖', permission: UI.rbacGraph } },
+        ],
+      },
+      {
+        path: 'gateway/observe',
+        component: TabbedPage,
+        meta: {
+          permission: IT.gwObserve,
+          requires: [OBS.read],
+          title: '架構觀測',
+          eyebrow: 'Gateway · 監控',
+          description: '各服務的健康狀態、請求紀錄、錯誤與 Nginx 流量(giga-observe);架構圖每 15 秒自動更新',
+          icon: 'workflow',
+          tabs: [
+            { label: '架構圖', to: '/gateway/observe', icon: 'workflow', permission: UI.obsMap },
+            { label: '紀錄', to: '/gateway/observe/logs', icon: 'list', permission: UI.obsLogs },
+            { label: '錯誤', to: '/gateway/observe/errors', icon: 'alert', permission: UI.obsErrors },
+            { label: '流量與來源 IP', to: '/gateway/observe/traffic', icon: 'globe', permission: UI.obsTraffic },
+          ],
+        },
+        children: [
+          { path: '', component: () => import('./pages/observe/ArchitectureMap.vue'), meta: { tab: '架構圖', permission: UI.obsMap } },
+          { path: 'logs', component: () => import('./pages/observe/Logs.vue'), meta: { tab: '紀錄', permission: UI.obsLogs } },
+          { path: 'errors', component: () => import('./pages/observe/Errors.vue'), meta: { tab: '錯誤', permission: UI.obsErrors } },
+          { path: 'traffic', component: () => import('./pages/observe/Traffic.vue'), meta: { tab: '流量與來源 IP', permission: UI.obsTraffic } },
         ],
       },
       {

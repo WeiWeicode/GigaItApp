@@ -59,7 +59,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
   backdrop-filter: blur(6px);
 }
 .g-modal {
-  max-width: 100%;
+  /* 以視窗寬度為上限:grid 置中時百分比上限不生效,窄螢幕會超出畫面 */
+  max-width: calc(100vw - 32px);
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;

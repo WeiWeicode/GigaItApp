@@ -23,6 +23,8 @@ permissions:
   - { code: it.dashboard.read, name: 儀表板, kind: menu, parent: it.group.overview, sort: 10 }
   - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.group.gateway, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read] }
   - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.group.gateway, sort: 30, includes: [gw.admin.rbac.read] }
+  # 架構觀測(Gateway MONITORING-PLAN W9-10):observe.* 由 giga-observe 的 OpenAPI 匯入 Gateway 時建立,需先匯入再套用本檔
+  - { code: it.gw-observe.read, name: 架構觀測, kind: menu, parent: it.group.gateway, sort: 35, includes: [observe.data.read] }
   - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.group.endpoint, sort: 40 }
   - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50, includes: [gw.admin.user.read] }
   - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.group.system, sort: 60, includes: [gw.admin.rbac.read] }
@@ -30,8 +32,8 @@ permissions:
   - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.group.system, sort: 70, includes: [gw.admin.audit.read] }
 
   # Tab / 按鈕(kind tab / button,掛在所屬選單下;includes = 用到的 API,授予即一併取得)
-  - { code: it.dashboard.overview, name: 營運總覽, kind: tab, parent: it.dashboard.read, sort: 10 }
-  - { code: it.dashboard.gateway, name: Gateway 概況, kind: tab, parent: it.dashboard.read, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read] }
+  - { code: it.dashboard.overview, name: 營運總覽, kind: tab, parent: it.dashboard.read, sort: 10, includes: [observe.data.read] }
+  - { code: it.dashboard.gateway, name: Gateway 概況, kind: tab, parent: it.dashboard.read, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read, observe.data.read] }
   - { code: it.dashboard.team, name: 團隊工作, kind: tab, parent: it.dashboard.read, sort: 30, includes: [gw.admin.rbac.read] }
   - { code: it.gw-service.upstreams, name: 上游服務, kind: tab, parent: it.gw-service.read, sort: 10, includes: [gw.admin.upstream.read] }
   - { code: it.gw-service.upstream-edit, name: 新增 / 編輯上游, kind: button, parent: it.gw-service.upstreams, sort: 10, includes: [gw.admin.upstream.write] }
@@ -42,6 +44,11 @@ permissions:
   - { code: it.gw-rbac.matrix, name: 角色權限總覽, kind: tab, parent: it.gw-rbac.read, sort: 10 }
   - { code: it.gw-rbac.who, name: 誰能存取, kind: tab, parent: it.gw-rbac.read, sort: 20, includes: [gw.admin.route.read] }
   - { code: it.gw-rbac.graph, name: 關係圖, kind: tab, parent: it.gw-rbac.read, sort: 30, includes: [gw.admin.route.read] }
+  - { code: it.gw-observe.map, name: 架構圖, kind: tab, parent: it.gw-observe.read, sort: 10, includes: [observe.data.read] }
+  - { code: it.gw-observe.logs, name: 紀錄, kind: tab, parent: it.gw-observe.read, sort: 20, includes: [observe.data.read] }
+  - { code: it.gw-observe.errors, name: 錯誤, kind: tab, parent: it.gw-observe.read, sort: 30, includes: [observe.data.read] }
+  - { code: it.gw-observe.traffic, name: 流量與來源 IP, kind: tab, parent: it.gw-observe.read, sort: 40, includes: [observe.data.read] }
+  - { code: it.gw-observe.body, name: 查看請求 / 回應內容, kind: button, parent: it.gw-observe.logs, sort: 10, includes: [observe.log.body] }
   - { code: it.endpoint-device.list, name: 電腦清單, kind: tab, parent: it.endpoint-device.read, sort: 10 }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
@@ -71,6 +78,7 @@ roles:
       - it.dashboard.read
       - it.gw-service.read
       - it.gw-rbac.read
+      - it.gw-observe.read
       - it.endpoint-device.read
       - it.sys-user.read
       - it.sys-role.read
@@ -88,6 +96,11 @@ roles:
       - it.gw-rbac.matrix
       - it.gw-rbac.who
       - it.gw-rbac.graph
+      - it.gw-observe.map
+      - it.gw-observe.logs
+      - it.gw-observe.errors
+      - it.gw-observe.traffic
+      - it.gw-observe.body
       - it.endpoint-device.list
       - it.sys-user.users
       - it.sys-user.roles

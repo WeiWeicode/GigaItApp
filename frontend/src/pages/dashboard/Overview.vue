@@ -1,19 +1,27 @@
 <script setup lang="ts">
-/** 營運總覽:上半部(KPI、流量、告警)進頁即載入;下半部(工單、最近操作)捲動到附近才載入(GLazy) */
+/**
+ * 營運總覽:上半部(KPI、流量、告警)進頁即載入;下半部(工單、最近操作)捲動到附近才載入(GLazy)
+ * KPI / 今日流量 / 系統告警優先取架構觀測(giga-observe,W9-11);沒有權限或尚未接入時沿用 itapp-api 的資料(顯示「開發中」)
+ */
 import { computed, ref } from 'vue';
 import { useAuth } from '@/api/auth';
 import { describeError } from '@/api/http';
 import { fromNow } from '@/api/format';
-import { loadOverview } from '@/composables/dashboard';
+import { loadObserveOverview, loadOverview } from '@/composables/dashboard';
 import { useAsync } from '@/composables/useAsync';
 import WorkSection from './sections/WorkSection.vue';
 
 const { me } = useAuth();
-const { data, loading, error, reload: reloadOverview } = useAsync(loadOverview);
+const { data: itData, loading: itLoading, error, reload: reloadOverview } = useAsync(loadOverview);
+const obs = useAsync(loadObserveOverview);
+/** 架構觀測有資料時以它為準 */
+const data = computed(() => obs.data.value ?? itData.value);
+const live = computed(() => !!obs.data.value);
+const loading = computed(() => itLoading.value || obs.loading.value);
 const refreshKey = ref(0);
 function reload() {
   refreshKey.value++;
-  return reloadOverview();
+  return Promise.all([reloadOverview(), obs.reload()]);
 }
 
 const greeting = computed(() => {
@@ -56,7 +64,8 @@ const traffic = computed(() => {
     labels: t.map((h) => `${String(h.hour).padStart(2, '0')}:00`),
     series: [
       { name: '請求數', values: t.map((h) => h.requests), color: 'var(--chart-1)' },
-      { name: '錯誤數', values: t.map((h) => h.errors * 20), color: 'var(--c-danger)', area: false },
+      // 示範資料的錯誤數很小,放大 20 倍才看得見;真實資料照原值
+      { name: '錯誤數', values: t.map((h) => h.errors * (live.value ? 1 : 20)), color: 'var(--c-danger)', area: false },
     ],
   };
 });
@@ -74,7 +83,8 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
           <div class="row" style="--gap: 6px; margin-top: 8px">
             <GBadge tone="primary" icon="building">{{ me?.user.department ?? '未指定部門' }}</GBadge>
             <GBadge v-if="me?.user.title" tone="violet" icon="shield">{{ me.user.title }}</GBadge>
-            <GBadge v-if="data" tone="neutral" icon="info" title="KPI、流量、工單、告警為開發中功能;Gateway 統計、部門人數與操作紀錄為真實資料"
+            <GBadge v-if="live" tone="neutral" icon="info" title="KPI、流量與告警為架構觀測的即時資料;待處理工單為開發中功能">工單開發中</GBadge>
+            <GBadge v-else-if="data" tone="neutral" icon="info" title="KPI、流量、工單、告警為開發中功能;Gateway 統計、部門人數與操作紀錄為真實資料"
               >部分功能開發中</GBadge
             >
           </div>
@@ -85,7 +95,7 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
     </GCard>
 
     <!-- KPI / 流量 / 告警來自 itapp-api(經 BFF /api/it/*);連不到時只影響這幾個區塊,其餘照常顯示 -->
-    <GCard v-if="error && !data" padding="sm" tone="warning">
+    <GCard v-if="error && !data && !live" padding="sm" tone="warning">
       <div class="row" style="--gap: 8px">
         <GIcon name="alert-circle" :size="16" />
         <span class="small">IT 系統 API 暫時無法取得,KPI、流量與告警以「開發中」顯示:{{ describeError(error) }}</span>
@@ -118,13 +128,18 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
 
     <div class="grid grid-3">
       <GCard class="span-2" title="今日 API 流量" subtitle="每小時請求數與錯誤數" icon="activity">
-        <template #actions><GBadge tone="info">開發中</GBadge></template>
+        <template #actions
+          ><GBadge v-if="live" tone="success" dot>即時</GBadge><GBadge v-else tone="info">開發中</GBadge></template
+        >
         <GAreaChart v-if="data && (data.traffic?.length ?? 0) > 0" :labels="traffic.labels" :series="traffic.series" :height="250" />
+        <GEmpty v-else-if="live" compact icon="activity" title="今天還沒有 API 呼叫" />
         <GEmpty v-else-if="data || error" compact icon="activity" title="開發中" description="API 流量監控功能開發中，尚未接入即時指標來源" />
         <GSkeleton v-else height="250px" />
       </GCard>
       <GCard title="系統告警" icon="bell" tone="neutral">
-        <template #actions><GBadge tone="info">開發中</GBadge></template>
+        <template #actions
+          ><RouterLink v-if="live" to="/gateway/observe" class="xs">架構觀測</RouterLink><GBadge v-else tone="info">開發中</GBadge></template
+        >
         <ul v-if="data && data.alerts.length" class="alerts">
           <li v-for="a in data.alerts" :key="a.title" :class="`tone-${a.level}`">
             <span class="al-ic"><GIcon :name="ALERT[a.level] ?? 'info'" :size="16" /></span>
@@ -134,6 +149,7 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
             </div>
           </li>
         </ul>
+        <GEmpty v-else-if="live" compact icon="check-circle" tone="success" title="所有服務正常" description="近 15 分鐘沒有系統告警" />
         <GEmpty v-else-if="data || error" compact icon="bell" title="開發中" description="系統告警模組開發中" />
         <GSkeleton v-else :lines="5" />
       </GCard>

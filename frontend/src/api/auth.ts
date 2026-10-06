@@ -23,6 +23,7 @@ export const IT = {
   dashboard: 'it.dashboard.read',
   gwService: 'it.gw-service.read',
   gwRbac: 'it.gw-rbac.read',
+  gwObserve: 'it.gw-observe.read',
   endpointDevice: 'it.endpoint-device.read',
   sysUser: 'it.sys-user.read',
   sysRole: 'it.sys-role.read',
@@ -47,6 +48,11 @@ export const UI = {
   rbacMatrix: 'it.gw-rbac.matrix',
   rbacWho: 'it.gw-rbac.who',
   rbacGraph: 'it.gw-rbac.graph',
+  obsMap: 'it.gw-observe.map',
+  obsLogs: 'it.gw-observe.logs',
+  obsErrors: 'it.gw-observe.errors',
+  obsTraffic: 'it.gw-observe.traffic',
+  obsBody: 'it.gw-observe.body',
   devList: 'it.endpoint-device.list',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
@@ -82,6 +88,12 @@ export const GW = {
   userSync: 'gw.admin.user.sync',
   companyRead: 'gw.admin.company.read',
   auditRead: 'gw.admin.audit.read',
+} as const;
+
+/** 架構觀測(giga-observe 經 BFF /api/observe/*,Gateway MONITORING-PLAN W9-10) */
+export const OBS = {
+  read: 'observe.data.read',
+  body: 'observe.log.body',
 } as const;
 
 const kit = kitUseAuth();
@@ -153,6 +165,7 @@ const MENU: readonly MenuGroup[] = [
     children: [
       { key: 'services', title: '服務與路由', path: '/gateway/services', permission: IT.gwService, requires: [GW.upstreamRead, GW.routeRead] },
       { key: 'rbac', title: '權限查詢', path: '/gateway/rbac', permission: IT.gwRbac, requires: [GW.rbacRead] },
+      { key: 'observe', title: '架構觀測', path: '/gateway/observe', permission: IT.gwObserve, requires: [OBS.read] },
     ],
   },
   {
