@@ -229,15 +229,15 @@
 
 > **作為** IT 人員,**我要**在 IT 管理系統查看使用者電腦上 Agent 的連線狀況,**以便**知道哪些電腦在線、用的是哪張裝置憑證。
 
-端點資料由 Go Endpoint Server 提供,經 Gateway BFF 轉送;**能否取得、能否下指令以 BFF 權限為準**,身分是使用者的 Gateway 登入。本系統的 `endpoint.device.read` 只決定選單與頁面是否顯示,`itapp-api` 不轉送端點 API(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8)。
+端點資料由 RustIt Endpoint Server(`ItAgentBack`,Node.js;RustIt ADR 0004)提供,經 Gateway BFF 轉送;**能否取得、能否下指令以 BFF 權限為準**,身分是使用者的 Gateway 登入。本系統的 `endpoint.device.read` 只決定選單與頁面是否顯示,`itapp-api` 不轉送端點 API(Gateway PRD Q27、`ENDPOINT-AGENT-GUIDE.md` §8)。
 
 | 編號 | 需求 | 驗收 |
 | --- | --- | --- |
 | FR-8.1 | 選單「端點管理 → 電腦清單」(`/endpoint/devices`),依本系統的 `endpoint.device.read` 顯示 | `endpoint/devices.feature`:預設職級看得到選單 |
 | FR-8.2 | 進頁呼叫 Gateway `GET /api/auth/me`:未登入 → 引導登入 Gateway(`/login?redirect=`);Gateway 工號與本系統登入者不同 → 提示重新登入,不取資料;Gateway 沒有 `endpoint.device.read` → 提示權限不足 | 同上(`@manual @e2e`) |
-| FR-8.3 | 電腦清單經 `GET /api/endpoint/devices` 取得:電腦名稱、在線 / 離線、憑證 DN、指紋、最後回報、首次連線;頁首顯示目前的 Gateway 身分;BFF 回 404 / 5xx 時分別提示「Gateway 尚未提供端點 API」「Endpoint Server 無法連線」 | 同上(`@manual @e2e`) |
+| FR-8.3 | 電腦清單經 `GET /api/endpoint/devices` 取得:電腦名稱、在線 / 離線(停用另標示)、使用者、IP、作業系統、CPU、記憶體、最後回報(憑證 DN 於滑過名稱與詳情顯示);點列開詳情 `GET /api/endpoint/devices/{deviceId}`:基本資訊、硬體、安全(防毒、最近更新、軟體筆數)、磁碟用量、網卡;BFF 回 403 / 404 / 5xx 時分別提示「Gateway 權限不足」「Gateway 尚未提供端點 API」「Endpoint Server 無法連線」 | `endpoint/device-inventory.feature`(`@manual`) |
 | FR-8.4 | Gateway 呼叫集中在 `src/api/gateway.ts`,目前只有唯讀 GET;加入下指令等寫入功能時改用 `@giganexus/web-kit`(CSRF、Token 自動更新) | 程式審查 |
-| FR-8.5 | 對電腦下指令、查詢指令結果(ENDPOINT-AGENT-GUIDE §8.3–§8.4) | `@wip`,待 Go Endpoint Server(W6) |
+| FR-8.5 | 對電腦下指令、查詢指令結果(ENDPOINT-AGENT-GUIDE §8.3–§8.4) | `@wip`,待 RustIt 進階階段(W6) |
 
 ---
 

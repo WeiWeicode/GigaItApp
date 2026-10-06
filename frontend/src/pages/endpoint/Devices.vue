@@ -1,14 +1,16 @@
 <script setup lang="ts">
 /**
- * 電腦清單:經 Gateway BFF 取得 Agent 基本資料(Gateway ENDPOINT-AGENT-GUIDE §8)。
+ * 電腦清單:經 Gateway BFF 取得 Agent 基本資料(Gateway ENDPOINT-AGENT-GUIDE §8;RustIt ItAgentBack,INTEGRATION-PLAN M3)。
  * 單一入口後本系統的登入就是 Gateway 登入(同一工號);資料權限以 BFF 的 endpoint.device.read 為準(§8.6)。
+ * 點列開詳情(DeviceDetail:硬體、網卡、磁碟、防毒)。
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { can, useAuth } from '@/api/auth';
-import { fmtTime, fromNow } from '@/api/format';
+import { fmtBytes, fmtTime, fromNow } from '@/api/format';
 import { ApiError, describeError, http } from '@/api/http';
 import type { EndpointDevice } from '@/api/types';
 import { useAsync } from '@/composables/useAsync';
+import DeviceDetail from './DeviceDetail.vue';
 
 const { user } = useAuth();
 const allowed = computed(() => can('endpoint.device.read'));
@@ -17,6 +19,12 @@ const { data, loading, error, reload } = useAsync(async () =>
 );
 const devices = computed(() => data.value ?? []);
 const onlineCount = computed(() => devices.value.filter((d) => d.online).length);
+const selected = ref<EndpointDevice | null>(null);
+const detailOpen = ref(false);
+function openDetail(row: EndpointDevice) {
+  selected.value = row;
+  detailOpen.value = true;
+}
 
 const errorTitle = computed(() => {
   const e = error.value;
@@ -55,36 +63,52 @@ const errorTitle = computed(() => {
         :loading="loading && !data"
         :rows="devices"
         row-key="deviceId"
+        clickable
         empty-title="尚無 Agent 連線紀錄"
         empty-description="Agent 經 Gateway :9443 連線後會出現在這裡"
         :columns="[
           { key: 'computerName', label: '電腦名稱' },
           { key: 'online', label: '狀態', width: '96px' },
-          { key: 'certDn', label: '憑證 DN', hideSm: true },
-          { key: 'certFingerprint', label: '憑證指紋', hideSm: true },
+          { key: 'userName', label: '使用者', hideSm: true },
+          { key: 'ips', label: 'IP' },
+          { key: 'osName', label: '作業系統', hideSm: true },
+          { key: 'cpuName', label: 'CPU', hideSm: true },
+          { key: 'memoryTotal', label: '記憶體', align: 'right', hideSm: true },
           { key: 'lastSeenAt', label: '最後回報' },
-          { key: 'firstSeenAt', label: '首次連線', hideSm: true },
         ]"
+        @row-click="openDetail"
       >
         <template #cell-computerName="{ row }"
-          ><strong class="nowrap">{{ row.computerName }}</strong></template
+          ><strong class="nowrap" :title="row.certDn">{{ row.computerName }}</strong></template
         >
         <template #cell-online="{ row }">
-          <GBadge :tone="row.online ? 'success' : 'neutral'" dot>{{ row.online ? '在線' : '離線' }}</GBadge>
+          <GBadge :tone="row.status === 'disabled' ? 'danger' : row.online ? 'success' : 'neutral'" dot>{{
+            row.status === 'disabled' ? '已停用' : row.online ? '在線' : '離線'
+          }}</GBadge>
         </template>
-        <template #cell-certDn="{ row }"
-          ><code class="nowrap">{{ row.certDn }}</code></template
+        <template #cell-userName="{ row }"
+          ><span class="nowrap">{{ row.userName ?? '—' }}</span></template
         >
-        <template #cell-certFingerprint="{ row }"
-          ><code :title="row.certFingerprint">{{ row.certFingerprint.slice(0, 12) }}…</code></template
+        <template #cell-ips="{ row }"
+          ><span class="mono small" :title="row.ips.join(', ')">{{ row.ips[0] ?? '—' }}{{ row.ips.length > 1 ? ` +${row.ips.length - 1}` : '' }}</span></template
+        >
+        <template #cell-osName="{ row }"
+          ><span class="small" :title="row.osVersion ?? ''">{{ row.osName ?? '—' }}</span></template
+        >
+        <template #cell-cpuName="{ row }"
+          ><span class="small">{{ row.cpuName ?? '—' }}</span></template
+        >
+        <template #cell-memoryTotal="{ row }"
+          ><span class="nowrap">{{ fmtBytes(row.memoryTotal) }}</span></template
         >
         <template #cell-lastSeenAt="{ row }"
           ><span class="nowrap" :title="fmtTime(row.lastSeenAt)">{{ fromNow(row.lastSeenAt) }}</span></template
         >
-        <template #cell-firstSeenAt="{ row }"
-          ><span class="nowrap">{{ fmtTime(row.firstSeenAt) }}</span></template
-        >
       </GTable>
     </GCard>
+
+    <GModal v-model:open="detailOpen" :title="selected?.computerName ?? ''" :subtitle="selected?.deviceId" icon="monitor" width="880px">
+      <DeviceDetail v-if="selected" :key="selected.deviceId" :device-id="selected.deviceId" />
+    </GModal>
   </div>
 </template>

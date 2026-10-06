@@ -16,6 +16,14 @@ export function fromNow(iso: string | null | undefined): string {
   return fmtTime(iso);
 }
 
+/** 位元組 → GB / MB(記憶體、磁碟;1024 進位) */
+export function fmtBytes(n: number | null | undefined): string {
+  if (n == null) return '—';
+  const gb = n / 1024 ** 3;
+  if (gb >= 1) return `${gb >= 100 ? Math.round(gb) : gb.toFixed(1)} GB`;
+  return `${Math.round(n / 1024 ** 2)} MB`;
+}
+
 export const METHOD_TONE: Record<string, string> = { GET: 'success', POST: 'primary', PUT: 'warning', PATCH: 'warning', DELETE: 'danger', '*': 'neutral' };
 export const AUTH_MODE: Record<string, { label: string; tone: string; icon: string }> = {
   public: { label: '公開', tone: 'warning', icon: 'globe' },
