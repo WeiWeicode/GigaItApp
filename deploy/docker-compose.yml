@@ -15,6 +15,7 @@ services:
     image: giganexus/itapp-api:${IMAGE_TAG:-dev}
     build:
       context: ../backend
+      secrets: [npm_token]
     restart: unless-stopped
     environment:
       IT_ENV: ${IT_ENV:-test}
@@ -32,10 +33,15 @@ services:
       # 經 Gateway 轉入的 /api/it/*:內部 Token 的 aud 與 BFF JWKS(同一 Docker 網路直連 bff-1,不經 Nginx 的內網白名單)
       SERVICE_CODE: itapp-api
       GW_JWKS_URL: ${GW_JWKS_URL:-http://bff-1:3000/.well-known/jwks.json}
+      # API 監控(giga-observe,Gateway BACKEND-GUIDE §11);Key 檔空白或未設定 MONITOR_URL 時停用
+      MONITOR_URL: ${MONITOR_URL:-}
+      MONITOR_API_KEY_FILE: /run/secrets/monitor_api_key
+      RELEASE_SHA: ${RELEASE_SHA:-dev}
     secrets:
       - itapp_jwt_secret
       - itapp_seed_password
       - bff_service_password
+      - monitor_api_key
     volumes:
       - itapp_data:/app/data
       - ${GW_CA_CERT:-../../giga-api-gateway-bff/deploy/dev/secrets/pki/ca.crt}:/run/gw-ca.crt:ro
@@ -47,9 +53,7 @@ services:
     image: giganexus/spa-it-admin:${IMAGE_TAG:-dev}
     build:
       context: ../frontend
-      # Gateway web-kit 原始碼(尚未發佈到 Registry,同 giga-Portal);GATEWAY_DIR 可覆寫兄弟 repo 位置
-      additional_contexts:
-        webkit: ${GATEWAY_DIR:-../../giga-api-gateway-bff}/web-kit/src
+      secrets: [npm_token]
       args:
         RELEASE_SHA: ${RELEASE_SHA:-dev}
     profiles: ["publish"]
@@ -66,6 +70,11 @@ secrets:
     file: ${ITAPP_SECRETS_DIR:-../secrets}/itapp_seed_password
   bff_service_password:
     file: ${ITAPP_SECRETS_DIR:-../secrets}/bff_service_password
+  monitor_api_key:
+    file: ${ITAPP_SECRETS_DIR:-../secrets}/monitor_api_key
+  # 建置用:GitLab npm Registry 讀取 Token(環境變數 GITLAB_NPM_TOKEN;CI 由主機機密檔讀入)
+  npm_token:
+    environment: GITLAB_NPM_TOKEN
 
 volumes:
   itapp_data:

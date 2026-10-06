@@ -4,13 +4,15 @@
 #   rbac-test    develop:以已部署的 Gateway 映像套用 deploy/gateway-rbac.yaml(it.* 選單權限、it-admin 角色)
 # 主機需有:${ITAPP_ENV_FILE}(範本 deploy/test.env.example)、ITAPP_SECRETS_DIR 內的機密檔;
 #           Gateway 已部署(giganexus-gw_default 網路、giganexus-gw_gw_www volume)
-# 前端改用 Gateway 單一入口(web-kit 尚未發佈到 Registry):取自 Gateway Pipeline 複製到主機的共用目錄 ${GATEWAY_DIR}(同 giga-Portal)
+# @giganexus/backend-sdk、@giganexus/web-kit 取自公司 GitLab npm Registry:Token(群組 Deploy Token,read_package_registry)
+#   放在主機機密檔 ${NPM_TOKEN_FILE}(擁有者 user、群組 gitlab-runner、440),以 GITLAB_NPM_TOKEN 提供給 npm 與 Docker 建置 secret
 stages: [check, deploy-test, rbac-test]
 
 variables:
   ITAPP_ENV_FILE: /srv/giganexus/deploy/itapp.env
   GATEWAY_DIR: /srv/giganexus/shared/giga-api-gateway-bff
   GW_TEST_ENV_FILE: /srv/giganexus/deploy/test.env
+  NPM_TOKEN_FILE: /srv/giganexus/deploy/secrets/gitlab_npm_token
 
 .runner: &runner
   tags: [windows-runner]
@@ -19,6 +21,7 @@ check:backend:
   <<: *runner
   stage: check
   script:
+    - export GITLAB_NPM_TOKEN="$(cat "$NPM_TOKEN_FILE")"
     - cd backend
     - npm ci --no-audit --no-fund
     - npm run typecheck
@@ -28,12 +31,10 @@ check:frontend:
   <<: *runner
   stage: check
   script:
-    - test -d "$GATEWAY_DIR/web-kit/src" || { echo "缺少 $GATEWAY_DIR/web-kit/src(Gateway Pipeline 的 build 尚未執行)" >&2; exit 1; }
-    # tsconfig 以 ../../giga-api-gateway-bff/web-kit/src 解析 web-kit:建置目錄旁沒有 Gateway repo 時連到共用目錄
-    - '[ -d ../giga-api-gateway-bff/web-kit/src ] || { mkdir -p ../giga-api-gateway-bff && ln -sfn "$GATEWAY_DIR/web-kit" ../giga-api-gateway-bff/web-kit; }'
+    - export GITLAB_NPM_TOKEN="$(cat "$NPM_TOKEN_FILE")"
     - cd frontend
     - npm ci --no-audit --no-fund
-    - WEB_KIT_DIR="$GATEWAY_DIR/web-kit/src" npm run typecheck
+    - npm run typecheck
 
 deploy-test:
   <<: *runner
@@ -44,6 +45,8 @@ deploy-test:
   script:
     - test -f "$ITAPP_ENV_FILE" || { echo "缺少 $ITAPP_ENV_FILE" >&2; exit 1; }
     - export IMAGE_TAG=$CI_COMMIT_SHORT_SHA RELEASE_SHA=$CI_COMMIT_SHORT_SHA COMPOSE_ENV_FILES="$ITAPP_ENV_FILE" GATEWAY_DIR
+    # 建置 secret npm_token(compose secrets: environment)
+    - export GITLAB_NPM_TOKEN="$(cat "$NPM_TOKEN_FILE")"
     - IT="docker compose -f deploy/docker-compose.yml"
     # 1. 後端:建置並更新,等待 healthcheck(/healthz)
     # --pull:一律以官方基底映像建置;主機上的 node:22-alpine 可能被其他專案覆寫(NODE_ENV=production 導致 tsc 不存在,同 Gateway 2026-10-02)

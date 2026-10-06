@@ -6,6 +6,7 @@
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { loadMonitorEnv, type MonitorEnv } from '@giganexus/backend-sdk';
 
 export type ItEnv = 'dev' | 'test' | 'prod';
 export type BffMode = 'mock' | 'live';
@@ -27,6 +28,8 @@ export interface Config {
     /** BFF JWKS;未設定時 /api/it/* 一律回 401(無法驗證) */
     jwksUrl: string | null;
   };
+  /** API 監控(giga-observe,Gateway BACKEND-GUIDE §11):MONITOR_URL、MONITOR_API_KEY_FILE;dev 預設關閉 */
+  monitor: MonitorEnv;
   bff: {
     mode: BffMode;
     baseUrl: string | null;
@@ -84,6 +87,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       serviceCode: env.SERVICE_CODE ?? 'itapp-api',
       jwksUrl: env.GW_JWKS_URL || null,
     },
+    monitor: loadMonitorEnv(itEnv, env),
     bff: {
       mode,
       baseUrl,

@@ -9,8 +9,7 @@ import { defineConfig, type ProxyOptions } from 'vite';
 // 本機開發:/api 與入口網登入頁(/login 及其靜態檔)經 proxy 轉給測試區 Gateway(公司憑證;可用 GATEWAY_TARGET 改指其他 Gateway),
 // Cookie 落在 localhost,登入後導回 http://localhost:5177/it/...
 const GATEWAY = process.env.GATEWAY_TARGET ?? 'https://giganexus-test.gigasolar.com.tw';
-// Gateway web-kit 尚未發佈到 Registry:以 alias 指向兄弟 repo 的原始碼(建置時以 WEB_KIT_DIR 指定,Dockerfile)
-const WEB_KIT = fileURLToPath(new URL(process.env.WEB_KIT_DIR ?? '../../giga-api-gateway-bff/web-kit/src', import.meta.url));
+// @giganexus/web-kit 取自公司 GitLab npm Registry(.npmrc,Token 為環境變數 GITLAB_NPM_TOKEN)
 const toGateway = { target: GATEWAY, changeOrigin: true };
 
 /**
@@ -74,14 +73,12 @@ export default defineConfig({
   resolve: {
     dedupe: ['vue', 'vue-router'],
     alias: {
-      '@giganexus/web-kit': `${WEB_KIT}/index.ts`,
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
     port: Number(process.env.PORT ?? 5177),
     strictPort: true,
-    fs: { allow: ['.', WEB_KIT] },
     proxy: {
       ...observeLocalProxy(),
       '/api': toGateway,
