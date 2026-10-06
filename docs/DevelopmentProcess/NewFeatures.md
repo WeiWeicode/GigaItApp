@@ -2,6 +2,18 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-06 架構觀測頁、儀表板接監控、itapp-api 接 giga-observe(Gateway W9-9 ~ W9-11、W9-3)
+- 內容:
+  - 「API Gateway 管理 › 架構觀測」:架構圖(分層、連線、15 秒更新、狀態篩選、服務詳情:概況 / 紀錄 / 錯誤 / 相依)、紀錄(Request ID 串接、載入更多、明細含步驟與錯誤堆疊)、錯誤聚合、流量與來源 IP(Nginx 流量、資安告警、IP 排行、前端效能 p75)。資料經 BFF `/api/observe/*`(`observe.data.read`;看請求 / 回應內容需 `observe.log.body`)。
+  - 權限:選單 `it.gw-observe.read`、Tab `.map` / `.logs` / `.errors` / `.traffic`、按鈕 `.body`;儀表板兩個 Tab 隨附 `observe.data.read`。
+  - 儀表板:今日 API 呼叫、可用率、平均回應時間、資安告警、今日流量、系統告警、Gateway 概況的上游服務健康改接即時資料;沒有權限或未接入時維持「開發中」。
+  - 前端 `installMonitor`(只在建置版本);itapp-api 改用 `@giganexus/backend-sdk`(Token 驗證 `createTokenVerifier`、`setupGateway` 監控,不自動註冊)。
+  - 套件改從公司 GitLab npm Registry 安裝(`.npmrc`、Token 為 `GITLAB_NPM_TOKEN`;Docker 以 BuildKit secret `npm_token` 傳入、CI 讀主機機密檔);移除 web-kit 兄弟 repo alias。
+  - GModal 以視窗寬度為上限(窄螢幕超出畫面);vite `OBSERVE_LOCAL` 本機示範模式。
+  - 使用手冊 `docs/OBSERVE-MANUAL.md`。
+- 檔案:`frontend/src/pages/observe/*`、`frontend/src/components/observe/*`、`frontend/src/api/{observe,auth}.ts`、`frontend/src/composables/{observe,dashboard}.ts`、`frontend/src/pages/dashboard/{Overview,GatewaySummary}.vue`、`frontend/src/{router,main}.ts`、`frontend/src/ui/components/GModal.vue`、`frontend/{vite.config.ts,tsconfig.json,Dockerfile,.npmrc}`、`backend/src/{app,config}.ts`、`backend/src/gateway/plugin.ts`、`backend/{Dockerfile,.npmrc}`、`deploy/{gateway-rbac.yaml,docker-compose.yml,gen-secrets.sh}`、`.gitlab-ci.yml`、`docs/OBSERVE-MANUAL.md`
+- 驗證:型別檢查、正式建置通過;本機以 giga-observe 示範資料實測四個 Tab、服務詳情、紀錄明細、Request ID 串接、儀表板(明亮 / 黑暗);測試區部署 `917d933` 後需求方確認畫面,itapp-api 心跳(版本 917d9336)與請求紀錄進到 giga-observe。後端單元測試在 Windows 有 3 項因檔案鎖定(rename EBUSY / EPERM)失敗,原版程式相同;CI(Linux)通過
+
 ## 2026-10-05 Tab / 按鈕登記為權限並綁定 API;角色權限合併
 - 內容:
   - 本系統 21 個 Tab、10 個按鈕登記為 `kind tab / button`(`api/auth.ts` 的 `UI`、`deploy/gateway-rbac.yaml`),各自綁定用到的 BFF API(按鈕綁寫入,如「停用 / 啟用」→ `gw.admin.user.write`);路由 Tab、Tab 名稱(以 BFF 為準)、各頁按鈕改用這些代碼。`it-admin` 擁有全部。
