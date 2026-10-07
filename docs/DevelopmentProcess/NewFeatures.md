@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-07 通知中心與儀表板即時公告(Gateway NOTIFY-PLAN N3、甘特圖 W10-4)
+- 內容:新功能頁「總覽 › 通知中心」(`it.notify.read`)五個 Tab:我的通知(收件匣、全部已讀、開啟桌面通知)、公告查詢(含已到期,關鍵字搜尋內文)、發布公告(Tiptap HTML 編輯器:標題、粗體、顏色、清單、表格、連結、圖片上傳 / 貼上;對象:全公司 / 公司 / 部門含下層 / 工號 / AD 群組 + 職級門檻;管道勾選,端點 Agent 未開放時灰掉;需確認已閱讀;立即 / 排程;到期;右側即時預覽與預估人數;發布前確認視窗;`?id=` 編輯草稿)、發布紀錄(已讀率、Email 寄送進度、已讀 / 未讀名單與 CSV、撤回、提醒未讀)、通知設定(保留期限預設永久等,只有 `notify.settings.write` 可存)。頁首鈴鐺(未讀數、最近 10 則)、全站 NotifyHost(新公告 Toast;緊急或需確認直接開對話框,按「已閱讀」才關)、儀表板「營運總覽」加「最新公告」卡片(即時)。連線與收件匣狀態用 web-kit 0.3.0 `useNotifyCenter('itapp')`。`gateway-rbac.yaml` 登記選單與 Tab(發布 / 紀錄綁 `notify.announce.publish`,設定綁 `gw.admin.notify.read`)、it-admin 角色加入;本機開發 `vite.config.ts` 加 `/ws/notify` WebSocket proxy。新增套件 Tiptap 3.31.4(只在發布頁按需載入)。
+- 檔案:`frontend/src/pages/notify/*.vue`、`frontend/src/components/notify/*.vue`、`frontend/src/composables/notify.ts`、`frontend/src/layouts/AppLayout.vue`、`frontend/src/pages/dashboard/Overview.vue`、`frontend/src/router.ts`、`frontend/src/api/auth.ts`、`frontend/src/api/format.ts`、`frontend/src/ui/icons.ts`、`frontend/vite.config.ts`、`frontend/package.json`、`deploy/gateway-rbac.yaml`、`docs/PROJECT-MAP.md`、`docs/UI-GUIDE.md`
+- 驗證:`npm run typecheck`、`npm run build` 通過;瀏覽器實測見下次紀錄。
+
 ## 2026-10-07 電腦清單接上測試區(RustIt 整合 M4)
 - 內容:`deploy/gateway-rbac.yaml` 的 `it.endpoint-device.read`(選單)與 `it.endpoint-device.list`(Tab)加 `includes: [endpoint.device.read]`(RustIt D9:原本缺綁定,授予選單時拿不到 API 權限而 403);前端 `api/auth.ts` 新增 `EP.deviceRead`,電腦清單選單 `requires` 同步。`endpoint.device.read` 由 RustIt ItAgentBack 啟動時自動註冊 OpenAPI 建立,先註冊再套用本檔。配合 RustIt 1d6d192 ~ 5103251、Gateway d9890dd / 5f5b989。
 - 檔案:`deploy/gateway-rbac.yaml`、`frontend/src/api/auth.ts`、`docs/Gherkin/endpoint/device-inventory.feature`

@@ -48,6 +48,8 @@
 | `GLazy` | 懶加載區塊 | 捲動到接近可視範圍(`rootMargin`,預設上下 200px)才渲染預設 slot;`#placeholder` 放骨架;`minHeight` 保留高度避免跳動 |
 | `GFeedbackHost` | toast / confirm 容器 | 只放在 `App.vue` |
 
+通知相關(非全域,`components/notify/`,Gateway NOTIFY-PLAN):`NotifyBell`(頁首鈴鐺)、`NotifyHost`(AppLayout 內唯一,負責連線、新公告提示與公告閱讀對話框)、`LatestAnnouncements`(儀表板卡片)、`RichEditor`(Tiptap,`v-model` HTML,只啟用白名單功能)、`AudiencePicker`。公告內文一律 `v-html="sanitizeHtml(html)"`(web-kit)並加 `class="gn-notify-content"`;開啟公告用 `composables/notify.ts` 的 `openAnnouncement(id)`。
+
 提示與確認:`import { toast, confirm } from '@/ui'`
 ```ts
 toast.success('已儲存');  toast.fromError(e, '儲存失敗');   // fromError 附 requestId

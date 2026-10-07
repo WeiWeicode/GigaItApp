@@ -9,6 +9,7 @@ import { describeError } from '@/api/http';
 import { fromNow } from '@/api/format';
 import { loadObserveOverview, loadOverview } from '@/composables/dashboard';
 import { useAsync } from '@/composables/useAsync';
+import LatestAnnouncements from '@/components/notify/LatestAnnouncements.vue';
 import WorkSection from './sections/WorkSection.vue';
 
 const { me } = useAuth();
@@ -93,6 +94,9 @@ const ALERT = { danger: 'alert', warning: 'alert-circle', info: 'info' } as Reco
         <GButton icon="refresh" :loading="loading" @click="reload">重新整理</GButton>
       </div>
     </GCard>
+
+    <!-- 最新公告(Gateway NOTIFY-PLAN):經 /ws/notify 即時更新 -->
+    <LatestAnnouncements />
 
     <!-- KPI / 流量 / 告警來自 itapp-api(經 BFF /api/it/*);連不到時只影響這幾個區塊,其餘照常顯示 -->
     <GCard v-if="error && !data && !live" padding="sm" tone="warning">

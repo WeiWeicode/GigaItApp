@@ -21,6 +21,7 @@ export type Me = KitMe & { apps?: AppEntry[] };
 export const IT = {
   app: 'it.app.access',
   dashboard: 'it.dashboard.read',
+  notify: 'it.notify.read',
   gwService: 'it.gw-service.read',
   gwRbac: 'it.gw-rbac.read',
   gwObserve: 'it.gw-observe.read',
@@ -39,6 +40,11 @@ export const UI = {
   dashOverview: 'it.dashboard.overview',
   dashGateway: 'it.dashboard.gateway',
   dashTeam: 'it.dashboard.team',
+  notifyInbox: 'it.notify.inbox',
+  notifyArchive: 'it.notify.archive',
+  notifyPublish: 'it.notify.publish',
+  notifyHistory: 'it.notify.history',
+  notifySettings: 'it.notify.settings',
   svcUpstreams: 'it.gw-service.upstreams',
   svcUpstreamEdit: 'it.gw-service.upstream-edit',
   svcRoutes: 'it.gw-service.routes',
@@ -94,6 +100,17 @@ export const GW = {
 export const OBS = {
   read: 'observe.data.read',
   body: 'observe.log.body',
+} as const;
+
+/**
+ * 通知與公告(Gateway NOTIFY-PLAN;BFF /api/notify/*):收件匣、公告查詢只需登入;
+ * 發布 = notify.announce.publish(只能發本部門),.all = 全公司與管理所有公告;設定寫入只給超級管理員。
+ */
+export const NOTIFY = {
+  publish: 'notify.announce.publish',
+  publishAll: 'notify.announce.publish.all',
+  settingsRead: 'gw.admin.notify.read',
+  settingsWrite: 'notify.settings.write',
 } as const;
 
 /** 端點管理(RustIt ItAgentBack 經 BFF /api/endpoint/*,RustIt INTEGRATION-PLAN M4) */
@@ -160,7 +177,10 @@ const MENU: readonly MenuGroup[] = [
     code: 'it.group.overview',
     title: '總覽',
     icon: 'dashboard',
-    children: [{ key: 'dashboard', title: '儀表板', path: '/dashboard', permission: IT.dashboard }],
+    children: [
+      { key: 'dashboard', title: '儀表板', path: '/dashboard', permission: IT.dashboard },
+      { key: 'notify', title: '通知中心', path: '/notify', permission: IT.notify },
+    ],
   },
   {
     key: 'gateway',

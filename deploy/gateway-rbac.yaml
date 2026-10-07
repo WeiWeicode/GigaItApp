@@ -21,6 +21,9 @@ permissions:
   - { code: it.group.endpoint, name: 端點管理, kind: group, parent: it.app.access, sort: 30, icon: monitor }
   - { code: it.group.system, name: 系統管理, kind: group, parent: it.app.access, sort: 40, icon: settings }
   - { code: it.dashboard.read, name: 儀表板, kind: menu, parent: it.group.overview, sort: 10 }
+  # 通知中心(Gateway NOTIFY-PLAN):收件匣 / 公告查詢只需登入;發布 Tab 綁 notify.announce.publish(只能發本部門,
+  # 全公司需另由超級管理員在「權限設定 › API 權限」授予 notify.announce.publish.all);設定寫入 notify.settings.write 只給 gw-super-admin
+  - { code: it.notify.read, name: 通知中心, kind: menu, parent: it.group.overview, sort: 20 }
   - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.group.gateway, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read] }
   - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.group.gateway, sort: 30, includes: [gw.admin.rbac.read] }
   # 架構觀測(Gateway MONITORING-PLAN W9-10):observe.* 由 giga-observe 的 OpenAPI 匯入 Gateway 時建立,需先匯入再套用本檔
@@ -36,6 +39,11 @@ permissions:
   - { code: it.dashboard.overview, name: 營運總覽, kind: tab, parent: it.dashboard.read, sort: 10, includes: [observe.data.read] }
   - { code: it.dashboard.gateway, name: Gateway 概況, kind: tab, parent: it.dashboard.read, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read, observe.data.read] }
   - { code: it.dashboard.team, name: 團隊工作, kind: tab, parent: it.dashboard.read, sort: 30, includes: [gw.admin.rbac.read] }
+  - { code: it.notify.inbox, name: 我的通知, kind: tab, parent: it.notify.read, sort: 10 }
+  - { code: it.notify.archive, name: 公告查詢, kind: tab, parent: it.notify.read, sort: 20 }
+  - { code: it.notify.publish, name: 發布公告, kind: tab, parent: it.notify.read, sort: 30, includes: [notify.announce.publish] }
+  - { code: it.notify.history, name: 發布紀錄, kind: tab, parent: it.notify.read, sort: 40, includes: [notify.announce.publish] }
+  - { code: it.notify.settings, name: 通知設定, kind: tab, parent: it.notify.read, sort: 50, includes: [gw.admin.notify.read] }
   - { code: it.gw-service.upstreams, name: 上游服務, kind: tab, parent: it.gw-service.read, sort: 10, includes: [gw.admin.upstream.read] }
   - { code: it.gw-service.upstream-edit, name: 新增 / 編輯上游, kind: button, parent: it.gw-service.upstreams, sort: 10, includes: [gw.admin.upstream.write] }
   - { code: it.gw-service.routes, name: API 路由, kind: tab, parent: it.gw-service.read, sort: 20, includes: [gw.admin.route.read] }
@@ -77,6 +85,7 @@ roles:
     permissions:
       - it.app.access
       - it.dashboard.read
+      - it.notify.read
       - it.gw-service.read
       - it.gw-rbac.read
       - it.gw-observe.read
@@ -88,6 +97,11 @@ roles:
       - it.dashboard.overview
       - it.dashboard.gateway
       - it.dashboard.team
+      - it.notify.inbox
+      - it.notify.archive
+      - it.notify.publish
+      - it.notify.history
+      - it.notify.settings
       - it.gw-service.upstreams
       - it.gw-service.upstream-edit
       - it.gw-service.routes

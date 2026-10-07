@@ -1,12 +1,15 @@
 <script setup lang="ts">
 /**
- * 主框架:左側兩層選單(群組 → 功能,依 Gateway 權限過濾,api/auth.ts)、上方列(麵包屑、主題、應用切換、使用者)、內容區。
+ * 主框架:左側兩層選單(群組 → 功能,依 Gateway 權限過濾,api/auth.ts)、上方列(麵包屑、通知鈴鐺、主題、應用切換、使用者)、內容區。
+ * 通知(Gateway NOTIFY-PLAN):NotifyHost 連 /ws/notify?app=itapp,新公告以 Toast / 對話框提示;鈴鐺顯示未讀數。
  * 頁面內的第三層切換使用 Tab(見 TabbedPage.vue)。窄螢幕時選單改為抽屜。
  * 側欄收合時只顯示群組圖示,滑鼠移上(或鍵盤聚焦、點擊)在右側浮出該群組的功能清單。
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuth } from '@/api/auth';
+import NotifyBell from '@/components/notify/NotifyBell.vue';
+import NotifyHost from '@/components/notify/NotifyHost.vue';
 import { appsOf, CURRENT_APP } from '@/composables/apps';
 import { useTheme } from '@/composables/theme';
 
@@ -162,6 +165,7 @@ const doLogout = () => logout();
           <li v-for="(c, i) in crumbs" :key="i" :class="{ last: i === crumbs.length - 1 }">{{ c }}</li>
         </ol>
         <div class="spacer" />
+        <NotifyBell />
         <GButton
           variant="ghost"
           square
@@ -212,6 +216,8 @@ const doLogout = () => logout();
         </RouterView>
       </main>
     </div>
+
+    <NotifyHost />
 
     <Teleport to="body">
       <Transition name="flyout">

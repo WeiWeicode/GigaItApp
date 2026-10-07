@@ -105,6 +105,8 @@ export default defineConfig({
       ...observeLocalProxy(),
       ...endpointLocalProxy(),
       '/api': toGateway,
+      // 通知 WebSocket(Gateway NOTIFY-PLAN §6.4):Cookie 落在 localhost,經 proxy 帶到測試區 BFF
+      '/ws/notify': { ...toGateway, ws: true },
       // 入口網(giga-Portal,base /)的首頁、登入頁與其靜態檔;只在本機開發使用。
       // 「/」也要轉:沒有 it.app.access 時守衛導回入口網 /,若由 Vite 回應會再導回 /it/ 造成無限迴圈
       '^/(\\?.*)?$': toGateway,

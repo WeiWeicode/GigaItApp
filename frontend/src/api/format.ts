@@ -84,6 +84,12 @@ export const ACTION_LABEL: Record<string, string> = {
   'employee_sync.trigger': '觸發人員同步',
   'notify.template.create': '新增通知範本',
   'notify.template.update': '修改通知範本',
+  'notify.announcement.publish': '發布公告',
+  'notify.announcement.draft': '儲存公告草稿',
+  'notify.announcement.update': '修改公告',
+  'notify.announcement.revoke': '撤回公告',
+  'notify.announcement.remind': '提醒未讀',
+  'notify.settings.update': '修改通知設定',
 };
 
 /** 登入紀錄事件(gw.auth_log.event) */

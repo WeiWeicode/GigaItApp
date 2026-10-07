@@ -9,7 +9,7 @@
  */
 import { redirectToLogin } from '@giganexus/web-kit';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { can, canAll, GW, IT, loadMe, OBS, setPageHasTab, UI } from './api/auth';
+import { can, canAll, GW, IT, loadMe, NOTIFY, OBS, setPageHasTab, UI } from './api/auth';
 import { hasCurrentApp } from './composables/apps';
 import AppLayout from './layouts/AppLayout.vue';
 import TabbedPage from './layouts/TabbedPage.vue';
@@ -59,6 +59,35 @@ const routes: RouteRecordRaw[] = [
             meta: { tab: 'Gateway 概況', permission: UI.dashGateway, requires: [GW.upstreamRead, GW.routeRead] },
           },
           { path: 'team', component: () => import('./pages/dashboard/Team.vue'), meta: { tab: '團隊工作', permission: UI.dashTeam, requires: [GW.rbacRead] } },
+        ],
+      },
+      {
+        path: 'notify',
+        component: TabbedPage,
+        meta: {
+          permission: IT.notify,
+          title: '通知中心',
+          eyebrow: 'Notify',
+          description: '公司公告與個人通知;有發布權限者可發布公告並查看已讀情形(Gateway NOTIFY-PLAN)',
+          icon: 'bell',
+          tabs: [
+            { label: '我的通知', to: '/notify', icon: 'bell', permission: UI.notifyInbox },
+            { label: '公告查詢', to: '/notify/archive', icon: 'search', permission: UI.notifyArchive },
+            { label: '發布公告', to: '/notify/publish', icon: 'send', permission: UI.notifyPublish },
+            { label: '發布紀錄', to: '/notify/history', icon: 'list', permission: UI.notifyHistory },
+            { label: '通知設定', to: '/notify/settings', icon: 'settings', permission: UI.notifySettings },
+          ],
+        },
+        children: [
+          { path: '', component: () => import('./pages/notify/Inbox.vue'), meta: { tab: '我的通知', permission: UI.notifyInbox } },
+          { path: 'archive', component: () => import('./pages/notify/Archive.vue'), meta: { tab: '公告查詢', permission: UI.notifyArchive } },
+          { path: 'publish', component: () => import('./pages/notify/Publish.vue'), meta: { tab: '發布公告', permission: UI.notifyPublish } },
+          { path: 'history', component: () => import('./pages/notify/History.vue'), meta: { tab: '發布紀錄', permission: UI.notifyHistory } },
+          {
+            path: 'settings',
+            component: () => import('./pages/notify/Settings.vue'),
+            meta: { tab: '通知設定', permission: UI.notifySettings, requires: [NOTIFY.settingsRead] },
+          },
         ],
       },
       {
