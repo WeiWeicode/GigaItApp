@@ -4,9 +4,10 @@
  *   標題、HTML 內文(Tiptap)、等級、對象、管道、需確認已閱讀、發布時間(立即 / 排程)、到期日;右側即時預覽與預估人數。
  *   ?id= 編輯草稿或排程中的公告。發布前確認視窗列出人數與管道;idempotencyKey 防止重按重複發布。
  */
-import { notifyApi, sanitizeHtml, type AnnounceChannel, type Audience, type AudiencePreview, type NotifyLevel } from '@giganexus/web-kit';
+import { notifyApi, sanitizeHtml, type AnnounceChannel, type Audience, type AudiencePreview, type ComposeOptions, type NotifyLevel } from '@giganexus/web-kit';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useAuth } from '@/api/auth';
 import { describeError } from '@/api/http';
 import AudiencePicker from '@/components/notify/AudiencePicker.vue';
 import RichEditor from '@/components/notify/RichEditor.vue';
@@ -16,6 +17,7 @@ import { confirm, toast } from '@/ui';
 
 const route = useRoute();
 const router = useRouter();
+const { me } = useAuth();
 const opts = useAsync(() => notifyApi.composeOptions());
 
 const form = reactive({
@@ -47,6 +49,7 @@ watch(
     if (!o) return;
     form.channels = o.defaults.channels.filter((c) => o.channels.find((x) => x.code === c)?.available);
     form.audience = o.canPublishAll ? { all: true } : { depts: o.ownDepts.map((code) => ({ code, sub: true })) };
+    form.publisherTitle = defaultPublisher(o);
     if (o.defaults.expireDays) {
       form.expire = 'date';
       form.expireAt = localInput(new Date(Date.now() + o.defaults.expireDays * 86_400_000));
@@ -55,6 +58,14 @@ watch(
     if (id) await loadDraft(id);
   },
 );
+
+/** 發布單位預設「公司-部門」:取本人第一個部門,公司名稱與「對象」的公司清單一致 */
+function defaultPublisher(o: ComposeOptions): string {
+  const dept = o.depts.find((d) => d.code === (me.value?.user.deptCode ?? o.ownDepts[0])) ?? o.depts.find((d) => d.code === o.ownDepts[0]);
+  const comp = o.companies.find((c) => c.id === dept?.companyId)?.name ?? me.value?.companies[0];
+  const deptName = dept?.name ?? me.value?.user.department;
+  return [comp, deptName].filter(Boolean).join('-');
+}
 
 async function loadDraft(id: number) {
   try {

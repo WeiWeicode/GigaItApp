@@ -55,7 +55,8 @@ function answer(ok: boolean) {
   top: 16px;
   right: 16px;
   left: 16px;
-  z-index: 200;
+  /* 高於所有對話框(GModal 依開啟順序遞增 z-index) */
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
