@@ -1,7 +1,7 @@
 # language: zh-TW
 # 2026-10-06 RustIt 整合 M3(RustIt docs/INTEGRATION-PLAN.md):資料來自 RustIt ItAgentBack(Node.js Endpoint Server),經 Gateway BFF。
 # 本機驗證:ItAgentBack npm run dev(DEV_SKIP_TOKEN=1)+ RustAgent 連本機,GigaItApp 以 ENDPOINT_LOCAL 啟動(vite.config.ts,只影響本機畫面)。
-# 測試區:待 M4(ItAgentBack 註冊 OpenAPI、gateway-rbac.yaml 端點節點補 includes: [endpoint.device.read])。
+# 測試區(2026-10-07 M4):ItAgentBack 已部署並註冊 OpenAPI、IT 已發佈;gateway-rbac.yaml 端點節點已加 includes: [endpoint.device.read];需求方以實機 Agent 驗證清單可見。
 功能: 端點管理 — 電腦清單顯示 Agent 回報的基本資訊與詳情
   為了知道公司電腦的使用者、網路位址與硬體狀況
   身為 IT 人員

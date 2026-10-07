@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-07 電腦清單接上測試區(RustIt 整合 M4)
+- 內容:`deploy/gateway-rbac.yaml` 的 `it.endpoint-device.read`(選單)與 `it.endpoint-device.list`(Tab)加 `includes: [endpoint.device.read]`(RustIt D9:原本缺綁定,授予選單時拿不到 API 權限而 403);前端 `api/auth.ts` 新增 `EP.deviceRead`,電腦清單選單 `requires` 同步。`endpoint.device.read` 由 RustIt ItAgentBack 啟動時自動註冊 OpenAPI 建立,先註冊再套用本檔。配合 RustIt 1d6d192 ~ 5103251、Gateway d9890dd / 5f5b989。
+- 檔案:`deploy/gateway-rbac.yaml`、`frontend/src/api/auth.ts`、`docs/Gherkin/endpoint/device-inventory.feature`
+- 驗證:`npm run typecheck`(前端)通過;CI check ×2、`deploy-test`、`rbac-test` 成功;IT 發佈 `endpoint-api` 路由後,需求方在測試區「電腦清單」看到自己的電腦(RustIt Agent 經 :9443 回報)。
+
 ## 2026-10-06 電腦清單顯示 Agent 回報的基本資訊與詳情(RustIt 整合 M3)
 - 內容:配合 RustIt INTEGRATION-PLAN M3(RustIt 8d83ab4:ItAgentBack 與 rustit-agent)。
   - `api/types.ts`:`EndpointDevice` 只新增欄位(`status`、`userName`、`domain`、`osName`、`osVersion`、`manufacturer`、`model`、`cpuName`、`memoryTotal`、`ips`、`agentVersion`、`lastInventoryAt`);新增 `EndpointInventory`、`EndpointDeviceDetail`。
