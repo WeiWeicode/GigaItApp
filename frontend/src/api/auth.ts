@@ -96,6 +96,11 @@ export const OBS = {
   body: 'observe.log.body',
 } as const;
 
+/** 端點管理(RustIt ItAgentBack 經 BFF /api/endpoint/*,RustIt INTEGRATION-PLAN M4) */
+export const EP = {
+  deviceRead: 'endpoint.device.read',
+} as const;
+
 const kit = kitUseAuth();
 const MAX_AGE_MS = 5 * 60 * 1000;
 let loadedAt = 0;
@@ -173,7 +178,7 @@ const MENU: readonly MenuGroup[] = [
     code: 'it.group.endpoint',
     title: '端點管理',
     icon: 'monitor',
-    children: [{ key: 'devices', title: '電腦清單', path: '/endpoint/devices', permission: IT.endpointDevice }],
+    children: [{ key: 'devices', title: '電腦清單', path: '/endpoint/devices', permission: IT.endpointDevice, requires: [EP.deviceRead] }],
   },
   {
     key: 'system',
