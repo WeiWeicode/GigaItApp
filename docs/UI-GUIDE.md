@@ -37,7 +37,7 @@
 | `GSwitch` / `GCheckbox` | 開關 / 核取 | `v-model`、`label` 或 `ariaLabel`、`disabled`、`size` |
 | `GSegmented` | 小型篩選 | `v-model`、`options: { label, value, icon? }[]`、`size` |
 | `GBadge` | 標籤 | `tone`、`variant` soft / outline / solid、`dot`、`icon`、`mono` |
-| `GModal` | 對話框 | `v-model:open`、`title`、`subtitle`、`icon`、`tone`、`width`、`persistent`;slot `footer` |
+| `GModal` | 對話框 | `v-model:open`、`title`、`subtitle`、`icon`、`tone`、`width`、`persistent`;slot `footer`。後開的在上層(z-index 依開啟順序遞增,confirm / 公告閱讀可疊在其他對話框上),Esc 只關最上層 |
 | `GEmpty` | 空狀態 / 錯誤 | `icon`、`title`、`description`、`tone`(載入失敗用 danger,slot 放「重試」) |
 | `GSkeleton` | 載入骨架 | `lines` 或 `height` |
 | `GAvatar` / `GLogo` | 頭像 / 品牌標誌 | `name`、`size` |
@@ -98,7 +98,7 @@ const list = usePaged<UserRow, UserPage>((page, pageSize) => http.get('/users', 
 
 1. 決定放在哪個目錄(側欄大項)與功能頁;在 `deploy/gateway-rbac.yaml` 登記選單 / Tab / 按鈕(`kind`、`parent`、`sort`、`includes` 綁定的 API),並把代碼加到 `frontend/src/api/auth.ts` 的 `IT` / `UI`、`MENU`;角色 `it-admin` 的清單一併加入。
 2. `router.ts`:功能頁用 `TabbedPage`,`meta` 填 `permission`、`title`、`description`、`icon`、`tabs`;每個 Tab 是子路由(`meta.tab`)。
-3. 頁面:單筆 / 小量資料用 `useAsync(() => http.get(...))`;**清單用 `usePaged`(後端分頁)**;首屏以外的區塊包 `<GLazy>`、由子元件自己載入資料;載入中用 `GSkeleton`,錯誤用 `<GEmpty tone="danger">` + 重試;頁首按鈕 `<Teleport to="#page-actions" defer>`。
+3. 頁面:單筆 / 小量資料用 `useAsync(() => http.get(...))`;**清單用 `usePaged`(後端分頁)**;首屏以外的區塊包 `<GLazy>`、由子元件自己載入資料;載入中用 `GSkeleton`,錯誤用 `<GEmpty tone="danger">` + 重試;頁首按鈕 `<Teleport to="#page-actions" defer>`。**模板必須單一根節點**(`TabbedPage` 以 `<Transition mode="out-in">` 切換 Tab,清單 + `GModal` 並列、或根元素外的 HTML 註解都會變成多根節點,切到其他 Tab 會空白):用一個 `<div>` 包住,註解放在裡面。
 4. 版面只用 `.grid` / `.grid-2|3|4|auto` / `.stack` / `.row` 與 G* 元件;需要新樣式先擴充元件或 token。
 5. 明亮 / 黑暗、1440px / 375px 都用瀏覽器看過;部署後在「選單管理」確認節點與綁定、在「權限試算」確認授予結果;更新 Gherkin(`@manual`)與修正紀錄。
 
