@@ -63,6 +63,7 @@ export const UI = {
   fileObjects: 'it.gw-file.objects',
   fileUpload: 'it.gw-file.upload',
   fileDelete: 'it.gw-file.delete',
+  fileBpm: 'it.gw-file.bpm',
   fileStorage: 'it.gw-file.storage',
   fileBackupRetry: 'it.gw-file.backup-retry',
   devList: 'it.endpoint-device.list',
@@ -126,6 +127,7 @@ export const FILE = {
   objectDelete: 'file.object.delete',
   storageRead: 'file.storage.read',
   storageManage: 'file.storage.manage',
+  bpmRead: 'file.bpm.read',
 } as const;
 
 /** 端點管理(RustIt ItAgentBack 經 BFF /api/endpoint/*,RustIt INTEGRATION-PLAN M4) */

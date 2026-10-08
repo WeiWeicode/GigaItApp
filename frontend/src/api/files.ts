@@ -67,6 +67,27 @@ export const files = {
   contentUrl: (uuid: string, inline = false) => withQuery(`/api/file/files/${uuid}/content`, inline ? { inline: 1 } : undefined),
 };
 
+/** BPM 表單附件(giga-file-service API.md §3;NaNa 唯讀 + 5144 即時代理) */
+export interface BpmAttachment {
+  doid: string;
+  originalName: string;
+  ext: string | null;
+  createdAt: string | null;
+  serialNumber: string | null;
+  formName: string | null;
+  subject: string | null;
+}
+
+export const bpm = {
+  /** 單號完全比對;source 為資料來源主機(測試區 191、正式區 190) */
+  bySerial: (serialNumber: string) =>
+    http.get<{ serialNumber: string; source: string; items: BpmAttachment[] }>(`/api/file/bpm/forms/${encodeURIComponent(serialNumber)}/attachments`),
+  contentUrl: (doid: string, inline = false) => withQuery(`/api/file/bpm/attachments/${doid}/content`, inline ? { inline: 1 } : undefined),
+};
+
+/** BPM 單號格式(與 file-api 相同:英數、底線、連字號) */
+export const BPM_SERIAL_RE = /^[A-Za-z0-9_-]{1,100}$/;
+
 export const BACKUP_STATUS: Record<FileItem['backupStatus'], { label: string; tone: string }> = {
   pending: { label: '待備份', tone: 'warning' },
   done: { label: '已備份', tone: 'success' },

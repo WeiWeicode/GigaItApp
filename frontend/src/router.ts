@@ -169,15 +169,17 @@ const routes: RouteRecordRaw[] = [
           permission: IT.gwFile,
           title: '檔案管理',
           eyebrow: 'Gateway · 附件服務',
-          description: '共用附件服務 file-api:上傳、下載、綁定單號、刪除與 NAS 備份狀態(giga-file-service);只列自己上傳的或同公司的檔案',
+          description: '共用附件服務 file-api:上傳、下載、綁定單號、刪除、BPM 表單附件與 NAS 備份狀態(giga-file-service);檔案清單只列自己上傳的或同公司的檔案',
           icon: 'folder',
           tabs: [
             { label: '檔案清單', to: '/gateway/files', icon: 'folder', permission: UI.fileObjects },
+            { label: 'BPM 附件', to: '/gateway/files/bpm', icon: 'workflow', permission: UI.fileBpm },
             { label: '儲存與備份', to: '/gateway/files/storage', icon: 'database', permission: UI.fileStorage },
           ],
         },
         children: [
           { path: '', component: () => import('./pages/files/Files.vue'), meta: { tab: '檔案清單', permission: UI.fileObjects, requires: [FILE.objectRead] } },
+          { path: 'bpm', component: () => import('./pages/files/Bpm.vue'), meta: { tab: 'BPM 附件', permission: UI.fileBpm, requires: [FILE.bpmRead] } },
           {
             path: 'storage',
             component: () => import('./pages/files/Storage.vue'),
