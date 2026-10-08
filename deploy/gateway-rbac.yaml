@@ -64,6 +64,7 @@ permissions:
   - { code: it.gw-file.upload, name: 上傳 / 綁定單號, kind: button, parent: it.gw-file.objects, sort: 10, includes: [file.object.upload] }
   - { code: it.gw-file.delete, name: 刪除, kind: button, parent: it.gw-file.objects, sort: 20, includes: [file.object.delete] }
   - { code: it.gw-file.storage, name: 儲存與備份, kind: tab, parent: it.gw-file.read, sort: 40, includes: [file.storage.read] }
+  - { code: it.gw-file.backup-retry, name: 重試 NAS 備份, kind: button, parent: it.gw-file.storage, sort: 10, includes: [file.storage.manage] }
   - { code: it.endpoint-device.list, name: 電腦清單, kind: tab, parent: it.endpoint-device.read, sort: 10, includes: [endpoint.device.read] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
@@ -127,6 +128,7 @@ roles:
       - it.gw-file.upload
       - it.gw-file.delete
       - it.gw-file.storage
+      - it.gw-file.backup-retry
       - it.endpoint-device.list
       - it.sys-user.users
       - it.sys-user.roles

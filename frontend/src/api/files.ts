@@ -25,6 +25,8 @@ export interface FileItem {
 }
 
 export interface StorageStats {
+  /** false = 此環境未設定 NAS 備份(備份狀態維持待備份) */
+  backupEnabled: boolean;
   files: number;
   bytes: number;
   temp: number;
@@ -59,6 +61,8 @@ export const files = {
     http.post<{ bound: number }>('/api/file/files/bind', { uuids, refNo, ...(refType ? { refType } : {}) }),
   remove: (uuid: string) => http.delete(`/api/file/files/${uuid}`),
   storage: () => http.get<StorageStats>('/api/file/storage'),
+  /** 失敗的備份改回待備份,由下一輪排程補傳;省略 uuids 重試全部(權限 file.storage.manage) */
+  retryBackup: (uuids?: string[]) => http.post<{ retried: number }>('/api/file/storage/backup/retry', uuids ? { fileUuids: uuids } : {}),
   /** 下載 / 預覽網址(同網域 Cookie;GET 不需 CSRF) */
   contentUrl: (uuid: string, inline = false) => withQuery(`/api/file/files/${uuid}/content`, inline ? { inline: 1 } : undefined),
 };
