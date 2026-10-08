@@ -78,11 +78,27 @@ export interface BpmAttachment {
   subject: string | null;
 }
 
+export type BpmEnv = 'test' | 'prod';
+
+export interface BpmSource {
+  env: BpmEnv;
+  /** 測試區 / 正式區 */
+  label: string;
+  /** 資料來源主機(191 / 190) */
+  source: string;
+}
+
 export const bpm = {
-  /** 單號完全比對;source 為資料來源主機(測試區 191、正式區 190) */
-  bySerial: (serialNumber: string) =>
-    http.get<{ serialNumber: string; source: string; items: BpmAttachment[] }>(`/api/file/bpm/forms/${encodeURIComponent(serialNumber)}/attachments`),
-  contentUrl: (doid: string, inline = false) => withQuery(`/api/file/bpm/attachments/${doid}/content`, inline ? { inline: 1 } : undefined),
+  /** file-api 已設定的來源(測試區 191 / 正式區 190)與預設來源 */
+  sources: () => http.get<{ defaultEnv: BpmEnv | null; items: BpmSource[] }>('/api/file/bpm/sources'),
+  /** 單號完全比對 */
+  bySerial: (serialNumber: string, env: BpmEnv) =>
+    http.get<{ serialNumber: string; env: BpmEnv; label: string; source: string; items: BpmAttachment[] }>(
+      `/api/file/bpm/forms/${encodeURIComponent(serialNumber)}/attachments`,
+      { query: { env } },
+    ),
+  /** Doid 要搭配查到它的 env */
+  contentUrl: (doid: string, env: BpmEnv, inline = false) => withQuery(`/api/file/bpm/attachments/${doid}/content`, inline ? { env, inline: 1 } : { env }),
 };
 
 /** BPM 單號格式(與 file-api 相同:英數、底線、連字號) */
