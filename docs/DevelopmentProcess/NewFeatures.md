@@ -2,11 +2,22 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-08 檔案管理 › BPM 附件(giga-file-service F6)
+- 工作項目:giga-file-service F6(甘特圖 W11-5)、F3(W11-6)
+- 內容:新 Tab「BPM 附件」(`it.gw-file.bpm` → `file.bpm.read`,sort 20):切換「測試區(191)/ 正式區(190)」(來源取自 `GET /api/file/bpm/sources`,只顯示 file-api 已設定的)、依 BPM 單號完全比對查詢表單附件、下載 / 預覽(PDF、圖片);網址 `?env=&sn=` 可直接查詢;正式區結果加標記
+- 檔案:`frontend/src/pages/files/Bpm.vue`、`frontend/src/api/files.ts`(`bpm`)、`api/auth.ts`、`router.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/gateway/files.feature`
+- 驗證:typecheck、build 通過;測試區(b9045ba、e84f82a)實測:191 / 190 皆可查詢與下載中文檔名、jpg 預覽;使用者以正式區單號 CustomerComplaintProcess00000003 下載 5 個附件正常
+
+## 2026-10-08 檔案管理 › 儲存與備份:重試 NAS 備份(giga-file-service F2)
+- 內容:「最近備份失敗」加「重試」「全部重試」(`it.gw-file.backup-retry` → `file.storage.manage`);file-api 回 `backupEnabled = false` 時不顯示
+- 檔案:`frontend/src/pages/files/Storage.vue`、`frontend/src/api/files.ts`(`retryBackup`)、`api/auth.ts`、`deploy/gateway-rbac.yaml`
+- 驗證:typecheck、build 通過;測試區部署(d561a9e);重試 API 由 file-api 單元測試涵蓋,畫面上尚無失敗檔案可實際按
+
 ## 2026-10-08 Gateway 管理 › 檔案管理(giga-file-service D16、F3 第一批)
 - 工作項目:giga-file-service F3(甘特圖 W11-6)
 - 內容:新增選單「檔案管理」(`it.gw-file.read`,目錄 Gateway 管理,sort 40)與 Tab「檔案清單」(`it.gw-file.objects` → `file.object.read`;按鈕「上傳 / 綁定單號」`it.gw-file.upload` → `file.object.upload`、「刪除」`it.gw-file.delete` → `file.object.delete`)、「儲存與備份」(`it.gw-file.storage` → `file.storage.read`)。檔案清單:後端分頁(單號、來源系統、只看我上傳的)、拖曳 / 多檔上傳(經 BFF 單檔 10 MB、一次 10 個,超過時按鈕停用)、暫存檔綁定單號(只限自己上傳的)、下載 / 圖片與 PDF 預覽、軟刪除;儲存與備份:統計卡、NAS 備份狀態、主機磁碟用量、備份失敗清單。`file.*` 權限由 file-api 自動註冊建立,尚未建立時 gateway-rbac 的 includes 會略過,file-api 部署後再套用一次即補上。BPM 附件、舊系統 Tab 隨 F6 / F4 加入
 - 檔案:`frontend/src/pages/files/Files.vue`、`Storage.vue`、`frontend/src/api/files.ts`、`api/auth.ts`、`api/format.ts`(fmtSize)、`router.ts`、`ui/icons.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/gateway/files.feature`、`docs/PROJECT-MAP.md`
-- 驗證:`npm run typecheck`、`npx vite build` 通過。**未驗證**:瀏覽器實測(file-api 尚未部署到測試區;本機需以自己的帳號登入測試區 Gateway)
+- 驗證:`npm run typecheck`、`npx vite build` 通過;2026-10-08 測試區實測(上傳 25 MB、31 MB 被擋、下載、綁定、刪除、容量顯示)見 giga-file-service HANDOFF §1
 
 ## 2026-10-07 通知中心與儀表板即時公告(Gateway NOTIFY-PLAN N3、甘特圖 W10-4)
 - 內容:新功能頁「總覽 › 通知中心」(`it.notify.read`)五個 Tab:我的通知(收件匣、全部已讀、開啟桌面通知)、公告查詢(含已到期,關鍵字搜尋內文)、發布公告(Tiptap HTML 編輯器:標題、粗體、顏色、清單、表格、連結、圖片上傳 / 貼上;對象:全公司 / 公司 / 部門含下層 / 工號 / AD 群組 + 職級門檻;管道勾選,端點 Agent 未開放時灰掉;需確認已閱讀;立即 / 排程;到期;右側即時預覽與預估人數;發布前確認視窗;`?id=` 編輯草稿)、發布紀錄(已讀率、Email 寄送進度、已讀 / 未讀名單與 CSV、撤回、提醒未讀)、通知設定(保留期限預設永久等,只有 `notify.settings.write` 可存)。頁首鈴鐺(未讀數、最近 10 則)、全站 NotifyHost(新公告 Toast;緊急或需確認直接開對話框,按「已閱讀」才關)、儀表板「營運總覽」加「最新公告」卡片(即時)。連線與收件匣狀態用 web-kit 0.3.0 `useNotifyCenter('itapp')`。`gateway-rbac.yaml` 登記選單與 Tab(發布 / 紀錄綁 `notify.announce.publish`,設定綁 `gw.admin.notify.read`)、it-admin 角色加入;本機開發 `vite.config.ts` 加 `/ws/notify` WebSocket proxy。新增套件 Tiptap 3.31.4(只在發布頁按需載入)。
