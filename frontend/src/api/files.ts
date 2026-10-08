@@ -1,6 +1,6 @@
 /**
  * 附件服務 file-api(giga-file-service docs/API.md §2;經 Gateway BFF /api/file/*,權限 file.*)。
- * 「Gateway 管理 › 檔案管理」頁使用;上傳經 BFF 時單檔上限 10 MB(BFF 全域限制,50 MB 直送待 Gateway Nginx 變更)。
+ * 「Gateway 管理 › 檔案管理」頁使用;上傳 POST /api/file/files 由 Gateway Nginx 驗證後直送 file-api(D4-B),單檔上限 30 MB(D3)。
  */
 import { http, withQuery } from './http';
 import type { Paged } from './admin';
@@ -30,7 +30,8 @@ export interface StorageStats {
   temp: number;
   backup: { pending: number; done: number; failed: number };
   failedItems: { fileUuid: string; originalName: string; createdAt: string }[];
-  capacity: { totalBytes: number; freeBytes: number } | null;
+  /** basis host = Windows 主機磁碟(實際可用);filesystem = 只有檔案根目錄所在檔案系統(WSL 虛擬磁碟,僅供參考) */
+  capacity: { totalBytes: number; freeBytes: number; basis: 'host' | 'filesystem'; filesystem: { totalBytes: number; freeBytes: number } } | null;
 }
 
 export interface FileQuery {
@@ -42,8 +43,8 @@ export interface FileQuery {
   pageSize: number;
 }
 
-/** 經 BFF 上傳的單檔上限(BFF 全域 10 MB);file-api 本身為 50 MB */
-export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+/** 單檔上限(giga-file-service D3:30 MB;Nginx 直送,不受 BFF 10 MB 限制) */
+export const UPLOAD_MAX_BYTES = 30 * 1024 * 1024;
 export const UPLOAD_MAX_FILES = 10;
 
 export const files = {

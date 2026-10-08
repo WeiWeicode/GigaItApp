@@ -63,13 +63,22 @@ const usedPct = computed(() => {
         </p>
       </GCard>
 
-      <GCard v-if="s" title="主機磁碟" subtitle="檔案根目錄所在的磁碟(WSL /srv/giga-files)" icon="server">
+      <GCard
+        v-if="s"
+        title="主機磁碟"
+        :subtitle="s.capacity?.basis === 'host' ? 'Windows 主機磁碟(檔案存在 WSL /srv/giga-files,實際佔用主機磁碟)' : '檔案根目錄所在的檔案系統'"
+        icon="server"
+      >
         <template v-if="s.capacity && usedPct !== null">
           <GProgress :value="usedPct" :tone="usedPct >= 85 ? 'danger' : usedPct >= 70 ? 'warning' : 'primary'" :height="10" />
           <p class="small muted legend">
             已用 {{ fmtSize(s.capacity.totalBytes - s.capacity.freeBytes) }} / {{ fmtSize(s.capacity.totalBytes) }}({{ usedPct }}%),剩餘
             {{ fmtSize(s.capacity.freeBytes) }}
           </p>
+          <p v-if="s.capacity.basis === 'host'" class="xs faint">
+            WSL 虛擬磁碟上限 {{ fmtSize(s.capacity.filesystem.totalBytes) }}(稀疏檔,隨使用成長,不代表實際可用空間)
+          </p>
+          <p v-else class="xs faint">未設定主機磁碟偵測(HOST_DISK_PATH),此數字可能是 WSL 虛擬磁碟上限而非實際可用空間</p>
         </template>
         <p v-else class="small muted">無法取得磁碟容量</p>
       </GCard>

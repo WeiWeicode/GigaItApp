@@ -3,7 +3,7 @@
  * 檔案管理 › 檔案清單(giga-file-service docs/API.md §2;PRD §8,D16):
  *   GET /api/file/files(後端分頁:單號、來源系統、只看自己上傳的)、上傳(multipart)、綁定單號、下載 / 預覽、刪除(軟刪除)
  *   資料範圍由 file-api 決定(自己上傳的或同公司);按鈕:上傳 / 綁定 UI.fileUpload、刪除 UI.fileDelete
- *   經 BFF 上傳單檔上限 10 MB(BFF 全域限制;50 MB 直送待 Gateway Nginx 變更),一次最多 10 個,不合格整批拒絕
+ *   上傳經 Gateway Nginx 直送 file-api(D4-B),單檔上限 30 MB、一次最多 10 個,不合格整批拒絕
  */
 import { computed, reactive, ref } from 'vue';
 import { can, UI, useAuth } from '@/api/auth';
@@ -215,7 +215,7 @@ const asFile = (r: unknown) => r as FileItem;
     <GModal
       v-model:open="uploadOpen"
       title="上傳檔案"
-      subtitle="單檔 10 MB、一次 10 個;執行檔與腳本不可上傳"
+      subtitle="單檔 30 MB、一次 10 個;執行檔與腳本不可上傳"
       icon="upload"
       width="620px"
       :persistent="uploading"
@@ -245,7 +245,7 @@ const asFile = (r: unknown) => r as FileItem;
             <GButton size="sm" variant="ghost" icon="x" square title="移除" @click="picked.splice(i, 1)" />
           </li>
         </ul>
-        <p v-if="tooBig.length" class="small tone-danger">有 {{ tooBig.length }} 個檔案超過 10 MB(經 Gateway 上傳的上限),請移除後再上傳。</p>
+        <p v-if="tooBig.length" class="small tone-danger">有 {{ tooBig.length }} 個檔案超過 30 MB(單檔上限),請移除後再上傳。</p>
         <p v-if="picked.length > UPLOAD_MAX_FILES" class="small tone-danger">一次最多 {{ UPLOAD_MAX_FILES }} 個檔案。</p>
         <div class="grid grid-2">
           <GInput v-model="up.refType" label="單據類型(選填)" placeholder="例 ecr(小寫英數)" />
