@@ -24,6 +24,20 @@ export function fmtBytes(n: number | null | undefined): string {
   return `${Math.round(n / 1024 ** 2)} MB`;
 }
 
+/** 檔案大小(1024 進位,到 KB;檔案清單、上傳對話框) */
+export function fmtSize(n: number | null | undefined): string {
+  if (n == null) return '—';
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
 export const METHOD_TONE: Record<string, string> = { GET: 'success', POST: 'primary', PUT: 'warning', PATCH: 'warning', DELETE: 'danger', '*': 'neutral' };
 export const AUTH_MODE: Record<string, { label: string; tone: string; icon: string }> = {
   public: { label: '公開', tone: 'warning', icon: 'globe' },

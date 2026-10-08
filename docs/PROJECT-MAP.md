@@ -1,6 +1,6 @@
 # 專案地圖 — GigaItApp(IT 管理系統)
 
-> **最後更新:2026-10-07**(通知中心(Gateway NOTIFY-PLAN N3):`pages/notify/`(我的通知、公告查詢、發布公告〔Tiptap 編輯器,日後複製到入口網〕、發布紀錄、通知設定)、`components/notify/`(鈴鐺、NotifyHost、最新公告卡片、RichEditor、AudiencePicker)、`composables/notify.ts`;連線與收件匣狀態用 web-kit 0.3.0 `useNotifyCenter`;測試區實測通過(發布單位預設公司-部門、`GModal` 依開啟順序疊層、Tab 頁面須單一根節點)。2026-10-05:畫面權限模型範本:目錄 / 選單 / Tab / 按鈕登記為 BFF 權限並綁定 API(`deploy/gateway-rbac.yaml`、`api/auth.ts` 的 `IT` / `UI`);新增選單管理 `pages/system/MenuManage.vue`、部門 / 個人權限 `DeptPermissions.vue` / `UserPermissions.vue`、角色權限 `AppPermissions.vue`;圖示登記 `ui/icons.ts`。2026-10-02:改用 Gateway 單一入口、各管理頁直接呼叫 BFF 管理 API(`api/admin.ts`);itapp-api 新增經 BFF 轉入的 `/api/it/*`(`gateway/plugin.ts`);`deploy/gateway-rbac.yaml`、`gateway-routes.yaml`)。
+> **最後更新:2026-10-08**(檔案管理(giga-file-service D16):`pages/files/`(檔案清單〔上傳、綁定單號、下載 / 預覽、刪除〕、儲存與備份)、`api/files.ts`(file-api 經 BFF `/api/file/*`)、`deploy/gateway-rbac.yaml` 的 `it.gw-file.*`;圖示 folder / file。2026-10-07:通知中心(Gateway NOTIFY-PLAN N3):`pages/notify/`(我的通知、公告查詢、發布公告〔Tiptap 編輯器,日後複製到入口網〕、發布紀錄、通知設定)、`components/notify/`(鈴鐺、NotifyHost、最新公告卡片、RichEditor、AudiencePicker)、`composables/notify.ts`;連線與收件匣狀態用 web-kit 0.3.0 `useNotifyCenter`;測試區實測通過(發布單位預設公司-部門、`GModal` 依開啟順序疊層、Tab 頁面須單一根節點)。2026-10-05:畫面權限模型範本:目錄 / 選單 / Tab / 按鈕登記為 BFF 權限並綁定 API(`deploy/gateway-rbac.yaml`、`api/auth.ts` 的 `IT` / `UI`);新增選單管理 `pages/system/MenuManage.vue`、部門 / 個人權限 `DeptPermissions.vue` / `UserPermissions.vue`、角色權限 `AppPermissions.vue`;圖示登記 `ui/icons.ts`。2026-10-02:改用 Gateway 單一入口、各管理頁直接呼叫 BFF 管理 API(`api/admin.ts`);itapp-api 新增經 BFF 轉入的 `/api/it/*`(`gateway/plugin.ts`);`deploy/gateway-rbac.yaml`、`gateway-routes.yaml`)。
 > 開發新功能後,在同一個變更內更新本文件(`AGENT.md` §9.1、Gateway `AGENT.md` §10.7)。只寫結構與職責,細節連到 `docs/` 對應章節。
 
 IT 部門的管理系統:`/it/`(Vue 前端)。登入走 Gateway 單一入口(web-kit);Gateway 管理與系統管理頁以使用者身分直接呼叫 BFF 管理 API(`/api/admin/*`);本系統自己的資料 `/api/it/*` 經 BFF 轉給 itapp-api(Fastify,port 51291,驗證內部 Token);端點管理經 BFF(`/api/endpoint/*`)。舊的 `/it/api/*`(自有登入)過渡期保留。
@@ -28,7 +28,7 @@ GigaItApp/
 ├─ frontend/                      Vue 3 + Vite(base /it/)
 │  ├─ src/
 │  │  ├─ main.ts、App.vue、router.ts   進入點與路由(兩層選單 → TabbedPage → Tab 子路由,懶加載)
-│  │  ├─ pages/                   畫面:dashboard/、notify/(通知中心五個 Tab)、gateway/(上游、路由、發佈、權限查詢〔唯讀〕)、endpoint/、system/(人員、部門、權限設定:角色權限、角色與規則、部門權限、個人權限、試算;選單管理;稽核)、403、404、Unavailable
+│  │  ├─ pages/                   畫面:dashboard/、notify/(通知中心五個 Tab)、gateway/(上游、路由、發佈、權限查詢〔唯讀〕)、files/(檔案管理:檔案清單、儲存與備份)、endpoint/、system/(人員、部門、權限設定:角色權限、角色與規則、部門權限、個人權限、試算;選單管理;稽核)、403、404、Unavailable
 │  │  ├─ layouts/                 AppLayout(選單、頁首、應用切換)、TabbedPage
 │  │  ├─ ui/                      全域 UI 套件:G* 元件(components/)、圖表(charts/)、tokens.css、feedback(toast / confirm)
 │  │  ├─ components/              本專案專用的小元件(非全域):GherkinView(行為規格顯示)、notify/(NotifyBell 鈴鐺、NotifyHost 連線與公告閱讀對話框、LatestAnnouncements 儀表板卡片、RichEditor〔Tiptap〕、AudiencePicker)
@@ -57,6 +57,7 @@ GigaItApp/
 | 登入 | `router.ts` 守衛 → `api/auth.ts` `loadMe`(web-kit `/api/auth/me`)→ 未登入 `redirectToLogin()` 到入口網 `/login?redirect=/it/...`;無 `it.app.access` → 入口網 `/` |
 | 管理頁資料 | `router.ts`(`meta.permission` 選單權限 + `meta.requires` BFF 讀取權限)→ 頁面 → `composables/usePaged` / `useAsync` → `api/admin.ts` → BFF `/api/admin/*`(BFF 以使用者權限檢查、寫稽核) |
 | 本系統資料 | `composables/dashboard.ts` → `/api/it/dashboard/*` → BFF 路由(`it.dashboard.read`)→ itapp-api `routes/it-dashboard.ts`(`gateway/plugin.ts` 驗證內部 Token) |
+| 檔案管理 | `pages/files/Files.vue`、`Storage.vue` → `api/files.ts` → Gateway `/api/file/*` → BFF(權限 `file.*`)→ file-api(giga-file-service);上傳經 BFF 單檔 10 MB |
 | 端點管理 | `pages/endpoint/Devices.vue` → `api/http.ts` → Gateway `/api/endpoint/*` → BFF(權限)→ Endpoint Server;itapp-api 不經手 |
 | 通知與公告 | `layouts/AppLayout.vue` 的 `NotifyHost` → web-kit `useNotifyCenter('itapp')`(`/ws/notify?app=itapp`,斷線重連後查 `/api/notify/feed`)→ 鈴鐺、儀表板「最新公告」、Toast / 對話框;發布 `pages/notify/Publish.vue` → web-kit `notifyApi` → BFF `/api/notify/*`(權限 `notify.announce.*`,BFF 檢查) |
 | 選單 | `api/auth.ts` 的 `MENU`(依 `it.*` ∩ `gw.admin.*` 讀取權限過濾)→ `layouts/AppLayout.vue` |

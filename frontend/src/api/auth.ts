@@ -25,6 +25,7 @@ export const IT = {
   gwService: 'it.gw-service.read',
   gwRbac: 'it.gw-rbac.read',
   gwObserve: 'it.gw-observe.read',
+  gwFile: 'it.gw-file.read',
   endpointDevice: 'it.endpoint-device.read',
   sysUser: 'it.sys-user.read',
   sysRole: 'it.sys-role.read',
@@ -59,6 +60,10 @@ export const UI = {
   obsErrors: 'it.gw-observe.errors',
   obsTraffic: 'it.gw-observe.traffic',
   obsBody: 'it.gw-observe.body',
+  fileObjects: 'it.gw-file.objects',
+  fileUpload: 'it.gw-file.upload',
+  fileDelete: 'it.gw-file.delete',
+  fileStorage: 'it.gw-file.storage',
   devList: 'it.endpoint-device.list',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
@@ -111,6 +116,14 @@ export const NOTIFY = {
   publishAll: 'notify.announce.publish.all',
   settingsRead: 'gw.admin.notify.read',
   settingsWrite: 'notify.settings.write',
+} as const;
+
+/** 附件服務(giga-file-service file-api 經 BFF /api/file/*;docs/API.md §1.1) */
+export const FILE = {
+  objectRead: 'file.object.read',
+  objectUpload: 'file.object.upload',
+  objectDelete: 'file.object.delete',
+  storageRead: 'file.storage.read',
 } as const;
 
 /** 端點管理(RustIt ItAgentBack 經 BFF /api/endpoint/*,RustIt INTEGRATION-PLAN M4) */
@@ -191,6 +204,8 @@ const MENU: readonly MenuGroup[] = [
       { key: 'services', title: '服務與路由', path: '/gateway/services', permission: IT.gwService, requires: [GW.upstreamRead, GW.routeRead] },
       { key: 'rbac', title: '權限查詢', path: '/gateway/rbac', permission: IT.gwRbac, requires: [GW.rbacRead] },
       { key: 'observe', title: '架構觀測', path: '/gateway/observe', permission: IT.gwObserve, requires: [OBS.read] },
+      // 檔案管理(giga-file-service D16):讀取權限掛在各 Tab(檔案清單 / 儲存與備份),有任一 Tab 即顯示
+      { key: 'files', title: '檔案管理', path: '/gateway/files', permission: IT.gwFile },
     ],
   },
   {

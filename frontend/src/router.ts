@@ -9,7 +9,7 @@
  */
 import { redirectToLogin } from '@giganexus/web-kit';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { can, canAll, GW, IT, loadMe, NOTIFY, OBS, setPageHasTab, UI } from './api/auth';
+import { can, canAll, FILE, GW, IT, loadMe, NOTIFY, OBS, setPageHasTab, UI } from './api/auth';
 import { hasCurrentApp } from './composables/apps';
 import AppLayout from './layouts/AppLayout.vue';
 import TabbedPage from './layouts/TabbedPage.vue';
@@ -160,6 +160,29 @@ const routes: RouteRecordRaw[] = [
           { path: 'logs', component: () => import('./pages/observe/Logs.vue'), meta: { tab: '紀錄', permission: UI.obsLogs } },
           { path: 'errors', component: () => import('./pages/observe/Errors.vue'), meta: { tab: '錯誤', permission: UI.obsErrors } },
           { path: 'traffic', component: () => import('./pages/observe/Traffic.vue'), meta: { tab: '流量與來源 IP', permission: UI.obsTraffic } },
+        ],
+      },
+      {
+        path: 'gateway/files',
+        component: TabbedPage,
+        meta: {
+          permission: IT.gwFile,
+          title: '檔案管理',
+          eyebrow: 'Gateway · 附件服務',
+          description: '共用附件服務 file-api:上傳、下載、綁定單號、刪除與 NAS 備份狀態(giga-file-service);只列自己上傳的或同公司的檔案',
+          icon: 'folder',
+          tabs: [
+            { label: '檔案清單', to: '/gateway/files', icon: 'folder', permission: UI.fileObjects },
+            { label: '儲存與備份', to: '/gateway/files/storage', icon: 'database', permission: UI.fileStorage },
+          ],
+        },
+        children: [
+          { path: '', component: () => import('./pages/files/Files.vue'), meta: { tab: '檔案清單', permission: UI.fileObjects, requires: [FILE.objectRead] } },
+          {
+            path: 'storage',
+            component: () => import('./pages/files/Storage.vue'),
+            meta: { tab: '儲存與備份', permission: UI.fileStorage, requires: [FILE.storageRead] },
+          },
         ],
       },
       {

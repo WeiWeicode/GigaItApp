@@ -28,6 +28,8 @@ permissions:
   - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.group.gateway, sort: 30, includes: [gw.admin.rbac.read] }
   # 架構觀測(Gateway MONITORING-PLAN W9-10):observe.* 由 giga-observe 的 OpenAPI 匯入 Gateway 時建立,需先匯入再套用本檔
   - { code: it.gw-observe.read, name: 架構觀測, kind: menu, parent: it.group.gateway, sort: 35, includes: [observe.data.read] }
+  # 檔案管理(giga-file-service PRD §8,D16):file.* 由 file-api 自動註冊;尚未註冊時 includes 會略過,下次套用補上
+  - { code: it.gw-file.read, name: 檔案管理, kind: menu, parent: it.group.gateway, sort: 40 }
   # 端點管理(RustIt ItAgentBack):endpoint.* 由 ItAgentBack 啟動時自動註冊 OpenAPI 建立,需先註冊再套用本檔(RustIt INTEGRATION-PLAN D9)
   - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.group.endpoint, sort: 40, includes: [endpoint.device.read] }
   - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50, includes: [gw.admin.user.read] }
@@ -58,6 +60,10 @@ permissions:
   - { code: it.gw-observe.errors, name: 錯誤, kind: tab, parent: it.gw-observe.read, sort: 30, includes: [observe.data.read] }
   - { code: it.gw-observe.traffic, name: 流量與來源 IP, kind: tab, parent: it.gw-observe.read, sort: 40, includes: [observe.data.read] }
   - { code: it.gw-observe.body, name: 查看請求 / 回應內容, kind: button, parent: it.gw-observe.logs, sort: 10, includes: [observe.log.body] }
+  - { code: it.gw-file.objects, name: 檔案清單, kind: tab, parent: it.gw-file.read, sort: 10, includes: [file.object.read] }
+  - { code: it.gw-file.upload, name: 上傳 / 綁定單號, kind: button, parent: it.gw-file.objects, sort: 10, includes: [file.object.upload] }
+  - { code: it.gw-file.delete, name: 刪除, kind: button, parent: it.gw-file.objects, sort: 20, includes: [file.object.delete] }
+  - { code: it.gw-file.storage, name: 儲存與備份, kind: tab, parent: it.gw-file.read, sort: 40, includes: [file.storage.read] }
   - { code: it.endpoint-device.list, name: 電腦清單, kind: tab, parent: it.endpoint-device.read, sort: 10, includes: [endpoint.device.read] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
@@ -89,6 +95,7 @@ roles:
       - it.gw-service.read
       - it.gw-rbac.read
       - it.gw-observe.read
+      - it.gw-file.read
       - it.endpoint-device.read
       - it.sys-user.read
       - it.sys-role.read
@@ -116,6 +123,10 @@ roles:
       - it.gw-observe.errors
       - it.gw-observe.traffic
       - it.gw-observe.body
+      - it.gw-file.objects
+      - it.gw-file.upload
+      - it.gw-file.delete
+      - it.gw-file.storage
       - it.endpoint-device.list
       - it.sys-user.users
       - it.sys-user.roles

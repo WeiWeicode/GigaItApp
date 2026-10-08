@@ -7,6 +7,8 @@ import type { Component } from 'vue';
 
 export const ICONS: Record<string, Component> = {
   dashboard: L.LayoutDashboard,
+  folder: L.FolderOpen,
+  file: L.File,
   gateway: L.Network,
   settings: L.Settings,
   users: L.Users,
