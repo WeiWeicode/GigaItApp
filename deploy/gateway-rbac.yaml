@@ -186,8 +186,6 @@ roles:
       - portal.ef-info.read
       - portal.ef-info.pending
       - portal.ef-info.unclosed
-      - portal.release-mail.read
-      - portal.release-mail.list
       - portal.asset.read
       - portal.asset.current
       - portal.asset.transfer
