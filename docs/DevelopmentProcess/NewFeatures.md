@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-12 it-admin 可查看員工入口網全部選單與 Tab(giga-Portal FRAMEWORK-PLAN §2)
+- 內容:需求方要求 IT 管理系統管理員能看到入口網主管專區等選單。Gateway `apply` 的角色權限整組取代、沒有角色繼承,入口網無法在自己的 yaml 修改 `it-admin`,改在本 repo 的 `it-admin` 加上入口網 `portal.app.access`、`portal.home.read` 與全部 menu + tab 代碼(121 個,含主管專區、ESH;**不含按鈕**,只能查看)。代碼由 giga-Portal `deploy/gateway-rbac.yaml` 登記,**需先套用入口網的 yaml**,否則本檔套用會因權限不存在而失敗
+- 檔案:`deploy/gateway-rbac.yaml`
+- 驗證:以 PyYAML 解析,`it-admin` 180 個代碼無重複,且全部存在於本檔或入口網 yaml;測試區套用結果見 giga-Portal `docs/DevelopmentProcess/NewFeatures.md` 2026-10-12
+
 ## 2026-10-08 檔案管理 › BPM 附件(giga-file-service F6)
 - 工作項目:giga-file-service F6(甘特圖 W11-5)、F3(W11-6)
 - 內容:新 Tab「BPM 附件」(`it.gw-file.bpm` → `file.bpm.read`,sort 20):切換「測試區(191)/ 正式區(190)」(來源取自 `GET /api/file/bpm/sources`,只顯示 file-api 已設定的)、依 BPM 單號完全比對查詢表單附件、下載 / 預覽(PDF、圖片);網址 `?env=&sn=` 可直接查詢;正式區結果加標記

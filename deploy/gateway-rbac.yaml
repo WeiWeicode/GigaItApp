@@ -7,7 +7,7 @@
 #      只負責首次登記:已存在的權限不覆寫名稱、上層與排序,之後在「系統管理 › 選單管理」調整(2026-10-05)
 #      includes = 此頁需要的 API 讀取權限(隨附:擁有選單即一併擁有),與 frontend/src/api/auth.ts 的 requires 一致
 #      資料與按鈕權限直接使用 BFF 管理 API 的 gw.admin.*(按鈕 = API),不在此重複登記
-#   ② 角色 it-admin:IT 管理系統全部選單、Tab、按鈕;成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
+#   ② 角色 it-admin:IT 管理系統全部選單、Tab、按鈕,以及員工入口網全部選單與 Tab(唯讀查看);成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
 #      (此處不寫 adGroups / companies,套用時不會覆蓋 IT 在畫面上的設定;permissions 會整組取代,新增選單請改此檔)
 #   上游 itapp-api 與 /api/it/* 路由在 gateway-routes.yaml(apply 會把路由設回草稿,不隨 CI 每次套用)
 # 測試區與正式區設定不互通(Gateway PRD Q3),兩區各自套用;正式區的上游位址於 2026-12 建置時調整 targets.prod。
@@ -150,3 +150,126 @@ roles:
       - it.sys-menu.edit
       - it.sys-audit.ops
       - it.sys-audit.logins
+      # 員工入口網(giga-Portal FRAMEWORK-PLAN §2):IT 協助排查,可查看全部選單與 Tab(含主管專區、ESH),不含按鈕。
+      # 代碼由 giga-Portal/deploy/gateway-rbac.yaml 登記,該檔需先套用,否則本檔套用會因權限不存在而失敗
+      - portal.app.access
+      - portal.home.read
+      - portal.profile.read
+      - portal.profile.basic
+      - portal.profile.pension
+      - portal.profile.health-family
+      - portal.profile.tax-dependents
+      - portal.profile.insurance-bracket
+      - portal.profile.commute
+      - portal.query.read
+      - portal.query.card
+      - portal.query.attendance
+      - portal.query.overtime
+      - portal.query.leave
+      - portal.query.schedule
+      - portal.query.comp-time
+      - portal.query.annual-leave
+      - portal.query.insurance-detail
+      - portal.query.nhi2
+      - portal.salary.read
+      - portal.salary.slip
+      - portal.salary.bonus
+      - portal.annual-gains.read
+      - portal.annual-gains.list
+      - portal.annual-gains.tax-proof
+      - portal.salary-adjust.read
+      - portal.salary-adjust.history
+      - portal.attendance-abnormal.read
+      - portal.attendance-abnormal.list
+      - portal.abnormal-respond.read
+      - portal.abnormal-respond.report
+      - portal.ef-info.read
+      - portal.ef-info.pending
+      - portal.ef-info.unclosed
+      - portal.release-mail.read
+      - portal.release-mail.list
+      - portal.asset.read
+      - portal.asset.current
+      - portal.asset.transfer
+      - portal.cipher-reset.read
+      - portal.cipher-reset.reset
+      - portal.course.read
+      - portal.course.required
+      - portal.note.read
+      - portal.note.list
+      - portal.approval.read
+      - portal.approval.pending
+      - portal.approval.done
+      - portal.approval.sent
+      - portal.form.read
+      - portal.form.list
+      - portal.ga.read
+      - portal.ga.service
+      - portal.ga.apply
+      - portal.ga.property
+      - portal.ga.outbound
+      - portal.ga.parking
+      - portal.hr.read
+      - portal.hr.welfare
+      - portal.hr.agent
+      - portal.job.read
+      - portal.job.list
+      - portal.survey.read
+      - portal.survey.list
+      - portal.onboarding.read
+      - portal.onboarding.tips
+      - portal.onboarding.quiz
+      - portal.directory.read
+      - portal.directory.extension
+      - portal.directory.contact
+      - portal.gui-number.read
+      - portal.gui-number.list
+      - portal.news.read
+      - portal.news.all
+      - portal.news.unread
+      - portal.calendar.read
+      - portal.calendar.month
+      - portal.calendar.list
+      - portal.links.read
+      - portal.links.list
+      - portal.talk.read
+      - portal.talk.board
+      - portal.mgr.rights.read
+      - portal.mgr.rights.level1
+      - portal.mgr.rights.level2
+      - portal.mgr.rights.level3
+      - portal.mgr.rights.level4
+      - portal.mgr.shift.read
+      - portal.mgr.shift.upload
+      - portal.mgr.boss-trace.read
+      - portal.mgr.boss-trace.trace
+      - portal.mgr.attendance.read
+      - portal.mgr.attendance.punch
+      - portal.mgr.attendance.abnormal
+      - portal.mgr.leave-balance.read
+      - portal.mgr.leave-balance.rank
+      - portal.mgr.promotion.read
+      - portal.mgr.promotion.map
+      - portal.mgr.training.read
+      - portal.mgr.training.plan
+      - portal.mgr.safety-course.read
+      - portal.mgr.safety-course.rate
+      - portal.mgr.property.read
+      - portal.mgr.property.list
+      - portal.mgr.budget.read
+      - portal.mgr.budget.exec
+      - portal.mgr.budget-apply.read
+      - portal.mgr.budget-apply.apply
+      - portal.esh.license.read
+      - portal.esh.license.list
+      - portal.esh.item.read
+      - portal.esh.item.list
+      - portal.esh.need.read
+      - portal.esh.need.list
+      - portal.esh.personal.read
+      - portal.esh.personal.list
+      - portal.esh.manager.read
+      - portal.esh.manager.list
+      - portal.esh.chemical.read
+      - portal.esh.chemical.regulated
+      - portal.esh.chemical.unregulated
