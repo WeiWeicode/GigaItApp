@@ -112,3 +112,48 @@ export const BACKUP_STATUS: Record<FileItem['backupStatus'], { label: string; to
 
 /** 可在瀏覽器預覽的類型(與 file-api file-types.ts 的 inline 清單一致;SVG 不預覽) */
 export const PREVIEWABLE = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']);
+
+/** 舊系統匯入檔案(giga-file-service F4 / A4;filebackend / SMBbackend 匯入後的對照,唯讀;權限 file.legacy.read) */
+export type LegacySource = 'filebackend' | 'smbbackend';
+
+export interface LegacySummary {
+  source: LegacySource;
+  files: number;
+  bytes: number;
+  /** 匯入後在新服務已刪除(舊畫面刪除,或切換前舊表改無效後同步) */
+  deleted: number;
+  backup: { pending: number; done: number; failed: number };
+  lastImportedAt: string | null;
+}
+
+export interface LegacyItem {
+  fileUuid: string;
+  legacySource: LegacySource;
+  /** 舊表 id */
+  legacyKey: string | null;
+  legacyDir: string | null;
+  /** 舊檔名(filebackend 為 {uuid}{副檔名};SMB 為 path,可能是中文原檔名) */
+  legacyName: string;
+  /** false = 與其他表單共用同一個舊檔(各自匯入) */
+  isCurrent: boolean;
+  syncState: string;
+  importedAt: string;
+  originalName: string;
+  refNo: string | null;
+  sourceSystem: string;
+  sourceApp: string | null;
+  sizeBytes: number;
+  sha256: string;
+  uploadedBy: string;
+  createdAt: string;
+  deleted: boolean;
+  backupStatus: FileItem['backupStatus'];
+}
+
+export const LEGACY_SOURCE_LABEL: Record<LegacySource, string> = { filebackend: 'filebackend(:5124)', smbbackend: 'SMBbackend(:5125)' };
+
+export const legacy = {
+  summary: () => http.get<{ items: LegacySummary[] }>('/api/file/legacy/summary'),
+  list: (q: { source?: LegacySource; q?: string; page: number; pageSize: number }) => http.get<Paged<LegacyItem>>('/api/file/legacy/files', { query: { ...q } }),
+  contentUrl: (uuid: string) => `/api/file/legacy/files/${uuid}/content`,
+};
