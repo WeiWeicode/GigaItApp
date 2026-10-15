@@ -71,6 +71,8 @@ permissions:
   # 端點一般指令(RustIt P4:立即蒐集資產、重啟 Agent、傳送訊息、遠端診斷、收集日誌、調整日誌等級);endpoint.command.basic 由 ItAgentBack 自動註冊建立。
   # 畫面按鈕屬 RustIt P4-3,先登記權限節點讓 it-admin 能經 /api/endpoint/*-commands 下指令
   - { code: it.endpoint-device.command, name: 下達一般指令, kind: button, parent: it.endpoint-device.list, sort: 10, includes: [endpoint.command.basic] }
+  # 指令紀錄(RustIt P4-3):所有電腦的指令與結果、日誌下載(endpoint.device.read)
+  - { code: it.endpoint-command.list, name: 指令紀錄, kind: tab, parent: it.endpoint-device.read, sort: 20, includes: [endpoint.device.read] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
   - { code: it.sys-user.revoke, name: 強制登出, kind: button, parent: it.sys-user.users, sort: 20, includes: [gw.admin.user.write] }
@@ -138,6 +140,7 @@ roles:
       - it.gw-file.backup-retry
       - it.endpoint-device.list
       - it.endpoint-device.command
+      - it.endpoint-command.list
       - it.sys-user.users
       - it.sys-user.roles
       - it.sys-user.revoke

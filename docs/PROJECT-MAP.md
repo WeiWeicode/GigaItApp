@@ -1,6 +1,6 @@
 # 專案地圖 — GigaItApp(IT 管理系統)
 
-> **最後更新:2026-10-13**(檔案管理新增「舊系統」Tab `pages/files/Legacy.vue`:giga-file-service A4,filebackend / SMBbackend 匯入檔案的摘要、對照清單、下載;節點 `it.gw-file.legacy`)。前次 2026-10-08(檔案管理(giga-file-service):`pages/files/` 三個 Tab — 檔案清單〔上傳、綁定單號、下載 / 預覽、刪除〕、BPM 附件〔測試區 191 / 正式區 190 切換、依單號查詢下載〕、儲存與備份〔NAS 備份狀態、重試〕;`api/files.ts`;`deploy/gateway-rbac.yaml` 的 `it.gw-file.*`;「舊系統」Tab 隨 giga-file-service F4)
+> **最後更新:2026-10-15**(端點指令 RustIt P4-3:電腦詳情「指令」Tab `pages/endpoint/DeviceCommands.vue`、「指令紀錄」Tab `pages/endpoint/Commands.vue`、結果元件 `components/endpoint/CommandResult.vue`、`api/endpoint.ts`;節點 `it.endpoint-device.command`、`it.endpoint-command.list`)。2026-10-13(檔案管理新增「舊系統」Tab `pages/files/Legacy.vue`:giga-file-service A4,filebackend / SMBbackend 匯入檔案的摘要、對照清單、下載;節點 `it.gw-file.legacy`)。前次 2026-10-08(檔案管理(giga-file-service):`pages/files/` 三個 Tab — 檔案清單〔上傳、綁定單號、下載 / 預覽、刪除〕、BPM 附件〔測試區 191 / 正式區 190 切換、依單號查詢下載〕、儲存與備份〔NAS 備份狀態、重試〕;`api/files.ts`;`deploy/gateway-rbac.yaml` 的 `it.gw-file.*`;「舊系統」Tab 隨 giga-file-service F4)
 > 開發新功能後,在同一個變更內更新本文件(`AGENT.md` §9.1、Gateway `AGENT.md` §10.7)。只寫結構與職責,細節連到 `docs/` 對應章節。
 
 IT 部門的管理系統:`/it/`(Vue 前端)。登入走 Gateway 單一入口(web-kit);Gateway 管理與系統管理頁以使用者身分直接呼叫 BFF 管理 API(`/api/admin/*`);本系統自己的資料 `/api/it/*` 經 BFF 轉給 itapp-api(Fastify,port 51291,驗證內部 Token);端點管理經 BFF(`/api/endpoint/*`)。舊的 `/it/api/*`(自有登入)過渡期保留。
@@ -58,7 +58,7 @@ GigaItApp/
 | 管理頁資料 | `router.ts`(`meta.permission` 選單權限 + `meta.requires` BFF 讀取權限)→ 頁面 → `composables/usePaged` / `useAsync` → `api/admin.ts` → BFF `/api/admin/*`(BFF 以使用者權限檢查、寫稽核) |
 | 本系統資料 | `composables/dashboard.ts` → `/api/it/dashboard/*` → BFF 路由(`it.dashboard.read`)→ itapp-api `routes/it-dashboard.ts`(`gateway/plugin.ts` 驗證內部 Token) |
 | 檔案管理 | `pages/files/Files.vue`、`Bpm.vue`、`Legacy.vue`(舊系統,`/api/file/legacy/*`)、`Storage.vue` → `api/files.ts` → Gateway `/api/file/*` → BFF(權限 `file.*`)→ file-api(giga-file-service);上傳 `POST /api/file/files` 由 Nginx `auth_request` 直送 file-api,單檔 30 MB;BPM 附件以 `?env=test|prod` 選 191 / 190 |
-| 端點管理 | `pages/endpoint/Devices.vue` → `api/http.ts` → Gateway `/api/endpoint/*` → BFF(權限)→ Endpoint Server;itapp-api 不經手 |
+| 端點管理 | `pages/endpoint/Devices.vue`(電腦清單)、`DeviceDetail.vue`(概要 / 指令 Tab)、`DeviceCommands.vue`(下指令、該電腦指令紀錄)、`Commands.vue`(全部指令紀錄)→ `api/endpoint.ts`、`api/http.ts` → Gateway `/api/endpoint/*` → BFF(權限)→ Endpoint Server;itapp-api 不經手 |
 | 通知與公告 | `layouts/AppLayout.vue` 的 `NotifyHost` → web-kit `useNotifyCenter('itapp')`(`/ws/notify?app=itapp`,斷線重連後查 `/api/notify/feed`)→ 鈴鐺、儀表板「最新公告」、Toast / 對話框;發布 `pages/notify/Publish.vue` → web-kit `notifyApi` → BFF `/api/notify/*`(權限 `notify.announce.*`,BFF 檢查) |
 | 選單 | `api/auth.ts` 的 `MENU`(依 `it.*` ∩ `gw.admin.*` 讀取權限過濾)→ `layouts/AppLayout.vue` |
 

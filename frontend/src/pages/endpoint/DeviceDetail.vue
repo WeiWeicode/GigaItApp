@@ -1,19 +1,26 @@
 <script setup lang="ts">
 /**
  * 電腦詳情(放在電腦清單的對話框內,開啟時才載入):GET /api/endpoint/devices/{deviceId}(RustIt ItAgentBack)。
- * 顯示 Agent 最新一份資產:基本資訊、硬體、磁碟、網卡、防毒;軟體清單只顯示筆數(進階功能再做查詢)。
+ * 「概要」Tab:Agent 最新一份資產:基本資訊、硬體、磁碟、網卡、防毒;軟體清單只顯示筆數(進階功能再做查詢)。
+ * 「指令」Tab(RustIt P4-3):下達指令與這台電腦的指令紀錄(DeviceCommands,切到該 Tab 才載入)。
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { fmtBytes, fmtTime, fromNow } from '@/api/format';
 import { describeError, http } from '@/api/http';
 import type { EndpointDeviceDetail } from '@/api/types';
 import { useAsync } from '@/composables/useAsync';
+import DeviceCommands from './DeviceCommands.vue';
 
 const props = defineProps<{ deviceId: string }>();
 const { data, loading, error, reload } = useAsync(() => http.get<EndpointDeviceDetail>(`/api/endpoint/devices/${encodeURIComponent(props.deviceId)}`));
 const d = computed(() => data.value);
 const inv = computed(() => data.value?.inventory ?? null);
 const usedPct = (v: { total: number; available: number }) => (v.total ? Math.round(((v.total - v.available) / v.total) * 100) : 0);
+const tab = ref('overview');
+const TABS = [
+  { label: '概要', value: 'overview', icon: 'monitor' },
+  { label: '指令', value: 'commands', icon: 'send' },
+];
 </script>
 
 <template>
@@ -22,6 +29,9 @@ const usedPct = (v: { total: number; available: number }) => (v.total ? Math.rou
     ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
   >
   <div v-else-if="d" class="stack" style="--gap: 16px">
+    <GTabs v-model="tab" :items="TABS" />
+    <DeviceCommands v-if="tab === 'commands'" :device-id="d.deviceId" :computer-name="d.computerName" :online="d.online" :active="d.status === 'active'" />
+    <div v-else class="stack" style="--gap: 16px">
     <dl class="kv">
       <dt>狀態</dt>
       <dd class="row" style="--gap: 6px">
@@ -123,6 +133,7 @@ const usedPct = (v: { total: number; available: number }) => (v.total ? Math.rou
 
       <p v-if="inv.warnings.length" class="faint xs" style="margin: 0">蒐集警告:{{ inv.warnings.join(';') }}</p>
     </template>
+    </div>
   </div>
 </template>
 
