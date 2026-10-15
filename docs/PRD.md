@@ -237,7 +237,7 @@
 | FR-8.2 | 進頁呼叫 Gateway `GET /api/auth/me`:未登入 → 引導登入 Gateway(`/login?redirect=`);Gateway 工號與本系統登入者不同 → 提示重新登入,不取資料;Gateway 沒有 `endpoint.device.read` → 提示權限不足 | 同上(`@manual @e2e`) |
 | FR-8.3 | 電腦清單經 `GET /api/endpoint/devices` 取得:電腦名稱、在線 / 離線(停用另標示)、使用者、IP、作業系統、CPU、記憶體、最後回報(憑證 DN 於滑過名稱與詳情顯示);點列開詳情 `GET /api/endpoint/devices/{deviceId}`:基本資訊、硬體、安全(防毒、最近更新、軟體筆數)、磁碟用量、網卡;BFF 回 403 / 404 / 5xx 時分別提示「Gateway 權限不足」「Gateway 尚未提供端點 API」「Endpoint Server 無法連線」 | `endpoint/device-inventory.feature`(`@manual`) |
 | FR-8.4 | Gateway 呼叫集中在 `src/api/gateway.ts`,目前只有唯讀 GET;加入下指令等寫入功能時改用 `@giganexus/web-kit`(CSRF、Token 自動更新) | 程式審查 |
-| FR-8.5 | 對電腦下指令、查詢指令結果(ENDPOINT-AGENT-GUIDE §8.3–§8.4) | `@wip`,待 RustIt 進階階段(W6) |
+| FR-8.5 | 對電腦下指令、查詢指令結果(ENDPOINT-AGENT-GUIDE §8.3–§8.4;RustIt P4-3):電腦詳情分「概要」「指令」兩個 Tab;「指令」Tab 有遠端診斷、收集日誌(1–14 天)、立即蒐集資產、調整日誌等級、傳送訊息、重新啟動 Agent(需確認)六個按鈕(按鈕 `it.endpoint-device.command` ∧ `endpoint.command.basic`,停用的電腦不顯示),下指令後每 2 秒更新狀態並依類型顯示結果(一律文字,不用 `v-html`),日誌可下載(保存 14 天);這台電腦的指令紀錄(「載入更多」)與取消自己建立且排隊中的指令。「端點管理 › 指令紀錄」Tab(`it.endpoint-command.list`)列出所有電腦的指令,依狀態、類型篩選 | `endpoint/commands.feature`(`@manual`) |
 
 ---
 

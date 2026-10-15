@@ -68,6 +68,8 @@ export const UI = {
   fileStorage: 'it.gw-file.storage',
   fileBackupRetry: 'it.gw-file.backup-retry',
   devList: 'it.endpoint-device.list',
+  devCommand: 'it.endpoint-device.command',
+  cmdList: 'it.endpoint-command.list',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
   userRevoke: 'it.sys-user.revoke',
@@ -135,6 +137,8 @@ export const FILE = {
 /** 端點管理(RustIt ItAgentBack 經 BFF /api/endpoint/*,RustIt INTEGRATION-PLAN M4) */
 export const EP = {
   deviceRead: 'endpoint.device.read',
+  /** 一般指令(RustIt P4:立即蒐集資產、遠端診斷、收集日誌、日誌等級、傳送訊息、重啟 Agent) */
+  commandBasic: 'endpoint.command.basic',
 } as const;
 
 const kit = kitUseAuth();

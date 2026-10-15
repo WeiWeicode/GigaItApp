@@ -9,7 +9,7 @@
  */
 import { redirectToLogin } from '@giganexus/web-kit';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { can, canAll, FILE, GW, IT, loadMe, NOTIFY, OBS, setPageHasTab, UI } from './api/auth';
+import { can, canAll, EP, FILE, GW, IT, loadMe, NOTIFY, OBS, setPageHasTab, UI } from './api/auth';
 import { hasCurrentApp } from './composables/apps';
 import AppLayout from './layouts/AppLayout.vue';
 import TabbedPage from './layouts/TabbedPage.vue';
@@ -198,9 +198,15 @@ const routes: RouteRecordRaw[] = [
           eyebrow: 'Endpoint',
           description: '經 Gateway BFF 取得的 Agent 基本資料;資料權限以 Gateway 為準',
           icon: 'monitor',
-          tabs: [{ label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList }],
+          tabs: [
+            { label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList },
+            { label: '指令紀錄', to: '/endpoint/devices/commands', icon: 'list', permission: UI.cmdList },
+          ],
         },
-        children: [{ path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單', permission: UI.devList } }],
+        children: [
+          { path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單', permission: UI.devList } },
+          { path: 'commands', component: () => import('./pages/endpoint/Commands.vue'), meta: { tab: '指令紀錄', permission: UI.cmdList, requires: [EP.deviceRead] } },
+        ],
       },
       {
         path: 'system/users',

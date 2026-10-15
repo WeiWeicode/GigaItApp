@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-15 端點指令畫面(RustIt P4-3)
+- 內容:需求方同意 P4-3 設計。電腦詳情對話框分「概要」(原內容)與「指令」Tab;「指令」Tab(`DeviceCommands.vue`)有六個按鈕:遠端診斷、收集日誌(範圍 1–14 天)、立即蒐集資產、調整日誌等級(debug / trace / 恢復,10 分鐘–1 天)、傳送訊息(標題、內文 1000 字 / 30 行、自動關閉;與主機相同的控制字元檢查)、重新啟動 Agent(確認對話框);權限為按鈕 `it.endpoint-device.command` ∧ `endpoint.command.basic`,停用的電腦不顯示。下指令後每 2 秒查詢直到結束,離線時提示排隊與 1 小時有效;下方為這台電腦的指令紀錄(nextCursor「載入更多」),點列看結果、自己建立且排隊中的可取消。結果元件 `CommandResult.vue` 依類型顯示(診斷檢查表、日誌下載與保存期限、日誌等級、資產回報、訊息、重啟時間;未知類型以 JSON 文字),一律文字不用 `v-html`。新 Tab「端點管理 › 指令紀錄」(`Commands.vue`,`it.endpoint-command.list` → `endpoint.device.read`):所有電腦的指令,依狀態、類型後端篩選。`gateway-rbac.yaml` 登記 Tab 節點並加入 it-admin;`api/endpoint.ts` 集中指令 API 與顯示文字。
+- 檔案:`frontend/src/pages/endpoint/{DeviceDetail,DeviceCommands,Commands}.vue`、`frontend/src/components/endpoint/CommandResult.vue`、`frontend/src/api/{endpoint,types,auth}.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/commands.feature`、`docs/PRD.md` FR-8.5、`docs/PROJECT-MAP.md`
+- 驗證:`npm run typecheck`、`npm run build` 通過。本機 5174 經 proxy 連測試區 Gateway(需求方登入、同意對測試區 VM 下指令),對 VM `DESKTOP-1TB2UMP`(Agent 0.4.0)實測:遠端診斷成功並列出 7 項檢查;收集日誌成功,「下載日誌」經 BFF 取得 zip(200、`application/zip`、SHA-256 與標頭相符);調整日誌等級 debug 10 分鐘(info → debug,顯示恢復時間);傳送訊息 31 行時顯示「內文最多 30 行」且不能傳送,送出後因 VM 主控台無登入者回 `NO_ACTIVE_SESSION` 並顯示說明;立即蒐集資產「已更新」;重新啟動 Agent 經確認對話框後,畫面自動由「排隊中」(重啟前送出、重連前退回排隊)更新為「成功」;指令紀錄點列開出詳情與下載按鈕。修正:檔案大小原用 `fmtBytes`(MB 為單位顯示 0 MB),改 `fmtSize`。未在本機驗證:「指令紀錄」Tab(新節點需合併後由 CI rbac-test 套用才有權限)、取消排隊中指令(需電腦離線,ItAgentBack 已有測試)
+
 ## 2026-10-15 端點一般指令權限(RustIt P4)
 - 內容:需求方同意只改 RBAC、不做畫面。新增按鈕節點「下達一般指令」`it.endpoint-device.command`(掛在 Tab「電腦清單」下,`includes: [endpoint.command.basic]`),並加入 `it-admin`,讓 IT 能經 `/api/endpoint/devices/{id}/basic-commands` 等 API 下指令、查詢與下載診斷日誌(下載權限 `endpoint.device.read` 原本就有)。`endpoint.command.basic` 由 RustIt ItAgentBack 自動註冊建立,**須在 RustIt `fix/p4-openapi-register`(MR !17)合併、部署並註冊後再合併本變更**,否則 CI rbac-test 套用時權限不存在。指令按鈕與「指令紀錄」Tab 屬 RustIt P4-3,另行確認。
 - 檔案:`deploy/gateway-rbac.yaml`

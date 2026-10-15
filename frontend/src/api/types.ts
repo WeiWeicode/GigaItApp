@@ -107,3 +107,50 @@ export interface EndpointDeviceDetail extends EndpointDevice {
   inventory: EndpointInventory | null;
   collectedAt: string | null;
 }
+/** 端點指令類型(RustIt docs/contracts/command-kinds.md;目前只開放 basic) */
+export type EndpointCommandKind = 'inventory.collect' | 'agent.diagnose' | 'logs.collect' | 'agent.log_level' | 'message.show' | 'agent.restart';
+export type EndpointCommandState = 'queued' | 'sent' | 'acked' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'expired';
+
+/** 指令附檔(logs.collect 的日誌 zip;保存 14 天) */
+export interface EndpointCommandFile {
+  fileId: string;
+  fileName: string;
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+}
+
+/** 指令(GET /api/endpoint/commands/{commandId};result 依類型不同,一律以文字顯示) */
+export interface EndpointCommand {
+  commandId: string;
+  batchId: string | null;
+  deviceId: string;
+  computerName: string;
+  kind: EndpointCommandKind | string;
+  level: 'basic' | 'admin';
+  params: Record<string, unknown>;
+  state: EndpointCommandState;
+  progress: number | null;
+  result: Record<string, unknown> | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  expiresAt: string;
+  sendCount: number;
+  createdBy: { emp: string; name: string | null };
+  requestId: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  ackedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** 只有單筆查詢才回傳 */
+  files?: EndpointCommandFile[];
+}
+
+/** 指令清單(新到舊;nextCursor 為下一頁游標) */
+export interface EndpointCommandPage {
+  items: EndpointCommand[];
+  nextCursor: string | null;
+}
