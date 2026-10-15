@@ -68,6 +68,9 @@ permissions:
   - { code: it.gw-file.storage, name: 儲存與備份, kind: tab, parent: it.gw-file.read, sort: 40, includes: [file.storage.read] }
   - { code: it.gw-file.backup-retry, name: 重試 NAS 備份, kind: button, parent: it.gw-file.storage, sort: 10, includes: [file.storage.manage] }
   - { code: it.endpoint-device.list, name: 電腦清單, kind: tab, parent: it.endpoint-device.read, sort: 10, includes: [endpoint.device.read] }
+  # 端點一般指令(RustIt P4:立即蒐集資產、重啟 Agent、傳送訊息、遠端診斷、收集日誌、調整日誌等級);endpoint.command.basic 由 ItAgentBack 自動註冊建立。
+  # 畫面按鈕屬 RustIt P4-3,先登記權限節點讓 it-admin 能經 /api/endpoint/*-commands 下指令
+  - { code: it.endpoint-device.command, name: 下達一般指令, kind: button, parent: it.endpoint-device.list, sort: 10, includes: [endpoint.command.basic] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
   - { code: it.sys-user.revoke, name: 強制登出, kind: button, parent: it.sys-user.users, sort: 20, includes: [gw.admin.user.write] }
@@ -134,6 +137,7 @@ roles:
       - it.gw-file.storage
       - it.gw-file.backup-retry
       - it.endpoint-device.list
+      - it.endpoint-device.command
       - it.sys-user.users
       - it.sys-user.roles
       - it.sys-user.revoke

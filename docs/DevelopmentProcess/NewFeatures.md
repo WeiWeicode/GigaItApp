@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-15 端點一般指令權限(RustIt P4)
+- 內容:需求方同意只改 RBAC、不做畫面。新增按鈕節點「下達一般指令」`it.endpoint-device.command`(掛在 Tab「電腦清單」下,`includes: [endpoint.command.basic]`),並加入 `it-admin`,讓 IT 能經 `/api/endpoint/devices/{id}/basic-commands` 等 API 下指令、查詢與下載診斷日誌(下載權限 `endpoint.device.read` 原本就有)。`endpoint.command.basic` 由 RustIt ItAgentBack 自動註冊建立,**須在 RustIt `fix/p4-openapi-register`(MR !17)合併、部署並註冊後再合併本變更**,否則 CI rbac-test 套用時權限不存在。指令按鈕與「指令紀錄」Tab 屬 RustIt P4-3,另行確認。
+- 檔案:`deploy/gateway-rbac.yaml`
+- 驗證:以 PyYAML 解析,`it-admin` 代碼無重複、新節點的 parent 存在
+
 ## 2026-10-12 it-admin 可查看員工入口網全部選單與 Tab(giga-Portal FRAMEWORK-PLAN §2)
 - 內容:需求方要求 IT 管理系統管理員能看到入口網主管專區等選單。Gateway `apply` 的角色權限整組取代、沒有角色繼承,入口網無法在自己的 yaml 修改 `it-admin`,改在本 repo 的 `it-admin` 加上入口網 `portal.app.access`、`portal.home.read` 與全部 menu + tab 代碼(121 個,含主管專區、ESH;**不含按鈕**,只能查看)。代碼由 giga-Portal `deploy/gateway-rbac.yaml` 登記,**需先套用入口網的 yaml**,否則本檔套用會因權限不存在而失敗
 - 檔案:`deploy/gateway-rbac.yaml`
