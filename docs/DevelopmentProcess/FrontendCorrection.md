@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-16 電腦詳情固定高度、篩選列換行、Agent 啟動事件文字(RustIt P3 測試區實測後)
+- 內容:需求方要求詳情對話框不隨 Tab 內容改變高度 → `GModal` 新增 `height`(固定高度、內容在內部捲動),電腦詳情設 `85vh`,Tab 列在捲動時固定在上方;電腦清單篩選列改為可換行(1280px 寬時「顯示退役」被擠掉),`GCheckbox` 改用 `label` 參數(原寫法 slot 不顯示文字);事件「Agent 啟動」顯示「Agent 版本 x.y.z」而非原始 JSON。
+- 檔案:`frontend/src/ui/components/GModal.vue`、`frontend/src/pages/endpoint/Devices.vue`、`DeviceDetail.vue`、`frontend/src/components/endpoint/DeviceEvents.vue`、`docs/UI-GUIDE.md`
+- 驗證:`npm run typecheck`、`npm run build` 通過;測試區瀏覽器(1280×860)以相同樣式暫時套用確認:詳情高度固定 731px(85vh),內容短的 Tab 不縮小;篩選列不再溢出。部署後需求方再確認。
+
 ## 2026-10-16 端點電腦清單分頁與篩選、詳情分 Tab、停用 / 退役 / 合併(RustIt P3)
 - 內容:配合 RustIt ItAgentBack P3(RustIt `docs/P3-DATA-DESIGN.md`,分支 `feature/p3-data`)。電腦清單改後端分頁(每頁 50 台,`usePaged`)與篩選(關鍵字:名稱 / 使用者 / IP / MAC / 裝置代碼;軟體名稱;作業系統;在線;顯示退役),標示「疑似同一台」「已退役 / 已合併」;詳情分 Tab:概要(時鐘偏差、開機時間、裝置代碼、疑似同一台提示)、硬體(CPU、記憶體模組、主機板與 BIOS、磁碟、實體磁碟、顯示卡)、網路(閘道、DNS)、軟體(名稱 / 發行者篩選)、安全與周邊(防毒、Windows 更新、USB 原則與使用過的裝置、RustDesk)、事件(主機稽核與端點事件,載入更多)、指令(既有);「下載資產 JSON」。管理操作(按鈕節點 `it.endpoint-device.admin` ∧ `endpoint.command.admin`):停用 / 啟用 / 退役、合併疑似同一台(首次連線較早者為舊裝置;後端回指紋不同或時間重疊時再確認一次後 force),原因必填。Agent 回報的字串一律文字顯示。`deviceApi.list` 相容 P3 前只回 `items` 的 ItAgentBack。新增圖示 package、hard-drive、merge、archive、ban。
 - 檔案:`frontend/src/pages/endpoint/Devices.vue`、`DeviceDetail.vue`、`frontend/src/components/endpoint/DeviceEvents.vue`(新)、`DeviceAdminActions.vue`(新)、`frontend/src/api/endpoint.ts`、`types.ts`、`auth.ts`、`frontend/src/ui/icons.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/device-inventory.feature`、`docs/PROJECT-MAP.md`
