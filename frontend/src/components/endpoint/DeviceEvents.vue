@@ -66,6 +66,7 @@ function summary(e: EndpointDeviceEvent): string {
       .filter(Boolean)
       .join(' · ');
   }
+  if (e.type === 'agent_started' && d.agent_version) return `Agent 版本 ${str(d.agent_version)}`;
   if (e.detail) return e.detail;
   if (e.data && typeof e.data === 'object' && Object.keys(e.data).length) return JSON.stringify(e.data);
   return '';

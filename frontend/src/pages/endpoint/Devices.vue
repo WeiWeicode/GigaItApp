@@ -97,7 +97,7 @@ const errorTitle = computed(() => {
         <GInput v-model="filters.software" icon="package" placeholder="軟體名稱" clearable />
         <GInput v-model="filters.os" placeholder="作業系統(例:Windows 11、24H2)" clearable />
         <GSelect v-model="filters.online" :options="ONLINE_OPTIONS" placeholder="在線 / 離線" />
-        <GCheckbox v-model="filters.retired">顯示退役</GCheckbox>
+        <GCheckbox v-model="filters.retired" label="顯示退役" />
         <GButton v-if="hasFilter" size="sm" variant="ghost" icon="x" @click="clearFilters">清除</GButton>
       </div>
 
@@ -159,7 +159,7 @@ const errorTitle = computed(() => {
       </GTable>
     </GCard>
 
-    <GModal v-model:open="detailOpen" :title="selected?.computerName ?? ''" :subtitle="selected?.deviceId" icon="monitor" width="960px">
+    <GModal v-model:open="detailOpen" :title="selected?.computerName ?? ''" :subtitle="selected?.deviceId" icon="monitor" width="960px" height="85vh">
       <DeviceDetail v-if="selected" :key="selected.deviceId" :device-id="selected.deviceId" @changed="onChanged" />
     </GModal>
   </div>
@@ -167,16 +167,26 @@ const errorTitle = computed(() => {
 
 <style scoped>
 .filters {
-  display: grid;
-  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(120px, 0.8fr) auto auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
-@media (max-width: 900px) {
-  .filters {
-    grid-template-columns: 1fr 1fr;
-  }
+/* 欄寬不足時自動換行,「顯示退役」與「清除」不被擠掉 */
+.filters > :nth-child(1) {
+  flex: 2 1 240px;
+}
+.filters > :nth-child(2),
+.filters > :nth-child(3) {
+  flex: 1 1 160px;
+}
+.filters > :nth-child(4) {
+  flex: 0 1 140px;
+}
+.filters > :nth-child(n + 5) {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 </style>

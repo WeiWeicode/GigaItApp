@@ -72,7 +72,7 @@ async function onChanged() {
     ><GButton icon="refresh" @click="reload">重試</GButton></GEmpty
   >
   <div v-else-if="d" class="stack" style="--gap: 16px">
-    <div class="row" style="--gap: 8px">
+    <div class="row tabbar" style="--gap: 8px">
       <GTabs v-model="tab" :items="TABS" />
       <span class="spacer" />
       <a v-if="inv" :href="inventoryJsonUrl(d.deviceId)" download><GButton size="sm" variant="ghost" icon="download">下載資產 JSON</GButton></a>
@@ -365,6 +365,15 @@ async function onChanged() {
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.tabbar {
+  /* 固定高度的對話框內捲動時,Tab 列留在上方(對話框 body 上內距 16px) */
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  margin: -16px -22px 0;
+  padding: 16px 22px 8px;
+  background: var(--glass-strong);
 }
 .notice {
   padding: 10px 12px;
