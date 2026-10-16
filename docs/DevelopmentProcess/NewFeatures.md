@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-16 端點電腦清單分頁與篩選、詳情分 Tab、停用 / 退役 / 合併(RustIt P3)
+- 內容:配合 RustIt ItAgentBack P3(RustIt `docs/P3-DATA-DESIGN.md`,分支 `feature/p3-data`)。電腦清單改後端分頁(每頁 50 台,`usePaged`)與篩選(關鍵字:名稱 / 使用者 / IP / MAC / 裝置代碼;軟體名稱;作業系統;在線;顯示退役),標示「疑似同一台」「已退役 / 已合併」;詳情分 Tab:概要(時鐘偏差、開機時間、裝置代碼、疑似同一台提示)、硬體(CPU、記憶體模組、主機板與 BIOS、磁碟、實體磁碟、顯示卡)、網路(閘道、DNS)、軟體(名稱 / 發行者篩選)、安全與周邊(防毒、Windows 更新、USB 原則與使用過的裝置、RustDesk)、事件(主機稽核與端點事件,載入更多)、指令(既有);「下載資產 JSON」。管理操作(按鈕節點 `it.endpoint-device.admin` ∧ `endpoint.command.admin`):停用 / 啟用 / 退役、合併疑似同一台(首次連線較早者為舊裝置;後端回指紋不同或時間重疊時再確認一次後 force),原因必填。Agent 回報的字串一律文字顯示。`deviceApi.list` 相容 P3 前只回 `items` 的 ItAgentBack。新增圖示 package、hard-drive、merge、archive、ban。
+- 檔案:`frontend/src/pages/endpoint/Devices.vue`、`DeviceDetail.vue`、`frontend/src/components/endpoint/DeviceEvents.vue`(新)、`DeviceAdminActions.vue`(新)、`frontend/src/api/endpoint.ts`、`types.ts`、`auth.ts`、`frontend/src/ui/icons.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/device-inventory.feature`、`docs/PROJECT-MAP.md`
+- 驗證:`frontend` `npm run typecheck`、`npm run build` 通過;`backend` `npm test` 52/55(3 項為 Windows 暫存檔鎖定 EPERM / EBUSY,未改動時同樣失敗)。瀏覽器:入口網登入需本人帳密,AI 未登入;改以本機 ItAgentBack(DEV_SKIP_TOKEN,唯讀測試庫)驗證畫面所用的 API(分頁、篩選、事件、下載)。**待部署後由需求方在瀏覽器實測各 Tab、篩選與下載**;停用 / 退役 / 合併待 P3-4 以測試 VM 驗證。
+
 ## 2026-10-15 端點指令畫面(RustIt P4-3)
 - 內容:需求方同意 P4-3 設計。電腦詳情對話框分「概要」(原內容)與「指令」Tab;「指令」Tab(`DeviceCommands.vue`)有六個按鈕:遠端診斷、收集日誌(範圍 1–14 天)、立即蒐集資產、調整日誌等級(debug / trace / 恢復,10 分鐘–1 天)、傳送訊息(標題、內文 1000 字 / 30 行、自動關閉;與主機相同的控制字元檢查)、重新啟動 Agent(確認對話框);權限為按鈕 `it.endpoint-device.command` ∧ `endpoint.command.basic`,停用的電腦不顯示。下指令後每 2 秒查詢直到結束,離線時提示排隊與 1 小時有效;下方為這台電腦的指令紀錄(nextCursor「載入更多」),點列看結果、自己建立且排隊中的可取消。結果元件 `CommandResult.vue` 依類型顯示(診斷檢查表、日誌下載與保存期限、日誌等級、資產回報、訊息、重啟時間;未知類型以 JSON 文字),一律文字不用 `v-html`。新 Tab「端點管理 › 指令紀錄」(`Commands.vue`,`it.endpoint-command.list` → `endpoint.device.read`):所有電腦的指令,依狀態、類型後端篩選。`gateway-rbac.yaml` 登記 Tab 節點並加入 it-admin;`api/endpoint.ts` 集中指令 API 與顯示文字。
 - 檔案:`frontend/src/pages/endpoint/{DeviceDetail,DeviceCommands,Commands}.vue`、`frontend/src/components/endpoint/CommandResult.vue`、`frontend/src/api/{endpoint,types,auth}.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/commands.feature`、`docs/PRD.md` FR-8.5、`docs/PROJECT-MAP.md`

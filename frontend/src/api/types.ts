@@ -67,8 +67,8 @@ export interface EndpointDevice {
   online: boolean;
   firstSeenAt: string;
   lastSeenAt: string;
-  /** active / disabled */
-  status: string;
+  /** active / disabled / retired(退役,RustIt P3) */
+  status: 'active' | 'disabled' | 'retired' | string;
   /** DOMAIN\user */
   userName: string | null;
   domain: string | null;
@@ -83,21 +83,50 @@ export interface EndpointDevice {
   ips: string[];
   agentVersion: string | null;
   lastInventoryAt: string | null;
+  /** 有其他裝置硬體指紋相同(疑似同一台:重灌、改名、換憑證;RustIt P3) */
+  suspectedDuplicate?: boolean;
+  /** 已併入的目標裝置 */
+  mergedInto?: string | null;
+  retiredAt?: string | null;
+}
+
+/** 電腦清單(GET /api/endpoint/devices;後端分頁,依電腦名稱排序) */
+export interface EndpointDevicePage {
+  items: EndpointDevice[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 /** Agent 最新一份資產快照(rustit-collector ComputerInfo,鍵名轉 camelCase;RustIt docs/contracts/inventory.schema.json) */
 export interface EndpointInventory {
-  system: { hostName: string; userName: string; domain: string; manufacturer: string; model: string; osName: string; osDisplayVersion: string; osBuild: string; arch: string; bootTime: number };
-  identity: { biosSerial: string; systemUuid: string; boardManufacturer: string; boardProduct: string };
+  system: {
+    hostName: string;
+    userName: string;
+    domain: string;
+    partOfDomain: boolean;
+    manufacturer: string;
+    model: string;
+    osName: string;
+    osVersion: string;
+    osDisplayVersion: string;
+    osBuild: string;
+    arch: string;
+    bootTime: number;
+  };
+  identity: { biosSerial: string; biosVendor: string; biosVersion: string; boardManufacturer: string; boardProduct: string; boardSerial: string; systemUuid: string };
   cpu: { name: string; cores: number; logical: number; maxMhz: number };
   memoryTotal: number;
-  memoryModules: { slot: string; capacity: number; speedMhz: number; manufacturer: string }[];
-  physicalDisks: { model: string; size: number; interface: string; mediaType: string }[];
+  memoryModules: { slot: string; capacity: number; speedMhz: number; manufacturer: string; partNumber: string }[];
+  physicalDisks: { model: string; serial: string; size: number; interface: string; mediaType: string }[];
   volumes: { mountPoint: string; label: string; fileSystem: string; total: number; available: number; removable: boolean }[];
-  gpus: { name: string; resolution: string }[];
-  network: { description: string; mac: string; ips: string[]; gateways: string[]; dhcpEnabled: boolean }[];
-  software: { name: string; version: string; publisher: string }[];
-  security: { antivirus: { name: string; enabled: boolean; upToDate: boolean }[]; recentHotfixes: { id: string; installedOn: string }[] };
+  gpus: { name: string; driverVersion: string; resolution: string }[];
+  network: { description: string; mac: string; ips: string[]; gateways: string[]; dns: string[]; dhcpEnabled: boolean }[];
+  software: { name: string; version: string; publisher: string; installDate: string }[];
+  security: { antivirus: { name: string; enabled: boolean; upToDate: boolean }[]; recentHotfixes: { id: string; description: string; installedOn: string }[] };
+  usb: { storagePolicy: 'Allowed' | 'Blocked' | 'Unknown' | string; storageHistory: { friendlyName: string; serial: string }[] };
+  rustdesk: { installed: boolean; version: string; exePath: string; id: string; customServer: string };
+  collectMs: number;
   warnings: string[];
 }
 
@@ -106,6 +135,27 @@ export interface EndpointDeviceDetail extends EndpointDevice {
   /** 尚未回報資產時為 null */
   inventory: EndpointInventory | null;
   collectedAt: string | null;
+  /** 端點 − 主機(毫秒);超過 ±5 分鐘會記 clock_skew 事件 */
+  clockSkewMs?: number | null;
+  /** 硬體指紋相同、未合併、未退役的其他裝置(RustIt P3) */
+  suspectedDuplicates?: { deviceId: string; computerName: string; status: string; firstSeenAt: string; lastSeenAt: string }[];
+}
+
+/** 電腦事件(GET /api/endpoint/devices/{deviceId}/events;新到舊,nextCursor 分頁) */
+export interface EndpointDeviceEvent {
+  id: number;
+  type: string;
+  /** 端點事件為端點上的發生時間 */
+  occurredAt: string;
+  /** 端點事件的主機收到時間;主機稽核為 null */
+  receivedAt: string | null;
+  detail: string | null;
+  data: unknown;
+}
+
+export interface EndpointDeviceEventPage {
+  items: EndpointDeviceEvent[];
+  nextCursor: string | null;
 }
 /** 端點指令類型(RustIt docs/contracts/command-kinds.md;目前只開放 basic) */
 export type EndpointCommandKind = 'inventory.collect' | 'agent.diagnose' | 'logs.collect' | 'agent.log_level' | 'message.show' | 'agent.restart';
