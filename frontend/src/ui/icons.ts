@@ -112,6 +112,12 @@ export const ICONS: Record<string, Component> = {
   apps: L.Grip,
   home: L.House,
   'arrow-right': L.ArrowRight,
+  // 端點管理(RustIt P3):軟體、USB 儲存、合併、退役、停用
+  package: L.Package,
+  'hard-drive': L.HardDrive,
+  merge: L.GitMerge,
+  archive: L.Archive,
+  ban: L.Ban,
 };
 
 export const ICON_NAMES = Object.keys(ICONS).sort();

@@ -42,3 +42,34 @@
     假如 使用者在 Gateway 沒有 endpoint.device.read
     當 開啟 "/it/endpoint/devices"
     那麼 顯示「Gateway 權限不足」,不呼叫 /api/endpoint/devices
+
+  # 2026-10-16 RustIt P3(RustIt docs/P3-DATA-DESIGN.md):後端分頁與篩選、詳情分 Tab、管理操作
+  @manual
+  場景: 依軟體名稱與 IP 找電腦
+    當 在電腦清單的「軟體名稱」輸入 "7-Zip"
+    那麼 只列出安裝了 7-Zip 的電腦,標題顯示「符合 N 台」
+    當 清除後在關鍵字輸入電腦的 IP 前幾碼
+    那麼 列出該 IP 的電腦;超過 50 台時以分頁切換
+
+  @manual
+  場景: 詳情分 Tab 與下載資產 JSON
+    當 點開 "PC-EXAMPLE-01"
+    那麼 看得到「概要、硬體、網路、軟體、安全與周邊、事件、指令」Tab
+    而且 「軟體」Tab 可依名稱篩選,「事件」Tab 依時間新到舊並可載入更多
+    當 按「下載資產 JSON」
+    那麼 下載 "PC-EXAMPLE-01-<日期>.json"(Agent 回報的原始資產)
+
+  @manual @security
+  場景: 合併疑似同一台
+    假如 測試 VM 改名並以新憑證重新登錄,與舊登錄的硬體指紋相同
+    而且 使用者擁有按鈕 it.endpoint-device.admin 與 API 權限 endpoint.command.admin
+    那麼 清單兩台都標示「疑似同一台」
+    當 在舊裝置詳情按「把 <新名稱>(新登錄)併入這台」並填寫原因
+    那麼 清單只剩舊裝置(裝置代碼不變、名稱改為新名稱),事件出現「合併」
+    而且 新登錄勾「顯示退役」才看得到,狀態為「已合併」
+
+  @manual @security
+  場景: 沒有管理權限看不到管理操作
+    假如 使用者沒有 endpoint.command.admin
+    當 點開任一電腦
+    那麼 「概要」Tab 不顯示停用、退役與合併按鈕

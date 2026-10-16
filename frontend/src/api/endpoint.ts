@@ -5,9 +5,18 @@
  *   - 取消:POST /commands/{commandId}/cancel(只能取消自己建立、仍在排隊的)
  *   - 日誌下載:GET /commands/{commandId}/files/{fileId}(瀏覽器直接下載,Cookie 驗證)
  * 指令只開放固定類型;結果一律以文字顯示(不用 v-html,RustIt P4-COMMAND-DESIGN §6.1)。
+ * 電腦(RustIt P3,P3-DATA-DESIGN §3):清單分頁與篩選、事件、下載資產 JSON(endpoint.device.read);
+ *   停用 / 啟用 / 退役 PUT /devices/{id}/status、合併 POST /devices/{id}/merge(endpoint.command.admin)。
  */
 import { http, type Query } from '@/api/http';
-import type { EndpointCommand, EndpointCommandKind, EndpointCommandPage, EndpointCommandState } from '@/api/types';
+import type {
+  EndpointCommand,
+  EndpointCommandKind,
+  EndpointCommandPage,
+  EndpointCommandState,
+  EndpointDeviceEventPage,
+  EndpointDevicePage,
+} from '@/api/types';
 
 const base = '/api/endpoint';
 
@@ -70,4 +79,79 @@ export const endpointApi = {
 /** 日誌下載網址(同網域,瀏覽器以 Cookie 驗證;BFF 權限 endpoint.device.read) */
 export function commandFileUrl(commandId: string, fileId: string): string {
   return `${base}/commands/${encodeURIComponent(commandId)}/files/${encodeURIComponent(fileId)}`;
+}
+
+// ---------- 電腦(RustIt P3) ----------
+
+export type DeviceStatus = 'active' | 'disabled' | 'retired';
+
+export const DEVICE_STATUS_LABELS: Record<DeviceStatus, string> = { active: '使用中', disabled: '已停用', retired: '已退役' };
+
+/** 事件類型說明(主機稽核 + Agent 端點事件;RustIt ItAgentBack DeviceEventType、docs/contracts/event.schema.json) */
+export const EVENT_LABELS: Record<string, string> = {
+  registered: '首次連線登錄',
+  fingerprint_changed: '憑證指紋變更',
+  disabled: '停用',
+  enabled: '啟用',
+  retired: '退役',
+  merged: '合併',
+  duplicate_connection: '重複連線',
+  clock_skew: '時鐘偏差',
+  suspected_duplicate: '疑似同一台',
+  usb_inserted: 'USB 插入',
+  usb_removed: 'USB 移除',
+  offline_period: '離線期間',
+  agent_started: 'Agent 啟動',
+};
+
+export const EVENT_TONES: Record<string, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
+  disabled: 'danger',
+  retired: 'danger',
+  enabled: 'success',
+  merged: 'info',
+  duplicate_connection: 'warning',
+  clock_skew: 'warning',
+  suspected_duplicate: 'warning',
+  fingerprint_changed: 'warning',
+  offline_period: 'warning',
+};
+
+export interface DeviceListQuery extends Query {
+  q?: string;
+  software?: string;
+  os?: string;
+  online?: boolean;
+  /** 逗號分隔;省略 = active,disabled */
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface MergeResponse {
+  deviceId: string;
+  sourceDeviceId: string;
+  alreadyMerged: boolean;
+  events: number;
+  commands: number;
+  /** 兩台尚未完成、因合併取消的指令數 */
+  canceledCommands: number;
+  inventoryFrom: 'source' | 'target' | 'none';
+}
+
+export const deviceApi = {
+  // 舊版 ItAgentBack(P3 前)只回 items:補上 total 等欄位,部署順序不同時清單仍可用
+  list: async (query: DeviceListQuery = {}): Promise<EndpointDevicePage> => {
+    const r = await http.get<Partial<EndpointDevicePage> & { items: EndpointDevicePage['items'] }>(`${base}/devices`, { query });
+    return { items: r.items, total: r.total ?? r.items.length, page: r.page ?? 1, pageSize: r.pageSize ?? r.items.length };
+  },
+  events: (deviceId: string, query: Query = {}) => http.get<EndpointDeviceEventPage>(`${base}/devices/${encodeURIComponent(deviceId)}/events`, { query }),
+  setStatus: (deviceId: string, status: DeviceStatus, reason: string) =>
+    http.put<{ deviceId: string; status: DeviceStatus; changed: boolean }>(`${base}/devices/${encodeURIComponent(deviceId)}/status`, { status, reason }),
+  merge: (deviceId: string, sourceDeviceId: string, reason: string, force = false) =>
+    http.post<MergeResponse>(`${base}/devices/${encodeURIComponent(deviceId)}/merge`, { sourceDeviceId, reason, force }),
+};
+
+/** 資產 JSON 下載網址(同網域,瀏覽器以 Cookie 驗證;BFF 權限 endpoint.device.read) */
+export function inventoryJsonUrl(deviceId: string): string {
+  return `${base}/devices/${encodeURIComponent(deviceId)}/inventory.json`;
 }

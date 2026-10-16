@@ -69,6 +69,8 @@ export const UI = {
   fileBackupRetry: 'it.gw-file.backup-retry',
   devList: 'it.endpoint-device.list',
   devCommand: 'it.endpoint-device.command',
+  /** 停用 / 啟用 / 退役、合併疑似同一台(RustIt P3) */
+  devAdmin: 'it.endpoint-device.admin',
   cmdList: 'it.endpoint-command.list',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
@@ -139,6 +141,8 @@ export const EP = {
   deviceRead: 'endpoint.device.read',
   /** 一般指令(RustIt P4:立即蒐集資產、遠端診斷、收集日誌、日誌等級、傳送訊息、重啟 Agent) */
   commandBasic: 'endpoint.command.basic',
+  /** 管理等級(RustIt P3 起:裝置停用 / 啟用 / 退役、合併;指令類型在 P6) */
+  commandAdmin: 'endpoint.command.admin',
 } as const;
 
 const kit = kitUseAuth();
