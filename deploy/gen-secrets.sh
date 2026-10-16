@@ -8,5 +8,7 @@ mkdir -p secrets
 [ -f secrets/itapp_jwt_secret ] || head -c 48 /dev/urandom | base64 | tr -d '\n=/+' > secrets/itapp_jwt_secret
 [ -f secrets/itapp_seed_password ] || printf '%s' "${ITAPP_SEED_PASSWORD:-Passw0rd!}" > secrets/itapp_seed_password
 [ -f secrets/bff_service_password ] || printf '%s' "${BFF_SERVICE_PASSWORD:-Passw0rd!}" > secrets/bff_service_password
+# giga-observe ingest Key:本機預設空白(監控停用);要試送時填入 Key
+[ -f secrets/monitor_api_key ] || : > secrets/monitor_api_key
 chmod 600 secrets/*
 ls -l secrets

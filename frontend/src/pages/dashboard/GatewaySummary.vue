@@ -78,7 +78,10 @@ const services = computed(() => [...(data.value?.services ?? [])].sort((a, b) =>
       </div>
 
       <GCard title="上游服務健康" subtitle="p95 回應時間與可用率" icon="activity" tone="cyan">
-        <template #actions><GBadge tone="info">開發中</GBadge></template>
+        <template #actions
+          ><GBadge v-if="!data || data.mockSections.includes('services')" tone="info">開發中</GBadge
+          ><GBadge v-else tone="success" dot>近 1 小時</GBadge></template
+        >
         <div v-if="data && services.length" class="svc-grid">
           <div v-for="s in services" :key="s.code" class="svc">
             <div class="row" style="--gap: 8px">
@@ -96,10 +99,11 @@ const services = computed(() => [...(data.value?.services ?? [])].sort((a, b) =>
                 >% 可用</span
               >
             </div>
-            <GProgress :value="s.p95" :max="400" :tone="s.status === 'healthy' ? 'success' : 'warning'" :height="6" />
+            <GProgress :value="Math.min(s.p95, 1000)" :max="1000" :tone="s.status === 'healthy' ? 'success' : 'warning'" :height="6" />
           </div>
         </div>
-        <GEmpty v-else-if="data" compact icon="activity" title="開發中" description="上游服務健康指標監控功能開發中，尚未接入即時指標來源" />
+        <GEmpty v-else-if="data && !data.mockSections.includes('services')" compact icon="activity" title="近 1 小時沒有轉送流量" description="BFF 近 1 小時沒有轉送到上游服務的請求" />
+        <GEmpty v-else-if="data" compact icon="activity" title="開發中" description="上游服務健康需要架構觀測權限(observe.data.read),或觀測服務尚未接入" />
         <GSkeleton v-else :lines="4" />
       </GCard>
     </template>

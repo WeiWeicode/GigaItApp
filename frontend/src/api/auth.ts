@@ -21,8 +21,11 @@ export type Me = KitMe & { apps?: AppEntry[] };
 export const IT = {
   app: 'it.app.access',
   dashboard: 'it.dashboard.read',
+  notify: 'it.notify.read',
   gwService: 'it.gw-service.read',
   gwRbac: 'it.gw-rbac.read',
+  gwObserve: 'it.gw-observe.read',
+  gwFile: 'it.gw-file.read',
   endpointDevice: 'it.endpoint-device.read',
   sysUser: 'it.sys-user.read',
   sysRole: 'it.sys-role.read',
@@ -38,6 +41,11 @@ export const UI = {
   dashOverview: 'it.dashboard.overview',
   dashGateway: 'it.dashboard.gateway',
   dashTeam: 'it.dashboard.team',
+  notifyInbox: 'it.notify.inbox',
+  notifyArchive: 'it.notify.archive',
+  notifyPublish: 'it.notify.publish',
+  notifyHistory: 'it.notify.history',
+  notifySettings: 'it.notify.settings',
   svcUpstreams: 'it.gw-service.upstreams',
   svcUpstreamEdit: 'it.gw-service.upstream-edit',
   svcRoutes: 'it.gw-service.routes',
@@ -47,7 +55,23 @@ export const UI = {
   rbacMatrix: 'it.gw-rbac.matrix',
   rbacWho: 'it.gw-rbac.who',
   rbacGraph: 'it.gw-rbac.graph',
+  obsMap: 'it.gw-observe.map',
+  obsLogs: 'it.gw-observe.logs',
+  obsErrors: 'it.gw-observe.errors',
+  obsTraffic: 'it.gw-observe.traffic',
+  obsBody: 'it.gw-observe.body',
+  fileObjects: 'it.gw-file.objects',
+  fileUpload: 'it.gw-file.upload',
+  fileDelete: 'it.gw-file.delete',
+  fileBpm: 'it.gw-file.bpm',
+  fileLegacy: 'it.gw-file.legacy',
+  fileStorage: 'it.gw-file.storage',
+  fileBackupRetry: 'it.gw-file.backup-retry',
   devList: 'it.endpoint-device.list',
+  devCommand: 'it.endpoint-device.command',
+  /** 停用 / 啟用 / 退役、合併疑似同一台(RustIt P3) */
+  devAdmin: 'it.endpoint-device.admin',
+  cmdList: 'it.endpoint-command.list',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
   userRevoke: 'it.sys-user.revoke',
@@ -82,6 +106,43 @@ export const GW = {
   userSync: 'gw.admin.user.sync',
   companyRead: 'gw.admin.company.read',
   auditRead: 'gw.admin.audit.read',
+} as const;
+
+/** 架構觀測(giga-observe 經 BFF /api/observe/*,Gateway MONITORING-PLAN W9-10) */
+export const OBS = {
+  read: 'observe.data.read',
+  body: 'observe.log.body',
+} as const;
+
+/**
+ * 通知與公告(Gateway NOTIFY-PLAN;BFF /api/notify/*):收件匣、公告查詢只需登入;
+ * 發布 = notify.announce.publish(只能發本部門),.all = 全公司與管理所有公告;設定寫入只給超級管理員。
+ */
+export const NOTIFY = {
+  publish: 'notify.announce.publish',
+  publishAll: 'notify.announce.publish.all',
+  settingsRead: 'gw.admin.notify.read',
+  settingsWrite: 'notify.settings.write',
+} as const;
+
+/** 附件服務(giga-file-service file-api 經 BFF /api/file/*;docs/API.md §1.1) */
+export const FILE = {
+  objectRead: 'file.object.read',
+  objectUpload: 'file.object.upload',
+  objectDelete: 'file.object.delete',
+  storageRead: 'file.storage.read',
+  storageManage: 'file.storage.manage',
+  bpmRead: 'file.bpm.read',
+  legacyRead: 'file.legacy.read',
+} as const;
+
+/** 端點管理(RustIt ItAgentBack 經 BFF /api/endpoint/*,RustIt INTEGRATION-PLAN M4) */
+export const EP = {
+  deviceRead: 'endpoint.device.read',
+  /** 一般指令(RustIt P4:立即蒐集資產、遠端診斷、收集日誌、日誌等級、傳送訊息、重啟 Agent) */
+  commandBasic: 'endpoint.command.basic',
+  /** 管理等級(RustIt P3 起:裝置停用 / 啟用 / 退役、合併;指令類型在 P6) */
+  commandAdmin: 'endpoint.command.admin',
 } as const;
 
 const kit = kitUseAuth();
@@ -143,7 +204,10 @@ const MENU: readonly MenuGroup[] = [
     code: 'it.group.overview',
     title: '總覽',
     icon: 'dashboard',
-    children: [{ key: 'dashboard', title: '儀表板', path: '/dashboard', permission: IT.dashboard }],
+    children: [
+      { key: 'dashboard', title: '儀表板', path: '/dashboard', permission: IT.dashboard },
+      { key: 'notify', title: '通知中心', path: '/notify', permission: IT.notify },
+    ],
   },
   {
     key: 'gateway',
@@ -153,6 +217,9 @@ const MENU: readonly MenuGroup[] = [
     children: [
       { key: 'services', title: '服務與路由', path: '/gateway/services', permission: IT.gwService, requires: [GW.upstreamRead, GW.routeRead] },
       { key: 'rbac', title: '權限查詢', path: '/gateway/rbac', permission: IT.gwRbac, requires: [GW.rbacRead] },
+      { key: 'observe', title: '架構觀測', path: '/gateway/observe', permission: IT.gwObserve, requires: [OBS.read] },
+      // 檔案管理(giga-file-service D16):讀取權限掛在各 Tab(檔案清單 / 儲存與備份),有任一 Tab 即顯示
+      { key: 'files', title: '檔案管理', path: '/gateway/files', permission: IT.gwFile },
     ],
   },
   {
@@ -160,7 +227,7 @@ const MENU: readonly MenuGroup[] = [
     code: 'it.group.endpoint',
     title: '端點管理',
     icon: 'monitor',
-    children: [{ key: 'devices', title: '電腦清單', path: '/endpoint/devices', permission: IT.endpointDevice }],
+    children: [{ key: 'devices', title: '電腦清單', path: '/endpoint/devices', permission: IT.endpointDevice, requires: [EP.deviceRead] }],
   },
   {
     key: 'system',

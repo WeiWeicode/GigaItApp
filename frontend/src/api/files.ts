@@ -1,0 +1,159 @@
+/**
+ * 附件服務 file-api(giga-file-service docs/API.md §2;經 Gateway BFF /api/file/*,權限 file.*)。
+ * 「Gateway 管理 › 檔案管理」頁使用;上傳 POST /api/file/files 由 Gateway Nginx 驗證後直送 file-api(D4-B),單檔上限 30 MB(D3)。
+ */
+import { http, withQuery } from './http';
+import type { Paged } from './admin';
+
+export interface FileItem {
+  fileUuid: string;
+  originalName: string;
+  ext: string | null;
+  mime: string | null;
+  sizeBytes: number;
+  sha256: string;
+  sourceSystem: string;
+  sourceApp: string | null;
+  refType: string | null;
+  refNo: string | null;
+  companyId: string | null;
+  uploadedBy: string;
+  createdAt: string;
+  boundAt: string | null;
+  backupStatus: 'pending' | 'done' | 'failed';
+  backupAt: string | null;
+}
+
+export interface StorageStats {
+  /** false = 此環境未設定 NAS 備份(備份狀態維持待備份) */
+  backupEnabled: boolean;
+  files: number;
+  bytes: number;
+  temp: number;
+  backup: { pending: number; done: number; failed: number };
+  failedItems: { fileUuid: string; originalName: string; createdAt: string }[];
+  /** basis host = Windows 主機磁碟(實際可用);filesystem = 只有檔案根目錄所在檔案系統(WSL 虛擬磁碟,僅供參考) */
+  capacity: { totalBytes: number; freeBytes: number; basis: 'host' | 'filesystem'; filesystem: { totalBytes: number; freeBytes: number } } | null;
+}
+
+export interface FileQuery {
+  refNo?: string;
+  refType?: string;
+  sourceSystem?: string;
+  uploadedBy?: string;
+  page: number;
+  pageSize: number;
+}
+
+/** 單檔上限(giga-file-service D3:30 MB;Nginx 直送,不受 BFF 10 MB 限制) */
+export const UPLOAD_MAX_BYTES = 30 * 1024 * 1024;
+export const UPLOAD_MAX_FILES = 10;
+
+export const files = {
+  list: (q: FileQuery) => http.get<Paged<FileItem>>('/api/file/files', { query: { ...q } }),
+  upload: (picked: File[], fields: { refType?: string; refNo?: string; sourceApp?: string }) => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) if (v) fd.append(k, v);
+    for (const f of picked) fd.append('file', f, f.name);
+    return http.post<{ items: FileItem[] }>('/api/file/files', fd);
+  },
+  bind: (uuids: string[], refNo: string, refType?: string) =>
+    http.post<{ bound: number }>('/api/file/files/bind', { uuids, refNo, ...(refType ? { refType } : {}) }),
+  remove: (uuid: string) => http.delete(`/api/file/files/${uuid}`),
+  storage: () => http.get<StorageStats>('/api/file/storage'),
+  /** 失敗的備份改回待備份,由下一輪排程補傳;省略 uuids 重試全部(權限 file.storage.manage) */
+  retryBackup: (uuids?: string[]) => http.post<{ retried: number }>('/api/file/storage/backup/retry', uuids ? { fileUuids: uuids } : {}),
+  /** 下載 / 預覽網址(同網域 Cookie;GET 不需 CSRF) */
+  contentUrl: (uuid: string, inline = false) => withQuery(`/api/file/files/${uuid}/content`, inline ? { inline: 1 } : undefined),
+};
+
+/** BPM 表單附件(giga-file-service API.md §3;NaNa 唯讀 + 5144 即時代理) */
+export interface BpmAttachment {
+  doid: string;
+  originalName: string;
+  ext: string | null;
+  createdAt: string | null;
+  serialNumber: string | null;
+  formName: string | null;
+  subject: string | null;
+}
+
+export type BpmEnv = 'test' | 'prod';
+
+export interface BpmSource {
+  env: BpmEnv;
+  /** 測試區 / 正式區 */
+  label: string;
+  /** 資料來源主機(191 / 190) */
+  source: string;
+}
+
+export const bpm = {
+  /** file-api 已設定的來源(測試區 191 / 正式區 190)與預設來源 */
+  sources: () => http.get<{ defaultEnv: BpmEnv | null; items: BpmSource[] }>('/api/file/bpm/sources'),
+  /** 單號完全比對 */
+  bySerial: (serialNumber: string, env: BpmEnv) =>
+    http.get<{ serialNumber: string; env: BpmEnv; label: string; source: string; items: BpmAttachment[] }>(
+      `/api/file/bpm/forms/${encodeURIComponent(serialNumber)}/attachments`,
+      { query: { env } },
+    ),
+  /** Doid 要搭配查到它的 env */
+  contentUrl: (doid: string, env: BpmEnv, inline = false) => withQuery(`/api/file/bpm/attachments/${doid}/content`, inline ? { env, inline: 1 } : { env }),
+};
+
+/** BPM 單號格式(與 file-api 相同:英數、底線、連字號) */
+export const BPM_SERIAL_RE = /^[A-Za-z0-9_-]{1,100}$/;
+
+export const BACKUP_STATUS: Record<FileItem['backupStatus'], { label: string; tone: string }> = {
+  pending: { label: '待備份', tone: 'warning' },
+  done: { label: '已備份', tone: 'success' },
+  failed: { label: '備份失敗', tone: 'danger' },
+};
+
+/** 可在瀏覽器預覽的類型(與 file-api file-types.ts 的 inline 清單一致;SVG 不預覽) */
+export const PREVIEWABLE = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']);
+
+/** 舊系統匯入檔案(giga-file-service F4 / A4;filebackend / SMBbackend 匯入後的對照,唯讀;權限 file.legacy.read) */
+export type LegacySource = 'filebackend' | 'smbbackend';
+
+export interface LegacySummary {
+  source: LegacySource;
+  files: number;
+  bytes: number;
+  /** 匯入後在新服務已刪除(舊畫面刪除,或切換前舊表改無效後同步) */
+  deleted: number;
+  backup: { pending: number; done: number; failed: number };
+  lastImportedAt: string | null;
+}
+
+export interface LegacyItem {
+  fileUuid: string;
+  legacySource: LegacySource;
+  /** 舊表 id */
+  legacyKey: string | null;
+  legacyDir: string | null;
+  /** 舊檔名(filebackend 為 {uuid}{副檔名};SMB 為 path,可能是中文原檔名) */
+  legacyName: string;
+  /** false = 與其他表單共用同一個舊檔(各自匯入) */
+  isCurrent: boolean;
+  syncState: string;
+  importedAt: string;
+  originalName: string;
+  refNo: string | null;
+  sourceSystem: string;
+  sourceApp: string | null;
+  sizeBytes: number;
+  sha256: string;
+  uploadedBy: string;
+  createdAt: string;
+  deleted: boolean;
+  backupStatus: FileItem['backupStatus'];
+}
+
+export const LEGACY_SOURCE_LABEL: Record<LegacySource, string> = { filebackend: 'filebackend(:5124)', smbbackend: 'SMBbackend(:5125)' };
+
+export const legacy = {
+  summary: () => http.get<{ items: LegacySummary[] }>('/api/file/legacy/summary'),
+  list: (q: { source?: LegacySource; q?: string; page: number; pageSize: number }) => http.get<Paged<LegacyItem>>('/api/file/legacy/files', { query: { ...q } }),
+  contentUrl: (uuid: string) => `/api/file/legacy/files/${uuid}/content`,
+};

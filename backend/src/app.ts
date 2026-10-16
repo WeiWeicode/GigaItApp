@@ -4,8 +4,10 @@
  *   - /it/api/*:過渡期保留的自有登入 API(Nginx 直通,auth/plugin.ts);前端已改用單一入口,測試區驗收後移除
  *   - 錯誤格式 { code, message, requestId, details? }
  *   - GET /healthz、/readyz 供 Docker 與 Nginx 檢查
+ *   - API 監控:@giganexus/backend-sdk 的 setupGateway 送 giga-observe(服務 itapp-api;路由由 deploy/gateway-routes.yaml 登記,不自動註冊)
  */
 import { randomUUID } from 'node:crypto';
+import { setupGateway } from '@giganexus/backend-sdk/fastify';
 import Fastify, { type FastifyInstance } from 'fastify';
 import authPlugin, { API_PREFIX } from './auth/plugin.js';
 import authRoutes from './auth/routes.js';
@@ -79,6 +81,16 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   });
   app.setNotFoundHandler((req, reply) => reply.status(404).send(errorBody('ITAPP_NOT_FOUND', '找不到此 API', req.id)));
 
+  // 監控需在路由之前註冊(hook 才會套用);dev、未設定 MONITOR_URL / Key 時停用
+  await app.register(setupGateway, {
+    register: false,
+    monitor: config.monitor,
+    version: process.env.RELEASE_SHA ?? process.env.npm_package_version,
+    monitorOptions: {
+      ignorePaths: ['/healthz', '/readyz', `${API_PREFIX}/healthz`],
+      deps: async () => [{ name: 'bff', ok: bff.mode === 'mock' || !!config.bff.baseUrl, latencyMs: null }],
+    },
+  });
   await app.register(gatewayPlugin, { config });
   await app.register(authPlugin, { config, store });
 

@@ -55,7 +55,10 @@ export interface DashboardTeam {
   departments: { code: string; name: string; members: number; open: number; closed: number }[];
 }
 
-/** Agent 基本資料(Gateway ENDPOINT-AGENT-GUIDE §8.3 草案) */
+/**
+ * 電腦清單一列(RustIt ItAgentBack GET /api/endpoint/devices;Gateway ENDPOINT-AGENT-GUIDE §8.3、RustIt INTEGRATION-PLAN §5)。
+ * 只新增欄位;userName 起為 Agent 回報資產後才有值,尚未回報時為 null / 空陣列。
+ */
 export interface EndpointDevice {
   deviceId: string;
   computerName: string;
@@ -64,4 +67,140 @@ export interface EndpointDevice {
   online: boolean;
   firstSeenAt: string;
   lastSeenAt: string;
+  /** active / disabled / retired(退役,RustIt P3) */
+  status: 'active' | 'disabled' | 'retired' | string;
+  /** DOMAIN\user */
+  userName: string | null;
+  domain: string | null;
+  osName: string | null;
+  osVersion: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  cpuName: string | null;
+  /** 位元組 */
+  memoryTotal: number | null;
+  /** IPv4,有閘道的網卡優先 */
+  ips: string[];
+  agentVersion: string | null;
+  lastInventoryAt: string | null;
+  /** 有其他裝置硬體指紋相同(疑似同一台:重灌、改名、換憑證;RustIt P3) */
+  suspectedDuplicate?: boolean;
+  /** 已併入的目標裝置 */
+  mergedInto?: string | null;
+  retiredAt?: string | null;
+}
+
+/** 電腦清單(GET /api/endpoint/devices;後端分頁,依電腦名稱排序) */
+export interface EndpointDevicePage {
+  items: EndpointDevice[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** Agent 最新一份資產快照(rustit-collector ComputerInfo,鍵名轉 camelCase;RustIt docs/contracts/inventory.schema.json) */
+export interface EndpointInventory {
+  system: {
+    hostName: string;
+    userName: string;
+    domain: string;
+    partOfDomain: boolean;
+    manufacturer: string;
+    model: string;
+    osName: string;
+    osVersion: string;
+    osDisplayVersion: string;
+    osBuild: string;
+    arch: string;
+    bootTime: number;
+  };
+  identity: { biosSerial: string; biosVendor: string; biosVersion: string; boardManufacturer: string; boardProduct: string; boardSerial: string; systemUuid: string };
+  cpu: { name: string; cores: number; logical: number; maxMhz: number };
+  memoryTotal: number;
+  memoryModules: { slot: string; capacity: number; speedMhz: number; manufacturer: string; partNumber: string }[];
+  physicalDisks: { model: string; serial: string; size: number; interface: string; mediaType: string }[];
+  volumes: { mountPoint: string; label: string; fileSystem: string; total: number; available: number; removable: boolean }[];
+  gpus: { name: string; driverVersion: string; resolution: string }[];
+  network: { description: string; mac: string; ips: string[]; gateways: string[]; dns: string[]; dhcpEnabled: boolean }[];
+  software: { name: string; version: string; publisher: string; installDate: string }[];
+  security: { antivirus: { name: string; enabled: boolean; upToDate: boolean }[]; recentHotfixes: { id: string; description: string; installedOn: string }[] };
+  usb: { storagePolicy: 'Allowed' | 'Blocked' | 'Unknown' | string; storageHistory: { friendlyName: string; serial: string }[] };
+  rustdesk: { installed: boolean; version: string; exePath: string; id: string; customServer: string };
+  collectMs: number;
+  warnings: string[];
+}
+
+/** 電腦詳情(GET /api/endpoint/devices/{deviceId}) */
+export interface EndpointDeviceDetail extends EndpointDevice {
+  /** 尚未回報資產時為 null */
+  inventory: EndpointInventory | null;
+  collectedAt: string | null;
+  /** 端點 − 主機(毫秒);超過 ±5 分鐘會記 clock_skew 事件 */
+  clockSkewMs?: number | null;
+  /** 硬體指紋相同、未合併、未退役的其他裝置(RustIt P3) */
+  suspectedDuplicates?: { deviceId: string; computerName: string; status: string; firstSeenAt: string; lastSeenAt: string }[];
+}
+
+/** 電腦事件(GET /api/endpoint/devices/{deviceId}/events;新到舊,nextCursor 分頁) */
+export interface EndpointDeviceEvent {
+  id: number;
+  type: string;
+  /** 端點事件為端點上的發生時間 */
+  occurredAt: string;
+  /** 端點事件的主機收到時間;主機稽核為 null */
+  receivedAt: string | null;
+  detail: string | null;
+  data: unknown;
+}
+
+export interface EndpointDeviceEventPage {
+  items: EndpointDeviceEvent[];
+  nextCursor: string | null;
+}
+/** 端點指令類型(RustIt docs/contracts/command-kinds.md;目前只開放 basic) */
+export type EndpointCommandKind = 'inventory.collect' | 'agent.diagnose' | 'logs.collect' | 'agent.log_level' | 'message.show' | 'agent.restart';
+export type EndpointCommandState = 'queued' | 'sent' | 'acked' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'expired';
+
+/** 指令附檔(logs.collect 的日誌 zip;保存 14 天) */
+export interface EndpointCommandFile {
+  fileId: string;
+  fileName: string;
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+}
+
+/** 指令(GET /api/endpoint/commands/{commandId};result 依類型不同,一律以文字顯示) */
+export interface EndpointCommand {
+  commandId: string;
+  batchId: string | null;
+  deviceId: string;
+  computerName: string;
+  kind: EndpointCommandKind | string;
+  level: 'basic' | 'admin';
+  params: Record<string, unknown>;
+  state: EndpointCommandState;
+  progress: number | null;
+  result: Record<string, unknown> | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  expiresAt: string;
+  sendCount: number;
+  createdBy: { emp: string; name: string | null };
+  requestId: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  ackedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** 只有單筆查詢才回傳 */
+  files?: EndpointCommandFile[];
+}
+
+/** 指令清單(新到舊;nextCursor 為下一頁游標) */
+export interface EndpointCommandPage {
+  items: EndpointCommand[];
+  nextCursor: string | null;
 }

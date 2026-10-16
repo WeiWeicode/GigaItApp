@@ -21,6 +21,7 @@
 | `bff/bff-write.feature` | BFF 角色權限設定與發佈:mock 寫入、live 明確拒絕 | §6.4 | 過渡期 |
 | `dashboard/dashboard.feature` | 首頁儀表板、模擬資料標示 | §6.5 | 過渡期 |
 | `endpoint/devices.feature` | 端點管理:經 Gateway BFF 取得 Agent 清單、Gateway 登入與同一工號檢查 | §6.8 | 過渡期 |
+| `endpoint/device-inventory.feature` | 端點管理:電腦清單顯示 Agent 回報的基本資訊、點列開詳情(RustIt ItAgentBack) | §6.8 | 現行 |
 | `ui/navigation.feature` | 兩層選單、頁內 Tab、403 / 404、明亮 / 黑暗、手機寬度 | §6.6 | 過渡期 |
 | `gateway/nginx-entry.feature` | 經 Gateway Nginx 的 `/it/`、`/it/api/`、登入限流、502 | §6.7 | 過渡期 |
 

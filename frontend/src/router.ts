@@ -9,7 +9,7 @@
  */
 import { redirectToLogin } from '@giganexus/web-kit';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { can, canAll, GW, IT, loadMe, setPageHasTab, UI } from './api/auth';
+import { can, canAll, EP, FILE, GW, IT, loadMe, NOTIFY, OBS, setPageHasTab, UI } from './api/auth';
 import { hasCurrentApp } from './composables/apps';
 import AppLayout from './layouts/AppLayout.vue';
 import TabbedPage from './layouts/TabbedPage.vue';
@@ -62,6 +62,35 @@ const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'notify',
+        component: TabbedPage,
+        meta: {
+          permission: IT.notify,
+          title: '通知中心',
+          eyebrow: 'Notify',
+          description: '公司公告與個人通知;有發布權限者可發布公告並查看已讀情形(Gateway NOTIFY-PLAN)',
+          icon: 'bell',
+          tabs: [
+            { label: '我的通知', to: '/notify', icon: 'bell', permission: UI.notifyInbox },
+            { label: '公告查詢', to: '/notify/archive', icon: 'search', permission: UI.notifyArchive },
+            { label: '發布公告', to: '/notify/publish', icon: 'send', permission: UI.notifyPublish },
+            { label: '發布紀錄', to: '/notify/history', icon: 'list', permission: UI.notifyHistory },
+            { label: '通知設定', to: '/notify/settings', icon: 'settings', permission: UI.notifySettings },
+          ],
+        },
+        children: [
+          { path: '', component: () => import('./pages/notify/Inbox.vue'), meta: { tab: '我的通知', permission: UI.notifyInbox } },
+          { path: 'archive', component: () => import('./pages/notify/Archive.vue'), meta: { tab: '公告查詢', permission: UI.notifyArchive } },
+          { path: 'publish', component: () => import('./pages/notify/Publish.vue'), meta: { tab: '發布公告', permission: UI.notifyPublish } },
+          { path: 'history', component: () => import('./pages/notify/History.vue'), meta: { tab: '發布紀錄', permission: UI.notifyHistory } },
+          {
+            path: 'settings',
+            component: () => import('./pages/notify/Settings.vue'),
+            meta: { tab: '通知設定', permission: UI.notifySettings, requires: [NOTIFY.settingsRead] },
+          },
+        ],
+      },
+      {
         path: 'gateway/services',
         component: TabbedPage,
         meta: {
@@ -110,6 +139,57 @@ const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'gateway/observe',
+        component: TabbedPage,
+        meta: {
+          permission: IT.gwObserve,
+          requires: [OBS.read],
+          title: '架構觀測',
+          eyebrow: 'Gateway · 監控',
+          description: '各服務的健康狀態、請求紀錄、錯誤與 Nginx 流量(giga-observe);架構圖每 15 秒自動更新',
+          icon: 'workflow',
+          tabs: [
+            { label: '架構圖', to: '/gateway/observe', icon: 'workflow', permission: UI.obsMap },
+            { label: '紀錄', to: '/gateway/observe/logs', icon: 'list', permission: UI.obsLogs },
+            { label: '錯誤', to: '/gateway/observe/errors', icon: 'alert', permission: UI.obsErrors },
+            { label: '流量與來源 IP', to: '/gateway/observe/traffic', icon: 'globe', permission: UI.obsTraffic },
+          ],
+        },
+        children: [
+          { path: '', component: () => import('./pages/observe/ArchitectureMap.vue'), meta: { tab: '架構圖', permission: UI.obsMap } },
+          { path: 'logs', component: () => import('./pages/observe/Logs.vue'), meta: { tab: '紀錄', permission: UI.obsLogs } },
+          { path: 'errors', component: () => import('./pages/observe/Errors.vue'), meta: { tab: '錯誤', permission: UI.obsErrors } },
+          { path: 'traffic', component: () => import('./pages/observe/Traffic.vue'), meta: { tab: '流量與來源 IP', permission: UI.obsTraffic } },
+        ],
+      },
+      {
+        path: 'gateway/files',
+        component: TabbedPage,
+        meta: {
+          permission: IT.gwFile,
+          title: '檔案管理',
+          eyebrow: 'Gateway · 附件服務',
+          description: '共用附件服務 file-api:上傳、下載、綁定單號、刪除、BPM 表單附件、舊系統匯入檔案與 NAS 備份狀態(giga-file-service);檔案清單只列自己上傳的或同公司的檔案',
+          icon: 'folder',
+          tabs: [
+            { label: '檔案清單', to: '/gateway/files', icon: 'folder', permission: UI.fileObjects },
+            { label: 'BPM 附件', to: '/gateway/files/bpm', icon: 'workflow', permission: UI.fileBpm },
+            { label: '舊系統', to: '/gateway/files/legacy', icon: 'boxes', permission: UI.fileLegacy },
+            { label: '儲存與備份', to: '/gateway/files/storage', icon: 'database', permission: UI.fileStorage },
+          ],
+        },
+        children: [
+          { path: '', component: () => import('./pages/files/Files.vue'), meta: { tab: '檔案清單', permission: UI.fileObjects, requires: [FILE.objectRead] } },
+          { path: 'bpm', component: () => import('./pages/files/Bpm.vue'), meta: { tab: 'BPM 附件', permission: UI.fileBpm, requires: [FILE.bpmRead] } },
+          { path: 'legacy', component: () => import('./pages/files/Legacy.vue'), meta: { tab: '舊系統', permission: UI.fileLegacy, requires: [FILE.legacyRead] } },
+          {
+            path: 'storage',
+            component: () => import('./pages/files/Storage.vue'),
+            meta: { tab: '儲存與備份', permission: UI.fileStorage, requires: [FILE.storageRead] },
+          },
+        ],
+      },
+      {
         path: 'endpoint/devices',
         component: TabbedPage,
         meta: {
@@ -118,9 +198,15 @@ const routes: RouteRecordRaw[] = [
           eyebrow: 'Endpoint',
           description: '經 Gateway BFF 取得的 Agent 基本資料;資料權限以 Gateway 為準',
           icon: 'monitor',
-          tabs: [{ label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList }],
+          tabs: [
+            { label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList },
+            { label: '指令紀錄', to: '/endpoint/devices/commands', icon: 'list', permission: UI.cmdList },
+          ],
         },
-        children: [{ path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單', permission: UI.devList } }],
+        children: [
+          { path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單', permission: UI.devList } },
+          { path: 'commands', component: () => import('./pages/endpoint/Commands.vue'), meta: { tab: '指令紀錄', permission: UI.cmdList, requires: [EP.deviceRead] } },
+        ],
       },
       {
         path: 'system/users',

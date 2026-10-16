@@ -2,6 +2,75 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-16 端點電腦清單分頁與篩選、詳情分 Tab、停用 / 退役 / 合併(RustIt P3)
+- 內容:配合 RustIt ItAgentBack P3(RustIt `docs/P3-DATA-DESIGN.md`,分支 `feature/p3-data`)。電腦清單改後端分頁(每頁 50 台,`usePaged`)與篩選(關鍵字:名稱 / 使用者 / IP / MAC / 裝置代碼;軟體名稱;作業系統;在線;顯示退役),標示「疑似同一台」「已退役 / 已合併」;詳情分 Tab:概要(時鐘偏差、開機時間、裝置代碼、疑似同一台提示)、硬體(CPU、記憶體模組、主機板與 BIOS、磁碟、實體磁碟、顯示卡)、網路(閘道、DNS)、軟體(名稱 / 發行者篩選)、安全與周邊(防毒、Windows 更新、USB 原則與使用過的裝置、RustDesk)、事件(主機稽核與端點事件,載入更多)、指令(既有);「下載資產 JSON」。管理操作(按鈕節點 `it.endpoint-device.admin` ∧ `endpoint.command.admin`):停用 / 啟用 / 退役、合併疑似同一台(首次連線較早者為舊裝置;後端回指紋不同或時間重疊時再確認一次後 force),原因必填。Agent 回報的字串一律文字顯示。`deviceApi.list` 相容 P3 前只回 `items` 的 ItAgentBack。新增圖示 package、hard-drive、merge、archive、ban。
+- 檔案:`frontend/src/pages/endpoint/Devices.vue`、`DeviceDetail.vue`、`frontend/src/components/endpoint/DeviceEvents.vue`(新)、`DeviceAdminActions.vue`(新)、`frontend/src/api/endpoint.ts`、`types.ts`、`auth.ts`、`frontend/src/ui/icons.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/device-inventory.feature`、`docs/PROJECT-MAP.md`
+- 驗證:`frontend` `npm run typecheck`、`npm run build` 通過;`backend` `npm test` 52/55(3 項為 Windows 暫存檔鎖定 EPERM / EBUSY,未改動時同樣失敗)。瀏覽器:入口網登入需本人帳密,AI 未登入;改以本機 ItAgentBack(DEV_SKIP_TOKEN,唯讀測試庫)驗證畫面所用的 API(分頁、篩選、事件、下載)。**待部署後由需求方在瀏覽器實測各 Tab、篩選與下載**;停用 / 退役 / 合併待 P3-4 以測試 VM 驗證。
+
+## 2026-10-15 端點指令畫面(RustIt P4-3)
+- 內容:需求方同意 P4-3 設計。電腦詳情對話框分「概要」(原內容)與「指令」Tab;「指令」Tab(`DeviceCommands.vue`)有六個按鈕:遠端診斷、收集日誌(範圍 1–14 天)、立即蒐集資產、調整日誌等級(debug / trace / 恢復,10 分鐘–1 天)、傳送訊息(標題、內文 1000 字 / 30 行、自動關閉;與主機相同的控制字元檢查)、重新啟動 Agent(確認對話框);權限為按鈕 `it.endpoint-device.command` ∧ `endpoint.command.basic`,停用的電腦不顯示。下指令後每 2 秒查詢直到結束,離線時提示排隊與 1 小時有效;下方為這台電腦的指令紀錄(nextCursor「載入更多」),點列看結果、自己建立且排隊中的可取消。結果元件 `CommandResult.vue` 依類型顯示(診斷檢查表、日誌下載與保存期限、日誌等級、資產回報、訊息、重啟時間;未知類型以 JSON 文字),一律文字不用 `v-html`。新 Tab「端點管理 › 指令紀錄」(`Commands.vue`,`it.endpoint-command.list` → `endpoint.device.read`):所有電腦的指令,依狀態、類型後端篩選。`gateway-rbac.yaml` 登記 Tab 節點並加入 it-admin;`api/endpoint.ts` 集中指令 API 與顯示文字。
+- 檔案:`frontend/src/pages/endpoint/{DeviceDetail,DeviceCommands,Commands}.vue`、`frontend/src/components/endpoint/CommandResult.vue`、`frontend/src/api/{endpoint,types,auth}.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/commands.feature`、`docs/PRD.md` FR-8.5、`docs/PROJECT-MAP.md`
+- 驗證:`npm run typecheck`、`npm run build` 通過。本機 5174 經 proxy 連測試區 Gateway(需求方登入、同意對測試區 VM 下指令),對 VM `DESKTOP-1TB2UMP`(Agent 0.4.0)實測:遠端診斷成功並列出 7 項檢查;收集日誌成功,「下載日誌」經 BFF 取得 zip(200、`application/zip`、SHA-256 與標頭相符);調整日誌等級 debug 10 分鐘(info → debug,顯示恢復時間);傳送訊息 31 行時顯示「內文最多 30 行」且不能傳送,送出後因 VM 主控台無登入者回 `NO_ACTIVE_SESSION` 並顯示說明;立即蒐集資產「已更新」;重新啟動 Agent 經確認對話框後,畫面自動由「排隊中」(重啟前送出、重連前退回排隊)更新為「成功」;指令紀錄點列開出詳情與下載按鈕。修正:檔案大小原用 `fmtBytes`(MB 為單位顯示 0 MB),改 `fmtSize`。未在本機驗證:「指令紀錄」Tab(新節點需合併後由 CI rbac-test 套用才有權限)、取消排隊中指令(需電腦離線,ItAgentBack 已有測試)
+
+## 2026-10-15 端點一般指令權限(RustIt P4)
+- 內容:需求方同意只改 RBAC、不做畫面。新增按鈕節點「下達一般指令」`it.endpoint-device.command`(掛在 Tab「電腦清單」下,`includes: [endpoint.command.basic]`),並加入 `it-admin`,讓 IT 能經 `/api/endpoint/devices/{id}/basic-commands` 等 API 下指令、查詢與下載診斷日誌(下載權限 `endpoint.device.read` 原本就有)。`endpoint.command.basic` 由 RustIt ItAgentBack 自動註冊建立,**須在 RustIt `fix/p4-openapi-register`(MR !17)合併、部署並註冊後再合併本變更**,否則 CI rbac-test 套用時權限不存在。指令按鈕與「指令紀錄」Tab 屬 RustIt P4-3,另行確認。
+- 檔案:`deploy/gateway-rbac.yaml`
+- 驗證:以 PyYAML 解析,`it-admin` 代碼無重複、新節點的 parent 存在
+
+## 2026-10-12 it-admin 可查看員工入口網全部選單與 Tab(giga-Portal FRAMEWORK-PLAN §2)
+- 內容:需求方要求 IT 管理系統管理員能看到入口網主管專區等選單。Gateway `apply` 的角色權限整組取代、沒有角色繼承,入口網無法在自己的 yaml 修改 `it-admin`,改在本 repo 的 `it-admin` 加上入口網 `portal.app.access`、`portal.home.read` 與全部 menu + tab 代碼(121 個,含主管專區、ESH;**不含按鈕**,只能查看)。代碼由 giga-Portal `deploy/gateway-rbac.yaml` 登記,**需先套用入口網的 yaml**,否則本檔套用會因權限不存在而失敗
+- 檔案:`deploy/gateway-rbac.yaml`
+- 驗證:以 PyYAML 解析,`it-admin` 180 個代碼無重複,且全部存在於本檔或入口網 yaml;測試區套用結果見 giga-Portal `docs/DevelopmentProcess/NewFeatures.md` 2026-10-12
+
+## 2026-10-08 檔案管理 › BPM 附件(giga-file-service F6)
+- 工作項目:giga-file-service F6(甘特圖 W11-5)、F3(W11-6)
+- 內容:新 Tab「BPM 附件」(`it.gw-file.bpm` → `file.bpm.read`,sort 20):切換「測試區(191)/ 正式區(190)」(來源取自 `GET /api/file/bpm/sources`,只顯示 file-api 已設定的)、依 BPM 單號完全比對查詢表單附件、下載 / 預覽(PDF、圖片);網址 `?env=&sn=` 可直接查詢;正式區結果加標記
+- 檔案:`frontend/src/pages/files/Bpm.vue`、`frontend/src/api/files.ts`(`bpm`)、`api/auth.ts`、`router.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/gateway/files.feature`
+- 驗證:typecheck、build 通過;測試區(b9045ba、e84f82a)實測:191 / 190 皆可查詢與下載中文檔名、jpg 預覽;使用者以正式區單號 CustomerComplaintProcess00000003 下載 5 個附件正常
+
+## 2026-10-08 檔案管理 › 儲存與備份:重試 NAS 備份(giga-file-service F2)
+- 內容:「最近備份失敗」加「重試」「全部重試」(`it.gw-file.backup-retry` → `file.storage.manage`);file-api 回 `backupEnabled = false` 時不顯示
+- 檔案:`frontend/src/pages/files/Storage.vue`、`frontend/src/api/files.ts`(`retryBackup`)、`api/auth.ts`、`deploy/gateway-rbac.yaml`
+- 驗證:typecheck、build 通過;測試區部署(d561a9e);重試 API 由 file-api 單元測試涵蓋,畫面上尚無失敗檔案可實際按
+
+## 2026-10-08 Gateway 管理 › 檔案管理(giga-file-service D16、F3 第一批)
+- 工作項目:giga-file-service F3(甘特圖 W11-6)
+- 內容:新增選單「檔案管理」(`it.gw-file.read`,目錄 Gateway 管理,sort 40)與 Tab「檔案清單」(`it.gw-file.objects` → `file.object.read`;按鈕「上傳 / 綁定單號」`it.gw-file.upload` → `file.object.upload`、「刪除」`it.gw-file.delete` → `file.object.delete`)、「儲存與備份」(`it.gw-file.storage` → `file.storage.read`)。檔案清單:後端分頁(單號、來源系統、只看我上傳的)、拖曳 / 多檔上傳(經 BFF 單檔 10 MB、一次 10 個,超過時按鈕停用)、暫存檔綁定單號(只限自己上傳的)、下載 / 圖片與 PDF 預覽、軟刪除;儲存與備份:統計卡、NAS 備份狀態、主機磁碟用量、備份失敗清單。`file.*` 權限由 file-api 自動註冊建立,尚未建立時 gateway-rbac 的 includes 會略過,file-api 部署後再套用一次即補上。BPM 附件、舊系統 Tab 隨 F6 / F4 加入
+- 檔案:`frontend/src/pages/files/Files.vue`、`Storage.vue`、`frontend/src/api/files.ts`、`api/auth.ts`、`api/format.ts`(fmtSize)、`router.ts`、`ui/icons.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/gateway/files.feature`、`docs/PROJECT-MAP.md`
+- 驗證:`npm run typecheck`、`npx vite build` 通過;2026-10-08 測試區實測(上傳 25 MB、31 MB 被擋、下載、綁定、刪除、容量顯示)見 giga-file-service HANDOFF §1
+
+## 2026-10-07 通知中心與儀表板即時公告(Gateway NOTIFY-PLAN N3、甘特圖 W10-4)
+- 內容:新功能頁「總覽 › 通知中心」(`it.notify.read`)五個 Tab:我的通知(收件匣、全部已讀、開啟桌面通知)、公告查詢(含已到期,關鍵字搜尋內文)、發布公告(Tiptap HTML 編輯器:標題、粗體、顏色、清單、表格、連結、圖片上傳 / 貼上;對象:全公司 / 公司 / 部門含下層 / 工號 / AD 群組 + 職級門檻;管道勾選,端點 Agent 未開放時灰掉;需確認已閱讀;立即 / 排程;到期;右側即時預覽與預估人數;發布前確認視窗;`?id=` 編輯草稿)、發布紀錄(已讀率、Email 寄送進度、已讀 / 未讀名單與 CSV、撤回、提醒未讀)、通知設定(保留期限預設永久等,只有 `notify.settings.write` 可存)。頁首鈴鐺(未讀數、最近 10 則)、全站 NotifyHost(新公告 Toast;緊急或需確認直接開對話框,按「已閱讀」才關)、儀表板「營運總覽」加「最新公告」卡片(即時)。連線與收件匣狀態用 web-kit 0.3.0 `useNotifyCenter('itapp')`。`gateway-rbac.yaml` 登記選單與 Tab(發布 / 紀錄綁 `notify.announce.publish`,設定綁 `gw.admin.notify.read`)、it-admin 角色加入;本機開發 `vite.config.ts` 加 `/ws/notify` WebSocket proxy。新增套件 Tiptap 3.31.4(只在發布頁按需載入)。
+- 檔案:`frontend/src/pages/notify/*.vue`、`frontend/src/components/notify/*.vue`、`frontend/src/composables/notify.ts`、`frontend/src/layouts/AppLayout.vue`、`frontend/src/pages/dashboard/Overview.vue`、`frontend/src/router.ts`、`frontend/src/api/auth.ts`、`frontend/src/api/format.ts`、`frontend/src/ui/icons.ts`、`frontend/vite.config.ts`、`frontend/package.json`、`deploy/gateway-rbac.yaml`、`docs/PROJECT-MAP.md`、`docs/UI-GUIDE.md`
+- 驗證:`npm run typecheck`、`npm run build` 通過;瀏覽器實測見下次紀錄。
+
+## 2026-10-07 電腦清單接上測試區(RustIt 整合 M4)
+- 內容:`deploy/gateway-rbac.yaml` 的 `it.endpoint-device.read`(選單)與 `it.endpoint-device.list`(Tab)加 `includes: [endpoint.device.read]`(RustIt D9:原本缺綁定,授予選單時拿不到 API 權限而 403);前端 `api/auth.ts` 新增 `EP.deviceRead`,電腦清單選單 `requires` 同步。`endpoint.device.read` 由 RustIt ItAgentBack 啟動時自動註冊 OpenAPI 建立,先註冊再套用本檔。配合 RustIt 1d6d192 ~ 5103251、Gateway d9890dd / 5f5b989。
+- 檔案:`deploy/gateway-rbac.yaml`、`frontend/src/api/auth.ts`、`docs/Gherkin/endpoint/device-inventory.feature`
+- 驗證:`npm run typecheck`(前端)通過;CI check ×2、`deploy-test`、`rbac-test` 成功;IT 發佈 `endpoint-api` 路由後,需求方在測試區「電腦清單」看到自己的電腦(RustIt Agent 經 :9443 回報)。
+
+## 2026-10-06 電腦清單顯示 Agent 回報的基本資訊與詳情(RustIt 整合 M3)
+- 內容:配合 RustIt INTEGRATION-PLAN M3(RustIt 8d83ab4:ItAgentBack 與 rustit-agent)。
+  - `api/types.ts`:`EndpointDevice` 只新增欄位(`status`、`userName`、`domain`、`osName`、`osVersion`、`manufacturer`、`model`、`cpuName`、`memoryTotal`、`ips`、`agentVersion`、`lastInventoryAt`);新增 `EndpointInventory`、`EndpointDeviceDetail`。
+  - 電腦清單欄位改為 名稱 / 狀態(停用另標示)/ 使用者 / IP / 作業系統 / CPU / 記憶體 / 最後回報,憑證 DN 改在滑過名稱與詳情顯示;點列以 GModal 開 `DeviceDetail.vue`(開啟時才呼叫 `GET /api/endpoint/devices/{deviceId}`):基本資訊、硬體、安全(防毒、最近更新、軟體筆數)、磁碟用量、網卡。既有的 403 / 404 / 5xx 提示不變。`format.ts` 新增 `fmtBytes`。
+  - `vite.config.ts`:新增 `ENDPOINT_LOCAL`(只在 dev 且有設定時生效),`/api/endpoint/*` 轉本機 ItAgentBack 管理 API(`/v1/*`),並在本機畫面的 `/api/auth/me` 補上 `it.endpoint-device.read`、`.list` 與 `endpoint.device.read`;與 `OBSERVE_LOCAL` 共用同一個 `/api/auth/me` 改寫(`localPermsProxy`)。測試區權限不變,`gateway-rbac.yaml` 的 `includes` 於 M4 ItAgentBack 註冊 OpenAPI 後再補。
+  - 文件:Gherkin `endpoint/device-inventory.feature`(`@manual`)、PRD FR-8.3(欄位與詳情;Endpoint Server 改為 RustIt ItAgentBack)。
+- 已知差異:UI-GUIDE §7 要求清單用後端分頁(`usePaged`),目前端點 API 回傳全部裝置(`{ items }`,沿用既有頁面與 RustIt 計畫 §5 的格式);裝置數成長前改為後端分頁與篩選(RustIt 路線圖「資產」階段)。
+- 檔案:`frontend/src/api/types.ts`、`frontend/src/api/format.ts`、`frontend/src/pages/endpoint/Devices.vue`、`frontend/src/pages/endpoint/DeviceDetail.vue`、`frontend/vite.config.ts`、`docs/Gherkin/endpoint/device-inventory.feature`、`docs/Gherkin/README.md`、`docs/PRD.md`
+- 驗證:`npm run typecheck`(vue-tsc)、`npm run build` 通過。本機閉環(使用者自己的電腦):RustIt ItAgentBack(dev,51296)+ rustit-agent 連本機,`ENDPOINT_LOCAL=http://127.0.0.1:51296 npm run dev -- --port 5179`,使用者自行登入測試區 Gateway 後開 `/it/endpoint/devices`:清單顯示 1 台、在線 1 台(電腦名稱、使用者、IPv4 +2、Windows 10 Education、i5-11400、15.8 GB、剛剛),點列詳情顯示硬體、防毒(Trend Micro 啟用 / Windows Defender 未啟用)、C: / D: 用量、3 張網卡;`/api/endpoint/*` 請求皆 200。黑暗 / 明亮主題與 375px 寬度已檢視(卡片改上下排列)。
+
+## 2026-10-06 架構觀測頁、儀表板接監控、itapp-api 接 giga-observe(Gateway W9-9 ~ W9-11、W9-3)
+- 內容:
+  - 「API Gateway 管理 › 架構觀測」:架構圖(分層、連線、15 秒更新、狀態篩選、服務詳情:概況 / 紀錄 / 錯誤 / 相依)、紀錄(Request ID 串接、載入更多、明細含步驟與錯誤堆疊)、錯誤聚合、流量與來源 IP(Nginx 流量、資安告警、IP 排行、前端效能 p75)。資料經 BFF `/api/observe/*`(`observe.data.read`;看請求 / 回應內容需 `observe.log.body`)。
+  - 權限:選單 `it.gw-observe.read`、Tab `.map` / `.logs` / `.errors` / `.traffic`、按鈕 `.body`;儀表板兩個 Tab 隨附 `observe.data.read`。
+  - 儀表板:今日 API 呼叫、可用率、平均回應時間、資安告警、今日流量、系統告警、Gateway 概況的上游服務健康改接即時資料;沒有權限或未接入時維持「開發中」。
+  - 前端 `installMonitor`(只在建置版本);itapp-api 改用 `@giganexus/backend-sdk`(Token 驗證 `createTokenVerifier`、`setupGateway` 監控,不自動註冊)。
+  - 套件改從公司 GitLab npm Registry 安裝(`.npmrc`、Token 為 `GITLAB_NPM_TOKEN`;Docker 以 BuildKit secret `npm_token` 傳入、CI 讀主機機密檔);移除 web-kit 兄弟 repo alias。
+  - GModal 以視窗寬度為上限(窄螢幕超出畫面);vite `OBSERVE_LOCAL` 本機示範模式。
+  - 使用手冊 `docs/OBSERVE-MANUAL.md`。
+- 檔案:`frontend/src/pages/observe/*`、`frontend/src/components/observe/*`、`frontend/src/api/{observe,auth}.ts`、`frontend/src/composables/{observe,dashboard}.ts`、`frontend/src/pages/dashboard/{Overview,GatewaySummary}.vue`、`frontend/src/{router,main}.ts`、`frontend/src/ui/components/GModal.vue`、`frontend/{vite.config.ts,tsconfig.json,Dockerfile,.npmrc}`、`backend/src/{app,config}.ts`、`backend/src/gateway/plugin.ts`、`backend/{Dockerfile,.npmrc}`、`deploy/{gateway-rbac.yaml,docker-compose.yml,gen-secrets.sh}`、`.gitlab-ci.yml`、`docs/OBSERVE-MANUAL.md`
+- 驗證:型別檢查、正式建置通過;本機以 giga-observe 示範資料實測四個 Tab、服務詳情、紀錄明細、Request ID 串接、儀表板(明亮 / 黑暗);測試區部署 `917d933` 後需求方確認畫面,itapp-api 心跳(版本 917d9336)與請求紀錄進到 giga-observe。後端單元測試在 Windows 有 3 項因檔案鎖定(rename EBUSY / EPERM)失敗,原版程式相同;CI(Linux)通過
+
 ## 2026-10-05 Tab / 按鈕登記為權限並綁定 API;角色權限合併
 - 內容:
   - 本系統 21 個 Tab、10 個按鈕登記為 `kind tab / button`(`api/auth.ts` 的 `UI`、`deploy/gateway-rbac.yaml`),各自綁定用到的 BFF API(按鈕綁寫入,如「停用 / 啟用」→ `gw.admin.user.write`);路由 Tab、Tab 名稱(以 BFF 為準)、各頁按鈕改用這些代碼。`it-admin` 擁有全部。
@@ -85,6 +154,6 @@
 - 驗證:`npm test` 41 項全部通過(原 15 + 新 26)、`npm run typecheck` 通過;`sh deploy/e2e-smoke.sh` 11 項通過,`STOP_API=1` 時 itapp-api 停止回 502 `UPSTREAM_ERROR` 通過(第一次執行時發現腳本本身的 shell 引號錯誤導致登入 body 被拆開、檢查誤判通過,已修正後重跑)
 
 ## 2026-09-25 IT 管理系統基本框架(取代 Gateway 範例 IT 頁面)
-- 內容:建立 GigaItApp。後端 itapp-api(Fastify,port 51291):自有登入(工號 + 密碼、JWT Session Cookie、CSRF、5 次失敗鎖 15 分)、職級(系統管理員 / 主管 / 高級工程師 / 一般工程師)× 部門(網管 / 系統 / 程式開發 / 資安)按鈕權限、兩層選單、資料範圍(只能管理同部門且職級較低者)、稽核紀錄、BFF 串接(mock 快照 / live 服務帳號)。前端 Vue 3 + Vite:全域 UI 套件(G* 元件、圖表、玻璃擬態 tokens、明亮 / 黑暗)、兩層選單 + 頁內 Tab、儀表板(部分模擬資料)、BFF 服務 / 路由 / 發佈版本、BFF 角色權限矩陣 / 反查 / 關係圖、人員與部門、職級權限 / 部門限制 / 權限試算、稽核紀錄。部署:Nginx `/it/api/` 直接轉給 itapp-api,前端發佈到 `it-admin` 取代範例頁。
+- 內容:建立 GigaItApp。後端 itapp-api(Fastify,port 51297):自有登入(工號 + 密碼、JWT Session Cookie、CSRF、5 次失敗鎖 15 分)、職級(系統管理員 / 主管 / 高級工程師 / 一般工程師)× 部門(網管 / 系統 / 程式開發 / 資安)按鈕權限、兩層選單、資料範圍(只能管理同部門且職級較低者)、稽核紀錄、BFF 串接(mock 快照 / live 服務帳號)。前端 Vue 3 + Vite:全域 UI 套件(G* 元件、圖表、玻璃擬態 tokens、明亮 / 黑暗)、兩層選單 + 頁內 Tab、儀表板(部分模擬資料)、BFF 服務 / 路由 / 發佈版本、BFF 角色權限矩陣 / 反查 / 關係圖、人員與部門、職級權限 / 部門限制 / 權限試算、稽核紀錄。部署:Nginx `/it/api/` 直接轉給 itapp-api,前端發佈到 `it-admin` 取代範例頁。
 - 檔案:`backend/`、`frontend/`、`deploy/`、`AGENT.md`、`README.md`;Gateway:`nginx/conf.d/portal.conf`、`nginx/templates/00-env.conf.template`、`nginx/Dockerfile`、`deploy/docker-compose.yml`、`deploy/*.env.example`、`deploy/docker-compose.dev.yml`
 - 驗證:後端 `npm test` 15 項通過、`typecheck`、`build` 通過;前端 `vue-tsc`、`vite build` 通過。live 模式對本機 BFF 讀取 overview / routes / releases / rbac / who-can-access 成功,寫入回 501 `ITAPP_BFF_NOT_SUPPORTED`。部署到本機 Gateway 後,經 Nginx `/it/api/healthz` 200、Cookie 為 Secure / HttpOnly、路徑 `/it/api`。瀏覽器(1440 / 375 寬,明亮 / 黑暗):登入 → 儀表板三個 Tab → 服務與路由 → BFF 權限矩陣 / 關係圖 → 人員 → 職級權限(itadmin 調整一般工程師權限 → 確認 → 儲存成功)→ 以一般工程師進入稽核紀錄被導向 403;經 Gateway 以資安課高級工程師登入,發佈版本頁無「發佈草稿」按鈕、資料來源顯示「BFF 即時」

@@ -7,7 +7,7 @@
 #      只負責首次登記:已存在的權限不覆寫名稱、上層與排序,之後在「系統管理 › 選單管理」調整(2026-10-05)
 #      includes = 此頁需要的 API 讀取權限(隨附:擁有選單即一併擁有),與 frontend/src/api/auth.ts 的 requires 一致
 #      資料與按鈕權限直接使用 BFF 管理 API 的 gw.admin.*(按鈕 = API),不在此重複登記
-#   ② 角色 it-admin:IT 管理系統全部選單、Tab、按鈕;成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
+#   ② 角色 it-admin:IT 管理系統全部選單、Tab、按鈕,以及員工入口網全部選單與 Tab(唯讀查看);成員以 GigaItApp「人員」個別指派,或在「角色與指派規則」設定規則 / AD 群組
 #      (此處不寫 adGroups / companies,套用時不會覆蓋 IT 在畫面上的設定;permissions 會整組取代,新增選單請改此檔)
 #   上游 itapp-api 與 /api/it/* 路由在 gateway-routes.yaml(apply 會把路由設回草稿,不隨 CI 每次套用)
 # 測試區與正式區設定不互通(Gateway PRD Q3),兩區各自套用;正式區的上游位址於 2026-12 建置時調整 targets.prod。
@@ -21,18 +21,31 @@ permissions:
   - { code: it.group.endpoint, name: 端點管理, kind: group, parent: it.app.access, sort: 30, icon: monitor }
   - { code: it.group.system, name: 系統管理, kind: group, parent: it.app.access, sort: 40, icon: settings }
   - { code: it.dashboard.read, name: 儀表板, kind: menu, parent: it.group.overview, sort: 10 }
+  # 通知中心(Gateway NOTIFY-PLAN):收件匣 / 公告查詢只需登入;發布 Tab 綁 notify.announce.publish(只能發本部門,
+  # 全公司需另由超級管理員在「權限設定 › API 權限」授予 notify.announce.publish.all);設定寫入 notify.settings.write 只給 gw-super-admin
+  - { code: it.notify.read, name: 通知中心, kind: menu, parent: it.group.overview, sort: 20 }
   - { code: it.gw-service.read, name: 服務與路由, kind: menu, parent: it.group.gateway, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read] }
   - { code: it.gw-rbac.read, name: 權限查詢, kind: menu, parent: it.group.gateway, sort: 30, includes: [gw.admin.rbac.read] }
-  - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.group.endpoint, sort: 40 }
+  # 架構觀測(Gateway MONITORING-PLAN W9-10):observe.* 由 giga-observe 的 OpenAPI 匯入 Gateway 時建立,需先匯入再套用本檔
+  - { code: it.gw-observe.read, name: 架構觀測, kind: menu, parent: it.group.gateway, sort: 35, includes: [observe.data.read] }
+  # 檔案管理(giga-file-service PRD §8,D16):file.* 由 file-api 自動註冊;尚未註冊時 includes 會略過,下次套用補上
+  - { code: it.gw-file.read, name: 檔案管理, kind: menu, parent: it.group.gateway, sort: 40 }
+  # 端點管理(RustIt ItAgentBack):endpoint.* 由 ItAgentBack 啟動時自動註冊 OpenAPI 建立,需先註冊再套用本檔(RustIt INTEGRATION-PLAN D9)
+  - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.group.endpoint, sort: 40, includes: [endpoint.device.read] }
   - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50, includes: [gw.admin.user.read] }
   - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.group.system, sort: 60, includes: [gw.admin.rbac.read] }
   - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.group.system, sort: 65, includes: [gw.admin.rbac.read] }
   - { code: it.sys-audit.read, name: 稽核紀錄, kind: menu, parent: it.group.system, sort: 70, includes: [gw.admin.audit.read] }
 
   # Tab / 按鈕(kind tab / button,掛在所屬選單下;includes = 用到的 API,授予即一併取得)
-  - { code: it.dashboard.overview, name: 營運總覽, kind: tab, parent: it.dashboard.read, sort: 10 }
-  - { code: it.dashboard.gateway, name: Gateway 概況, kind: tab, parent: it.dashboard.read, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read] }
+  - { code: it.dashboard.overview, name: 營運總覽, kind: tab, parent: it.dashboard.read, sort: 10, includes: [observe.data.read] }
+  - { code: it.dashboard.gateway, name: Gateway 概況, kind: tab, parent: it.dashboard.read, sort: 20, includes: [gw.admin.upstream.read, gw.admin.route.read, observe.data.read] }
   - { code: it.dashboard.team, name: 團隊工作, kind: tab, parent: it.dashboard.read, sort: 30, includes: [gw.admin.rbac.read] }
+  - { code: it.notify.inbox, name: 我的通知, kind: tab, parent: it.notify.read, sort: 10 }
+  - { code: it.notify.archive, name: 公告查詢, kind: tab, parent: it.notify.read, sort: 20 }
+  - { code: it.notify.publish, name: 發布公告, kind: tab, parent: it.notify.read, sort: 30, includes: [notify.announce.publish] }
+  - { code: it.notify.history, name: 發布紀錄, kind: tab, parent: it.notify.read, sort: 40, includes: [notify.announce.publish] }
+  - { code: it.notify.settings, name: 通知設定, kind: tab, parent: it.notify.read, sort: 50, includes: [gw.admin.notify.read] }
   - { code: it.gw-service.upstreams, name: 上游服務, kind: tab, parent: it.gw-service.read, sort: 10, includes: [gw.admin.upstream.read] }
   - { code: it.gw-service.upstream-edit, name: 新增 / 編輯上游, kind: button, parent: it.gw-service.upstreams, sort: 10, includes: [gw.admin.upstream.write] }
   - { code: it.gw-service.routes, name: API 路由, kind: tab, parent: it.gw-service.read, sort: 20, includes: [gw.admin.route.read] }
@@ -42,7 +55,26 @@ permissions:
   - { code: it.gw-rbac.matrix, name: 角色權限總覽, kind: tab, parent: it.gw-rbac.read, sort: 10 }
   - { code: it.gw-rbac.who, name: 誰能存取, kind: tab, parent: it.gw-rbac.read, sort: 20, includes: [gw.admin.route.read] }
   - { code: it.gw-rbac.graph, name: 關係圖, kind: tab, parent: it.gw-rbac.read, sort: 30, includes: [gw.admin.route.read] }
-  - { code: it.endpoint-device.list, name: 電腦清單, kind: tab, parent: it.endpoint-device.read, sort: 10 }
+  - { code: it.gw-observe.map, name: 架構圖, kind: tab, parent: it.gw-observe.read, sort: 10, includes: [observe.data.read] }
+  - { code: it.gw-observe.logs, name: 紀錄, kind: tab, parent: it.gw-observe.read, sort: 20, includes: [observe.data.read] }
+  - { code: it.gw-observe.errors, name: 錯誤, kind: tab, parent: it.gw-observe.read, sort: 30, includes: [observe.data.read] }
+  - { code: it.gw-observe.traffic, name: 流量與來源 IP, kind: tab, parent: it.gw-observe.read, sort: 40, includes: [observe.data.read] }
+  - { code: it.gw-observe.body, name: 查看請求 / 回應內容, kind: button, parent: it.gw-observe.logs, sort: 10, includes: [observe.log.body] }
+  - { code: it.gw-file.objects, name: 檔案清單, kind: tab, parent: it.gw-file.read, sort: 10, includes: [file.object.read] }
+  - { code: it.gw-file.upload, name: 上傳 / 綁定單號, kind: button, parent: it.gw-file.objects, sort: 10, includes: [file.object.upload] }
+  - { code: it.gw-file.delete, name: 刪除, kind: button, parent: it.gw-file.objects, sort: 20, includes: [file.object.delete] }
+  - { code: it.gw-file.bpm, name: BPM 附件, kind: tab, parent: it.gw-file.read, sort: 20, includes: [file.bpm.read] }
+  - { code: it.gw-file.legacy, name: 舊系統, kind: tab, parent: it.gw-file.read, sort: 30, includes: [file.legacy.read] }
+  - { code: it.gw-file.storage, name: 儲存與備份, kind: tab, parent: it.gw-file.read, sort: 40, includes: [file.storage.read] }
+  - { code: it.gw-file.backup-retry, name: 重試 NAS 備份, kind: button, parent: it.gw-file.storage, sort: 10, includes: [file.storage.manage] }
+  - { code: it.endpoint-device.list, name: 電腦清單, kind: tab, parent: it.endpoint-device.read, sort: 10, includes: [endpoint.device.read] }
+  # 端點一般指令(RustIt P4:立即蒐集資產、重啟 Agent、傳送訊息、遠端診斷、收集日誌、調整日誌等級);endpoint.command.basic 由 ItAgentBack 自動註冊建立。
+  # 畫面按鈕屬 RustIt P4-3,先登記權限節點讓 it-admin 能經 /api/endpoint/*-commands 下指令
+  - { code: it.endpoint-device.command, name: 下達一般指令, kind: button, parent: it.endpoint-device.list, sort: 10, includes: [endpoint.command.basic] }
+  # 端點裝置管理(RustIt P3:停用 / 啟用 / 退役、合併疑似同一台);endpoint.command.admin 由 ItAgentBack 自動註冊建立,需先部署 ItAgentBack 再套用本檔
+  - { code: it.endpoint-device.admin, name: 裝置管理(停用、退役、合併), kind: button, parent: it.endpoint-device.list, sort: 20, includes: [endpoint.command.admin] }
+  # 指令紀錄(RustIt P4-3):所有電腦的指令與結果、日誌下載(endpoint.device.read)
+  - { code: it.endpoint-command.list, name: 指令紀錄, kind: tab, parent: it.endpoint-device.read, sort: 20, includes: [endpoint.device.read] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
   - { code: it.sys-user.revoke, name: 強制登出, kind: button, parent: it.sys-user.users, sort: 20, includes: [gw.admin.user.write] }
@@ -69,8 +101,11 @@ roles:
     permissions:
       - it.app.access
       - it.dashboard.read
+      - it.notify.read
       - it.gw-service.read
       - it.gw-rbac.read
+      - it.gw-observe.read
+      - it.gw-file.read
       - it.endpoint-device.read
       - it.sys-user.read
       - it.sys-role.read
@@ -79,6 +114,11 @@ roles:
       - it.dashboard.overview
       - it.dashboard.gateway
       - it.dashboard.team
+      - it.notify.inbox
+      - it.notify.archive
+      - it.notify.publish
+      - it.notify.history
+      - it.notify.settings
       - it.gw-service.upstreams
       - it.gw-service.upstream-edit
       - it.gw-service.routes
@@ -88,7 +128,22 @@ roles:
       - it.gw-rbac.matrix
       - it.gw-rbac.who
       - it.gw-rbac.graph
+      - it.gw-observe.map
+      - it.gw-observe.logs
+      - it.gw-observe.errors
+      - it.gw-observe.traffic
+      - it.gw-observe.body
+      - it.gw-file.objects
+      - it.gw-file.upload
+      - it.gw-file.delete
+      - it.gw-file.bpm
+      - it.gw-file.legacy
+      - it.gw-file.storage
+      - it.gw-file.backup-retry
       - it.endpoint-device.list
+      - it.endpoint-device.command
+      - it.endpoint-device.admin
+      - it.endpoint-command.list
       - it.sys-user.users
       - it.sys-user.roles
       - it.sys-user.revoke
@@ -107,3 +162,124 @@ roles:
       - it.sys-menu.edit
       - it.sys-audit.ops
       - it.sys-audit.logins
+      # 員工入口網(giga-Portal FRAMEWORK-PLAN §2):IT 協助排查,可查看全部選單與 Tab(含主管專區、ESH),不含按鈕。
+      # 代碼由 giga-Portal/deploy/gateway-rbac.yaml 登記,該檔需先套用,否則本檔套用會因權限不存在而失敗
+      - portal.app.access
+      - portal.home.read
+      - portal.profile.read
+      - portal.profile.basic
+      - portal.profile.pension
+      - portal.profile.health-family
+      - portal.profile.tax-dependents
+      - portal.profile.insurance-bracket
+      - portal.profile.commute
+      - portal.query.read
+      - portal.query.card
+      - portal.query.attendance
+      - portal.query.overtime
+      - portal.query.leave
+      - portal.query.schedule
+      - portal.query.comp-time
+      - portal.query.annual-leave
+      - portal.query.insurance-detail
+      - portal.query.nhi2
+      - portal.salary.read
+      - portal.salary.slip
+      - portal.salary.bonus
+      - portal.annual-gains.read
+      - portal.annual-gains.list
+      - portal.annual-gains.tax-proof
+      - portal.salary-adjust.read
+      - portal.salary-adjust.history
+      - portal.attendance-abnormal.read
+      - portal.attendance-abnormal.list
+      - portal.abnormal-respond.read
+      - portal.abnormal-respond.report
+      - portal.ef-info.read
+      - portal.ef-info.pending
+      - portal.ef-info.unclosed
+      - portal.asset.read
+      - portal.asset.current
+      - portal.asset.transfer
+      - portal.cipher-reset.read
+      - portal.cipher-reset.reset
+      - portal.course.read
+      - portal.course.required
+      - portal.note.read
+      - portal.note.list
+      - portal.approval.read
+      - portal.approval.pending
+      - portal.approval.done
+      - portal.approval.sent
+      - portal.form.read
+      - portal.form.list
+      - portal.ga.read
+      - portal.ga.service
+      - portal.ga.apply
+      - portal.ga.property
+      - portal.ga.outbound
+      - portal.ga.parking
+      - portal.hr.read
+      - portal.hr.welfare
+      - portal.hr.agent
+      - portal.job.read
+      - portal.job.list
+      - portal.survey.read
+      - portal.survey.list
+      - portal.onboarding.read
+      - portal.onboarding.tips
+      - portal.onboarding.quiz
+      - portal.directory.read
+      - portal.directory.extension
+      - portal.directory.contact
+      - portal.gui-number.read
+      - portal.gui-number.list
+      - portal.news.read
+      - portal.news.all
+      - portal.news.unread
+      - portal.calendar.read
+      - portal.calendar.month
+      - portal.calendar.list
+      - portal.links.read
+      - portal.links.list
+      - portal.talk.read
+      - portal.talk.board
+      - portal.mgr.rights.read
+      - portal.mgr.rights.level1
+      - portal.mgr.rights.level2
+      - portal.mgr.rights.level3
+      - portal.mgr.rights.level4
+      - portal.mgr.shift.read
+      - portal.mgr.shift.upload
+      - portal.mgr.boss-trace.read
+      - portal.mgr.boss-trace.trace
+      - portal.mgr.attendance.read
+      - portal.mgr.attendance.punch
+      - portal.mgr.attendance.abnormal
+      - portal.mgr.leave-balance.read
+      - portal.mgr.leave-balance.rank
+      - portal.mgr.promotion.read
+      - portal.mgr.promotion.map
+      - portal.mgr.training.read
+      - portal.mgr.training.plan
+      - portal.mgr.safety-course.read
+      - portal.mgr.safety-course.rate
+      - portal.mgr.property.read
+      - portal.mgr.property.list
+      - portal.mgr.budget.read
+      - portal.mgr.budget.exec
+      - portal.mgr.budget-apply.read
+      - portal.mgr.budget-apply.apply
+      - portal.esh.license.read
+      - portal.esh.license.list
+      - portal.esh.item.read
+      - portal.esh.item.list
+      - portal.esh.need.read
+      - portal.esh.need.list
+      - portal.esh.personal.read
+      - portal.esh.personal.list
+      - portal.esh.manager.read
+      - portal.esh.manager.list
+      - portal.esh.chemical.read
+      - portal.esh.chemical.regulated
+      - portal.esh.chemical.unregulated

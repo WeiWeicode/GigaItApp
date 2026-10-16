@@ -7,6 +7,8 @@ import type { Component } from 'vue';
 
 export const ICONS: Record<string, Component> = {
   dashboard: L.LayoutDashboard,
+  folder: L.FolderOpen,
+  file: L.File,
   gateway: L.Network,
   settings: L.Settings,
   users: L.Users,
@@ -80,10 +82,42 @@ export const ICONS: Record<string, Component> = {
   calendar: L.Calendar,
   repo: L.FolderGit2,
   spec: L.ListChecks,
+  // 通知中心與公告編輯器(Gateway NOTIFY-PLAN)
+  send: L.Send,
+  megaphone: L.Megaphone,
+  'bell-ring': L.BellRing,
+  'check-check': L.CheckCheck,
+  mail: L.Mail,
+  upload: L.Upload,
+  trash: L.Trash2,
+  bold: L.Bold,
+  italic: L.Italic,
+  underline: L.Underline,
+  strike: L.Strikethrough,
+  h2: L.Heading2,
+  h3: L.Heading3,
+  'list-ordered': L.ListOrdered,
+  quote: L.Quote,
+  link: L.Link,
+  image: L.Image,
+  table: L.Table,
+  'table-row': L.Rows3,
+  'table-col': L.Columns3,
+  palette: L.Palette,
+  redo: L.Redo2,
+  'align-left': L.TextAlignStart,
+  'align-center': L.TextAlignCenter,
+  'align-right': L.TextAlignEnd,
   // 應用切換(與 giga-Portal 同步)
   apps: L.Grip,
   home: L.House,
   'arrow-right': L.ArrowRight,
+  // 端點管理(RustIt P3):軟體、USB 儲存、合併、退役、停用
+  package: L.Package,
+  'hard-drive': L.HardDrive,
+  merge: L.GitMerge,
+  archive: L.Archive,
+  ban: L.Ban,
 };
 
 export const ICON_NAMES = Object.keys(ICONS).sort();

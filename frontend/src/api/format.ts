@@ -16,6 +16,28 @@ export function fromNow(iso: string | null | undefined): string {
   return fmtTime(iso);
 }
 
+/** 位元組 → GB / MB(記憶體、磁碟;1024 進位) */
+export function fmtBytes(n: number | null | undefined): string {
+  if (n == null) return '—';
+  const gb = n / 1024 ** 3;
+  if (gb >= 1) return `${gb >= 100 ? Math.round(gb) : gb.toFixed(1)} GB`;
+  return `${Math.round(n / 1024 ** 2)} MB`;
+}
+
+/** 檔案大小(1024 進位,到 KB;檔案清單、上傳對話框) */
+export function fmtSize(n: number | null | undefined): string {
+  if (n == null) return '—';
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
 export const METHOD_TONE: Record<string, string> = { GET: 'success', POST: 'primary', PUT: 'warning', PATCH: 'warning', DELETE: 'danger', '*': 'neutral' };
 export const AUTH_MODE: Record<string, { label: string; tone: string; icon: string }> = {
   public: { label: '公開', tone: 'warning', icon: 'globe' },
@@ -76,6 +98,12 @@ export const ACTION_LABEL: Record<string, string> = {
   'employee_sync.trigger': '觸發人員同步',
   'notify.template.create': '新增通知範本',
   'notify.template.update': '修改通知範本',
+  'notify.announcement.publish': '發布公告',
+  'notify.announcement.draft': '儲存公告草稿',
+  'notify.announcement.update': '修改公告',
+  'notify.announcement.revoke': '撤回公告',
+  'notify.announcement.remind': '提醒未讀',
+  'notify.settings.update': '修改通知設定',
 };
 
 /** 登入紀錄事件(gw.auth_log.event) */

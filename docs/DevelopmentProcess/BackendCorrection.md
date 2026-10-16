@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-12 配合入口網郵件審核退場:it-admin 移除 portal.release-mail.*
+- 內容:主管確認郵件審核已不實施(giga-Portal `docs/PORTAL-API-PLAN.md` Q-D9),入口網移除「郵件審核資訊」頁與 `portal.release-mail.read` / `.list`。`deploy/gateway-rbac.yaml` 的 it-admin 角色同步移除這兩個代碼,避免測試區以 giga-Portal `deploy/sql/2026-10-12-portal-release-mail-remove.sql` 刪除代碼後,本專案 apply 因代碼不存在而整批失敗。經使用者同意後由 giga-Portal 的工作階段修改
+- 檔案:`deploy/gateway-rbac.yaml`
+- 驗證:yaml 僅刪除 2 行;推 develop 後由 CI 套用。套用後才執行上述刪除 SQL
+
 ## 2026-10-01 測試區 / 正式區不保留示範帳號
 - 內容:測試區人員清單有 12 位虛構示範帳號(S100001–S100041),介面只能停用、無法刪除,需求方要求移除;`itadmin` 保留(實際人員帳號被鎖或忘記密碼時用來重設)。① `seed.ts`:種子拆為 `SEED_ADMIN`(itadmin)、`DEMO_USERS`(示範帳號)、`IT_STAFF`;`buildSeed` 只在 `IT_ENV=dev` 建立示範帳號與部門主管(單元測試以示範帳號驗證權限),test / prod 新資料檔只有 itadmin 與實際 IT 人員、部門主管未指定。② `syncStaff` 改為 `syncSeedUsers`:既有資料檔啟動時,test / prod 先移除示範帳號(**工號與姓名都和種子相同才移除**,避免誤刪同工號的實際人員),指向被移除者的部門主管改為未指定,寫入一筆稽核 `user.demo-remove`(actor `system`,detail 列出工號);再補齊缺少的實際 IT 人員。既有稽核紀錄保留。③ 前端稽核動作名稱新增「移除示範帳號」。被移除帳號的既有 Session 因找不到使用者而失效
 - 檔案:`backend/src/store/seed.ts`、`backend/src/app.ts`、`backend/test/seed.test.ts`(新增)、`frontend/src/api/format.ts`、`README.md`、`docs/Gherkin/auth/login.feature`、`docs/PROJECT-MAP.md`
