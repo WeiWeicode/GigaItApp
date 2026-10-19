@@ -431,6 +431,18 @@ export interface EffectivePermissions {
   apps: { code: string; name: string }[];
 }
 
+export interface LocalPasswordResult {
+  employeeNo: string;
+  created: boolean;
+  generated: boolean;
+  mustChangePassword: true;
+  revokedSessions: number;
+  delivery: 'email' | 'screen';
+  sentTo: string | null;
+  /** 沒寄出時,或非正式區,才有明文 */
+  temporaryPassword?: string;
+}
+
 export const users = {
   list: (query: { q?: string; companyId?: number; deptCode?: string; disabled?: boolean; authType?: string; page: number; pageSize: number }) =>
     http.get<Paged<UserRow>>('/api/admin/users', { query: query as Query }),
@@ -438,6 +450,9 @@ export const users = {
   update: (id: string | number, rowVer: string, body: { isDisabled?: boolean; roles?: { code: string; validTo?: string | null; reason?: string | null }[] }) =>
     http.patch<UserDetail>(`/api/admin/users/${id}`, { ...body, rowVer }),
   revokeSessions: (id: string | number) => http.post(`/api/admin/users/${id}/revoke-sessions`),
+  /** IT 建立本機帳號 / 重置密碼:password 未填由系統產生;寄本人 Email(測試區寄測試信箱),沒寄出時回傳 temporaryPassword */
+  setLocalPassword: (id: string | number, password?: string) =>
+    http.post<LocalPasswordResult>(`/api/admin/local-accounts/${id}/reset-password`, password ? { password } : {}),
   effective: (id: string | number) => http.get<EffectivePermissions>(`/api/admin/users/${id}/effective-permissions`),
   companies: () => http.get<{ items: Company[] }>('/api/admin/companies'),
 };

@@ -76,6 +76,8 @@ export const UI = {
   userRoles: 'it.sys-user.roles',
   userRevoke: 'it.sys-user.revoke',
   userDisable: 'it.sys-user.disable',
+  /** 本機帳號建立 / 重置密碼(gw.admin.local.write) */
+  userPassword: 'it.sys-user.password',
   userDepts: 'it.sys-user.depts',
   roleRolePerm: 'it.sys-role.role-perm',
   roleRolePermEdit: 'it.sys-role.role-perm-edit',

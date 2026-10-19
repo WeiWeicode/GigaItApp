@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
- * 人員(Gateway 使用者,Gateway PRD §8.7、P2-3):GET /api/admin/users(後端搜尋、篩選、分頁)、明細、停用 / 啟用、強制登出、個別指派角色。
- * 人員資料由 BPM / LOS 每小時同步(W3-4.6b);本頁不新增人員(本機帳號由入口網自行註冊或 IT 代建)。
+ * 人員(Gateway 使用者,Gateway PRD §8.7、P2-3):GET /api/admin/users(後端搜尋、篩選、分頁)、明細、停用 / 啟用、強制登出、個別指派角色、
+ * 本機帳號建立 / 重置密碼(POST /api/admin/local-accounts/:id/reset-password,需 gw.admin.local.write)。
+ * 人員資料由 BPM / LOS 每小時同步(W3-4.6b);本頁不新增人員(本機帳號由入口網自行註冊,或在此由 IT 建立)。
  * 寫入需 gw.admin.user.write;個別指派的角色所含權限須是操作人本身具備的,否則 BFF 回 403(防止提權)。
  */
 import { computed, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { can, GW, UI, useAuth } from '@/api/auth';
-import { rbac, users, type UserDetail, type UserRow } from '@/api/admin';
+import { rbac, users, type LocalPasswordResult, type UserDetail, type UserRow } from '@/api/admin';
 import { describeError } from '@/api/http';
 import { fmtTime, fromNow } from '@/api/format';
 import { useAsync } from '@/composables/useAsync';
@@ -38,11 +39,12 @@ const list = usePaged<UserRow>(
 
 const AUTH: Record<string, { label: string; tone: string }> = { ad: { label: 'AD', tone: 'primary' }, local: { label: '本機帳號', tone: 'cyan' } };
 const EMPLOYMENT: Record<string, string> = { active: '在職', resigned: '離職' };
-const LOCAL: Record<string, string> = { pending: '待審核', active: '已啟用', locked: '已鎖定', disabled: '已停用', invited: '待啟用' };
+const LOCAL: Record<string, string> = { pending_approval: '待審核', pending_verify: '待啟用', active: '已啟用', locked: '已鎖定', disabled: '已停用' };
 /** 按鈕權限:調整角色 / 強制登出 / 停用(各自綁定 gw.admin.user.write) */
 const canRoles = computed(() => can(UI.userRoles));
 const canRevoke = computed(() => can(UI.userRevoke));
 const canDisable = computed(() => can(UI.userDisable));
+const canPassword = computed(() => can(UI.userPassword));
 
 // ---- 明細 ----
 const detail = ref<UserDetail | null>(null);
@@ -86,6 +88,30 @@ async function revoke(u: UserDetail) {
     toast.success('已強制登出');
   } catch (e) {
     toast.fromError(e);
+  }
+}
+
+// ---- 本機帳號建立 / 重置密碼(AD 帳號不適用) ----
+const hasLocal = computed(() => ['active', 'locked'].includes(detail.value?.localAccount?.status ?? ''));
+const pwOpen = ref(false);
+const pwInput = ref('');
+const pwResult = ref<LocalPasswordResult | null>(null);
+function openPassword() {
+  pwInput.value = '';
+  pwResult.value = null;
+  pwOpen.value = true;
+}
+async function submitPassword(u: UserDetail) {
+  busy.value = true;
+  try {
+    pwResult.value = await users.setLocalPassword(u.userId, pwInput.value.trim() || undefined);
+    pwInput.value = '';
+    detail.value = await users.get(u.userId);
+    await list.reload();
+  } catch (e) {
+    toast.fromError(e, hasLocal.value ? '重置密碼失敗' : '建立帳號失敗');
+  } finally {
+    busy.value = false;
   }
 }
 
@@ -297,6 +323,9 @@ async function saveRoles(u: UserDetail) {
         </GButton>
         <span class="spacer" />
         <template v-if="detail && !isSelf">
+          <GButton v-if="canPassword && detail.authType !== 'ad'" variant="ghost" :icon="hasLocal ? 'key' : 'user-plus'" @click="openPassword">
+            {{ hasLocal ? '重置密碼' : '建立帳號' }}
+          </GButton>
           <GButton v-if="canRevoke" variant="ghost" icon="logout" @click="revoke(detail)">強制登出</GButton>
           <GButton
             v-if="canDisable"
@@ -307,6 +336,53 @@ async function saveRoles(u: UserDetail) {
             {{ detail.isDisabled ? '啟用' : '停用' }}
           </GButton>
         </template>
+      </template>
+    </GModal>
+
+    <GModal
+      v-model:open="pwOpen"
+      :title="hasLocal || pwResult ? '重置密碼' : '建立本機帳號'"
+      :subtitle="detail ? `${detail.displayName}(${detail.employeeNo})` : ''"
+      icon="key"
+      width="480px"
+    >
+      <div v-if="detail" class="stack" style="--gap: 12px">
+        <template v-if="!pwResult">
+          <p class="small" style="margin: 0">
+            {{ hasLocal ? '重設後原密碼失效、解除鎖定並登出所有裝置。' : '直接建立已啟用的本機帳號(不經啟用連結)。' }}
+            本人首次登入須變更密碼。
+          </p>
+          <GInput
+            v-model="pwInput"
+            type="password"
+            label="密碼(選填)"
+            autocomplete="new-password"
+            placeholder="留空由系統產生臨時密碼"
+            hint="至少 8 碼、需包含英文字母與數字、不可包含工號"
+          />
+          <p class="faint xs" style="margin: 0">密碼會寄到本人 Email(測試區改寄測試信箱);沒有 Email 時只在下一步顯示一次,請以安全管道轉交。</p>
+        </template>
+        <template v-else>
+          <p class="small" style="margin: 0">
+            已{{ pwResult.created ? '建立帳號' : '重置密碼'
+            }}<template v-if="pwResult.revokedSessions > 0">,並登出 {{ pwResult.revokedSessions }} 個裝置</template>。
+          </p>
+          <p v-if="pwResult.sentTo" class="small" style="margin: 0"><GIcon name="mail" :size="14" /> 已寄送至 {{ pwResult.sentTo }}</p>
+          <div v-if="pwResult.temporaryPassword" class="box stack" style="--gap: 6px">
+            <span class="faint xs">{{ pwResult.sentTo ? '密碼(非正式區另外顯示)' : '尚未寄出,請轉交本人(只顯示這一次)' }}</span>
+            <code class="mono strong">{{ pwResult.temporaryPassword }}</code>
+          </div>
+        </template>
+      </div>
+      <template #footer>
+        <span class="spacer" />
+        <template v-if="!pwResult">
+          <GButton variant="ghost" @click="pwOpen = false">取消</GButton>
+          <GButton v-if="detail" variant="primary" :icon="hasLocal ? 'key' : 'user-plus'" :loading="busy" @click="submitPassword(detail)">
+            {{ hasLocal ? '重置密碼' : '建立帳號' }}
+          </GButton>
+        </template>
+        <GButton v-else variant="primary" @click="pwOpen = false">完成</GButton>
       </template>
     </GModal>
   </div>
