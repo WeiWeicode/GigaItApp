@@ -79,6 +79,8 @@ permissions:
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
   - { code: it.sys-user.revoke, name: 強制登出, kind: button, parent: it.sys-user.users, sort: 20, includes: [gw.admin.user.write] }
   - { code: it.sys-user.disable, name: 停用 / 啟用, kind: button, parent: it.sys-user.users, sort: 30, includes: [gw.admin.user.write] }
+  # 本機帳號建立 / 重置密碼(2026-10-19):POST /api/admin/local-accounts/:id/reset-password
+  - { code: it.sys-user.password, name: 建立帳號 / 重置密碼, kind: button, parent: it.sys-user.users, sort: 40, includes: [gw.admin.local.write] }
   - { code: it.sys-user.depts, name: 部門, kind: tab, parent: it.sys-user.read, sort: 20, includes: [gw.admin.rbac.read] }
   - { code: it.sys-role.role-perm, name: 角色權限, kind: tab, parent: it.sys-role.read, sort: 10 }
   - { code: it.sys-role.role-perm-edit, name: 編輯角色權限, kind: button, parent: it.sys-role.role-perm, sort: 10, includes: [gw.admin.rbac.write] }
@@ -148,6 +150,7 @@ roles:
       - it.sys-user.roles
       - it.sys-user.revoke
       - it.sys-user.disable
+      - it.sys-user.password
       - it.sys-user.depts
       - it.sys-role.role-perm
       - it.sys-role.role-perm-edit

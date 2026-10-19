@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-19 人員明細:本機帳號建立 / 重置密碼
+- 內容:需求方要求 it-admin 可在「人員與部門 › 人員」為人員建立本機帳號或重置密碼(禾迅等無 AD 網域公司;配合 giga-api-gateway-bff 同日「reset-password 擴充為建立帳號 / 重置密碼」)。明細對話框新增按鈕(AD 帳號不顯示;已有啟用 / 鎖定的本機帳號顯示「重置密碼」,否則「建立帳號」),對話框可指定密碼(留空由系統產生);完成後顯示寄送對象,沒寄出(或非正式區)才顯示明文。新按鈕權限 `it.sys-user.password`(includes `gw.admin.local.write`,`deploy/gateway-rbac.yaml`,it-admin 擁有);`LOCAL` 狀態對照改為 BFF 實際值(`pending_approval` / `pending_verify`)
+- 檔案:`frontend/src/pages/system/Users.vue`、`frontend/src/api/admin.ts`、`frontend/src/api/auth.ts`、`deploy/gateway-rbac.yaml`
+- 驗證:`npm run typecheck`、`npm run build` 通過;瀏覽器實測需 BFF 新版部署到測試區後進行(未執行)
+
 ## 2026-10-16 電腦詳情固定高度、篩選列換行、Agent 啟動事件文字(RustIt P3 測試區實測後)
 - 內容:需求方要求詳情對話框不隨 Tab 內容改變高度 → `GModal` 新增 `height`(固定高度、內容在內部捲動),電腦詳情設 `85vh`,Tab 列在捲動時固定在上方;電腦清單篩選列改為可換行(1280px 寬時「顯示退役」被擠掉),`GCheckbox` 改用 `label` 參數(原寫法 slot 不顯示文字);事件「Agent 啟動」顯示「Agent 版本 x.y.z」而非原始 JSON。
 - 檔案:`frontend/src/ui/components/GModal.vue`、`frontend/src/pages/endpoint/Devices.vue`、`DeviceDetail.vue`、`frontend/src/components/endpoint/DeviceEvents.vue`、`docs/UI-GUIDE.md`
