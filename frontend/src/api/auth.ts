@@ -72,6 +72,9 @@ export const UI = {
   /** 停用 / 啟用 / 退役、合併疑似同一台(RustIt P3) */
   devAdmin: 'it.endpoint-device.admin',
   cmdList: 'it.endpoint-command.list',
+  /** 告警(RustIt P5):清單 Tab、關閉告警按鈕 */
+  alertList: 'it.endpoint-alert.list',
+  alertResolve: 'it.endpoint-alert.resolve',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
   userRevoke: 'it.sys-user.revoke',

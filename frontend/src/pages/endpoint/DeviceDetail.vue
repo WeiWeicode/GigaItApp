@@ -2,7 +2,8 @@
 /**
  * 電腦詳情(放在電腦清單的對話框內,開啟時才載入):GET /api/endpoint/devices/{deviceId}(RustIt ItAgentBack)。
  * RustIt P3 分 Tab(PLATFORM-PLAN §3.3、§7;P3-DATA-DESIGN §5):
- *   概要(狀態、身分、疑似同一台與管理操作)/ 硬體 / 網路 / 軟體(名稱篩選)/ 安全與周邊(防毒、更新、USB、RustDesk)/ 事件 / 指令。
+ *   概要(狀態、身分、疑似同一台與管理操作)/ 硬體 / 網路 / 軟體(名稱篩選)/ 安全與周邊(防毒、更新、USB、RustDesk)/
+ *   健康與 Agent(RustIt P5:健康、走勢、Watchdog、此台告警)/ 事件 / 指令。
  *   硬體到安全與周邊都來自同一份資產快照;事件、指令切到該 Tab 才載入。
  *   「下載資產 JSON」:最新一份快照原樣(snake_case),瀏覽器以 Cookie 下載(endpoint.device.read)。
  * Agent 回報的字串一律以文字顯示(不用 v-html)。
@@ -15,6 +16,7 @@ import type { EndpointDeviceDetail } from '@/api/types';
 import { useAsync } from '@/composables/useAsync';
 import DeviceAdminActions from '@/components/endpoint/DeviceAdminActions.vue';
 import DeviceEvents from '@/components/endpoint/DeviceEvents.vue';
+import DeviceHealth from '@/components/endpoint/DeviceHealth.vue';
 import DeviceCommands from './DeviceCommands.vue';
 
 const props = defineProps<{ deviceId: string }>();
@@ -30,6 +32,7 @@ const TABS = [
   { label: '網路', value: 'network', icon: 'wifi' },
   { label: '軟體', value: 'software', icon: 'package' },
   { label: '安全與周邊', value: 'security', icon: 'shield' },
+  { label: '健康與 Agent', value: 'health', icon: 'activity' },
   { label: '事件', value: 'events', icon: 'clock' },
   { label: '指令', value: 'commands', icon: 'send' },
 ];
@@ -345,6 +348,7 @@ async function onChanged() {
       <p v-if="inv.warnings.length" class="faint xs" style="margin: 0; grid-column: 1 / -1">蒐集警告:{{ inv.warnings.join(';') }}</p>
     </div>
 
+    <DeviceHealth v-else-if="tab === 'health'" :device="d" @changed="onChanged" />
     <DeviceEvents v-else-if="tab === 'events'" :device-id="d.deviceId" />
     <DeviceCommands v-else-if="tab === 'commands'" :device-id="d.deviceId" :computer-name="d.computerName" :online="d.online" :active="d.status === 'active'" />
   </div>
