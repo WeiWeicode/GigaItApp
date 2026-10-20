@@ -201,11 +201,17 @@ const routes: RouteRecordRaw[] = [
           tabs: [
             { label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList },
             { label: '指令紀錄', to: '/endpoint/devices/commands', icon: 'list', permission: UI.cmdList },
+            { label: '告警', to: '/endpoint/devices/alerts', icon: 'bell', permission: UI.alertList },
           ],
         },
         children: [
           { path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單', permission: UI.devList } },
           { path: 'commands', component: () => import('./pages/endpoint/Commands.vue'), meta: { tab: '指令紀錄', permission: UI.cmdList, requires: [EP.deviceRead] } },
+          {
+            path: 'alerts',
+            component: () => import('./pages/endpoint/Alerts.vue'),
+            meta: { tab: '告警', permission: UI.alertList, requires: [EP.deviceRead] },
+          },
         ],
       },
       {

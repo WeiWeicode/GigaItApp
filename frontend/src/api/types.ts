@@ -88,6 +88,67 @@ export interface EndpointDevice {
   /** 已併入的目標裝置 */
   mergedInto?: string | null;
   retiredAt?: string | null;
+  /** 健康摘要(RustIt P5;在線取最近一則心跳,離線取最後落盤;舊版 Agent 為 null) */
+  health?: EndpointHealth | null;
+  /** 未結束的告警數(RustIt P5) */
+  openAlerts?: number;
+}
+
+/** 健康摘要(RustIt P5-MONITOR-DESIGN §2.1;取不到的欄位省略) */
+export interface EndpointHealth {
+  at: string;
+  cpuPct?: number;
+  memUsedPct?: number;
+  /** 最滿的固定磁碟剩餘百分比 */
+  diskMinFreePct?: number;
+  diskMinFreeDrive?: string;
+  uptimeS?: number;
+  agentRssMb?: number;
+}
+
+/** Watchdog 最近一次回報(RustIt P5-2) */
+export interface EndpointWatchdog {
+  version: string | null;
+  reportAt: string | null;
+  agentServiceState: string | null;
+  agentStartType: string | null;
+  agentStatusOk: boolean | null;
+  agentLastError: string | null;
+  agentRestarts24h: number | null;
+}
+
+export type EndpointAlertRule =
+  'offline_long' | 'disk_low' | 'hardware_changed' | 'agent_restarts' | 'cert_expiring' | 'clock_skew' | 'agent_tampered' | 'agent_silent';
+
+/** 告警(GET /api/endpoint/alerts;RustIt P5-MONITOR-DESIGN §4) */
+export interface EndpointAlert {
+  alertId: string;
+  deviceId: string;
+  computerName: string;
+  rule: EndpointAlertRule | string;
+  severity: 'warn' | 'critical';
+  state: 'open' | 'resolved';
+  openedAt: string;
+  lastSeenAt: string;
+  resolvedAt: string | null;
+  resolvedBy: 'auto' | 'manual' | null;
+  resolvedByEmp: string | null;
+  resolvedByName: string | null;
+  resolveNote: string | null;
+  /** 規則的數值與依據(端點回報的內容,一律以文字顯示) */
+  detail: unknown;
+}
+
+export interface EndpointAlertPage {
+  items: EndpointAlert[];
+  nextCursor: string | null;
+}
+
+/** 健康走勢(GET /api/endpoint/devices/{deviceId}/health;5 分鐘分桶) */
+export interface EndpointHealthSeries {
+  deviceId: string;
+  bucketSec: number;
+  points: { at: string; cpuPct: number | null; memUsedPct: number | null; diskMinFreePct: number | null }[];
 }
 
 /** 電腦清單(GET /api/endpoint/devices;後端分頁,依電腦名稱排序) */
@@ -139,6 +200,12 @@ export interface EndpointDeviceDetail extends EndpointDevice {
   clockSkewMs?: number | null;
   /** 硬體指紋相同、未合併、未退役的其他裝置(RustIt P3) */
   suspectedDuplicates?: { deviceId: string; computerName: string; status: string; firstSeenAt: string; lastSeenAt: string }[];
+  /** 裝置憑證到期日(RustIt P5) */
+  certNotAfter?: string | null;
+  /** Watchdog 最近一次回報(RustIt P5-2;尚未回報為 null) */
+  watchdog?: EndpointWatchdog | null;
+  /** 未結束的告警(RustIt P5) */
+  alerts?: EndpointAlert[];
 }
 
 /** 電腦事件(GET /api/endpoint/devices/{deviceId}/events;新到舊,nextCursor 分頁) */

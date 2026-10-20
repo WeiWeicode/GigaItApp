@@ -7,15 +7,22 @@
  * 指令只開放固定類型;結果一律以文字顯示(不用 v-html,RustIt P4-COMMAND-DESIGN §6.1)。
  * 電腦(RustIt P3,P3-DATA-DESIGN §3):清單分頁與篩選、事件、下載資產 JSON(endpoint.device.read);
  *   停用 / 啟用 / 退役 PUT /devices/{id}/status、合併 POST /devices/{id}/merge(endpoint.command.admin)。
+ * 監測(RustIt P5,P5-MONITOR-DESIGN §3.3):健康走勢 GET /devices/{id}/health、告警 GET /alerts(endpoint.device.read)、
+ *   關閉告警 POST /alerts/{id}/resolve(endpoint.command.basic)。告警的 detail 來自端點回報,一律以文字顯示。
  */
+import { fmtTime, fromNow } from '@/api/format';
 import { http, type Query } from '@/api/http';
 import type {
   EndpointCommand,
   EndpointCommandKind,
   EndpointCommandPage,
   EndpointCommandState,
+  EndpointAlert,
+  EndpointAlertPage,
+  EndpointAlertRule,
   EndpointDeviceEventPage,
   EndpointDevicePage,
+  EndpointHealthSeries,
 } from '@/api/types';
 
 const base = '/api/endpoint';
@@ -102,6 +109,24 @@ export const EVENT_LABELS: Record<string, string> = {
   usb_removed: 'USB 移除',
   offline_period: '離線期間',
   agent_started: 'Agent 啟動',
+  company_changed: '公司變更',
+  // RustIt P5:主機比對資產
+  software_installed: '安裝軟體',
+  software_removed: '移除軟體',
+  software_updated: '軟體更新',
+  software_changed_bulk: '大量軟體變更',
+  hardware_changed: '硬體變更',
+  // RustIt P5-2:Watchdog 與 Agent 互相看守
+  agent_restarted: 'Agent 重新啟動',
+  agent_service_stopped: 'Agent 服務被停止',
+  agent_start_type_changed: 'Agent 啟動類型被改',
+  agent_binary_missing: 'Agent 程式不見',
+  agent_binary_changed: 'Agent 程式被換',
+  agent_start_failed: 'Agent 無法啟動',
+  agent_pipe_impersonation: '本機管道被冒充',
+  watchdog_stopped: 'Watchdog 被停止',
+  watchdog_missing: 'Watchdog 不存在',
+  watchdog_binary_changed: 'Watchdog 程式被換',
 };
 
 export const EVENT_TONES: Record<string, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
@@ -109,11 +134,103 @@ export const EVENT_TONES: Record<string, 'neutral' | 'info' | 'success' | 'dange
   retired: 'danger',
   enabled: 'success',
   merged: 'info',
+  company_changed: 'info',
   duplicate_connection: 'warning',
   clock_skew: 'warning',
   suspected_duplicate: 'warning',
   fingerprint_changed: 'warning',
   offline_period: 'warning',
+  software_installed: 'info',
+  software_removed: 'info',
+  software_updated: 'info',
+  software_changed_bulk: 'warning',
+  hardware_changed: 'danger',
+  agent_restarted: 'warning',
+  agent_start_failed: 'danger',
+  agent_service_stopped: 'danger',
+  agent_start_type_changed: 'danger',
+  agent_binary_missing: 'danger',
+  agent_binary_changed: 'danger',
+  agent_pipe_impersonation: 'danger',
+  watchdog_stopped: 'danger',
+  watchdog_missing: 'danger',
+  watchdog_binary_changed: 'danger',
+};
+
+/** Windows 服務啟動類型(Watchdog / Agent 回報的 start_type) */
+export const START_TYPE_LABELS: Record<string, string> = { auto: '自動', manual: '手動', disabled: '停用', missing: '—', unknown: '未知' };
+export const startTypeLabel = (v: string) => START_TYPE_LABELS[v] ?? v;
+
+// ---------- 告警(RustIt P5) ----------
+
+export const ALERT_RULE_LABELS: Record<EndpointAlertRule, string> = {
+  offline_long: '離線過久',
+  disk_low: '磁碟空間不足',
+  hardware_changed: '硬體變更',
+  agent_restarts: 'Agent 反覆重啟',
+  cert_expiring: '憑證即將到期',
+  clock_skew: '時鐘偏差',
+  agent_tampered: 'Agent / Watchdog 被變更',
+  agent_silent: 'Agent 沒有回應',
+};
+
+export const ALERT_SEVERITY_LABELS: Record<EndpointAlert['severity'], string> = { critical: '嚴重', warn: '警告' };
+export const ALERT_SEVERITY_TONES: Record<EndpointAlert['severity'], 'danger' | 'warning'> = { critical: 'danger', warn: 'warning' };
+export const alertRuleLabel = (rule: string) => ALERT_RULE_LABELS[rule as EndpointAlertRule] ?? rule;
+
+const HW_COMPONENTS: Record<string, string> = { memory: '記憶體', disk: '磁碟', gpu: '顯示卡', bios: 'BIOS', board: '主機板', cpu: 'CPU' };
+
+type Data = Record<string, unknown>;
+const txt = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+const list = (v: unknown) => (Array.isArray(v) ? v.map(txt).join('、') : txt(v));
+
+/** 事件類規則:同一台已有未結束告警時,後續事件只更新 last_seen_at,detail 保留第一次觸發(RustIt P5-MONITOR-DESIGN §8.1) */
+const FIRST_DETAIL_RULES = new Set<string>(['hardware_changed', 'agent_tampered']);
+export const alertDetailHint = (rule: string) => (FIRST_DETAIL_RULES.has(rule) ? '此為第一次觸發的內容,之後的事件請看電腦詳情的「事件」Tab' : undefined);
+
+/** 告警 detail 摘要成一行文字(RustIt P5-MONITOR-DESIGN §4;內容來自端點,呼叫端以文字顯示) */
+export function alertSummary(a: Pick<EndpointAlert, 'rule' | 'detail'>): string {
+  const d = (a.detail && typeof a.detail === 'object' ? a.detail : {}) as Data;
+  switch (a.rule) {
+    case 'offline_long':
+      return `最後回報 ${fmtTime(txt(d.lastSeenAt))}(${txt(d.days)} 天)`;
+    case 'disk_low':
+      return `${txt(d.drive) || '磁碟'} 剩餘 ${txt(d.freePct)}%`;
+    case 'hardware_changed':
+      return `首次:${HW_COMPONENTS[txt(d.component)] ?? txt(d.component)}:${list(d.before) || '—'} → ${list(d.after) || '—'}`;
+    case 'agent_restarts':
+      return `24 小時內非正常重啟 ${txt(d.restarts24h)} 次`;
+    case 'cert_expiring': {
+      const days = Number(d.days);
+      return `到期 ${fmtTime(txt(d.certNotAfter))}(${Number.isFinite(days) && days < 0 ? '已過期' : `剩 ${txt(d.days)} 天`})`;
+    }
+    case 'clock_skew':
+      return `端點時鐘與主機相差 ${Math.round(Number(d.clockSkewMs) / 1000)} 秒`;
+    case 'agent_tampered': {
+      const ev = EVENT_LABELS[txt(d.type)] ?? txt(d.type);
+      const n = Number(d.count);
+      return `首次:${ev}${Number.isFinite(n) && n > 1 ? `(同批 ${n} 筆)` : ''}`;
+    }
+    case 'agent_silent':
+      return `Watchdog ${fromNow(txt(d.watchdogReportAt))}有回報,Agent 最後回報 ${fromNow(txt(d.lastSeenAt))}`;
+    default:
+      return Object.keys(d).length ? JSON.stringify(d) : '';
+  }
+}
+
+export interface AlertListQuery extends Query {
+  /** open(預設)/ resolved / all */
+  state?: 'open' | 'resolved' | 'all';
+  rule?: string;
+  severity?: string;
+  deviceId?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export const alertApi = {
+  list: (query: AlertListQuery = {}) => http.get<EndpointAlertPage>(`${base}/alerts`, { query }),
+  resolve: (alertId: string, note: string) => http.post<EndpointAlert>(`${base}/alerts/${encodeURIComponent(alertId)}/resolve`, { note }),
 };
 
 export interface DeviceListQuery extends Query {
@@ -149,6 +266,8 @@ export const deviceApi = {
     http.put<{ deviceId: string; status: DeviceStatus; changed: boolean }>(`${base}/devices/${encodeURIComponent(deviceId)}/status`, { status, reason }),
   merge: (deviceId: string, sourceDeviceId: string, reason: string, force = false) =>
     http.post<MergeResponse>(`${base}/devices/${encodeURIComponent(deviceId)}/merge`, { sourceDeviceId, reason, force }),
+  /** 健康走勢(RustIt P5;hours 1–24) */
+  health: (deviceId: string, hours = 24) => http.get<EndpointHealthSeries>(`${base}/devices/${encodeURIComponent(deviceId)}/health`, { query: { hours } }),
 };
 
 /** 資產 JSON 下載網址(同網域,瀏覽器以 Cookie 驗證;BFF 權限 endpoint.device.read) */

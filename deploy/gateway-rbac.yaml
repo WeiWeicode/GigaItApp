@@ -75,6 +75,11 @@ permissions:
   - { code: it.endpoint-device.admin, name: 裝置管理(停用、退役、合併), kind: button, parent: it.endpoint-device.list, sort: 20, includes: [endpoint.command.admin] }
   # 指令紀錄(RustIt P4-3):所有電腦的指令與結果、日誌下載(endpoint.device.read)
   - { code: it.endpoint-command.list, name: 指令紀錄, kind: tab, parent: it.endpoint-device.read, sort: 20, includes: [endpoint.device.read] }
+  # 告警(RustIt P5:健康、資產變更、Watchdog 互相看守的固定規則告警;ItAgentBack OpenAPI 批次 2026-10-20 已發佈)。
+  #   關閉告警沿用 endpoint.command.basic(RustIt P5-MONITOR-DESIGN §9-2,不新增權限代碼)。注意:授予「關閉告警」在 BFF 端
+  #   等同也能下一般指令(與 it.endpoint-device.command 相同權限),只授予已有「下達一般指令」的角色
+  - { code: it.endpoint-alert.list, name: 告警, kind: tab, parent: it.endpoint-device.read, sort: 30, includes: [endpoint.device.read] }
+  - { code: it.endpoint-alert.resolve, name: 關閉告警, kind: button, parent: it.endpoint-alert.list, sort: 10, includes: [endpoint.command.basic] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
   - { code: it.sys-user.revoke, name: 強制登出, kind: button, parent: it.sys-user.users, sort: 20, includes: [gw.admin.user.write] }
@@ -146,6 +151,8 @@ roles:
       - it.endpoint-device.command
       - it.endpoint-device.admin
       - it.endpoint-command.list
+      - it.endpoint-alert.list
+      - it.endpoint-alert.resolve
       - it.sys-user.users
       - it.sys-user.roles
       - it.sys-user.revoke
