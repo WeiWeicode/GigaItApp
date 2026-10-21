@@ -117,6 +117,82 @@ export interface EndpointWatchdog {
   agentRestarts24h: number | null;
 }
 
+// ---------- Agent 版本與升級(RustIt P6;P6-UPGRADE-DESIGN §1、§2、§7) ----------
+
+export type EndpointReleaseComponent = 'agent' | 'watchdog';
+export type EndpointReleaseStatus = 'draft' | 'published' | 'revoked';
+export type EndpointRing = 'pilot' | 'it' | 'all';
+
+/** 版本登錄(GET /api/endpoint/releases);sha256、sizeBytes 由主機讀檔計算 */
+export interface EndpointRelease {
+  releaseId: string;
+  component: EndpointReleaseComponent;
+  version: string;
+  fileName: string;
+  sha256: string;
+  sizeBytes: number;
+  signerThumbprints: string[];
+  status: EndpointReleaseStatus;
+  notes: string | null;
+  createdBy: { emp: string; name: string | null };
+  createdAt: string;
+  publishedByEmp: string | null;
+  publishedAt: string | null;
+  revokedByEmp: string | null;
+  revokedAt: string | null;
+  /** 撤回回應才有:因此被改為「不升級」的環 */
+  clearedRings?: EndpointRing[];
+}
+
+/** 版本檔目錄中尚未登錄的檔案(GET /api/endpoint/releases/files) */
+export interface EndpointReleaseFile {
+  component: EndpointReleaseComponent;
+  version: string;
+  fileName: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface EndpointRingProgress {
+  total: number;
+  atTarget: number;
+  inProgress: number;
+  failed: number;
+  waiting: number;
+}
+
+/** 發佈環 × 元件的目標版本與進度(GET /api/endpoint/release-rings) */
+export interface EndpointRingTarget {
+  ring: EndpointRing;
+  component: EndpointReleaseComponent;
+  targetVersion: string | null;
+  targetSetAt: string | null;
+  updatedBy: { emp: string | null; name: string | null };
+  updatedAt: string;
+  progress: EndpointRingProgress;
+}
+
+export type EndpointUpgradeState = 'pending' | 'downloading' | 'verifying' | 'installing' | 'succeeded' | 'failed' | 'rolled_back';
+
+/** 電腦的升級狀態(GET /api/endpoint/devices/{id}/upgrade) */
+export interface EndpointDeviceUpgrade {
+  deviceId: string;
+  ring: EndpointRing;
+  upgrades: {
+    component: EndpointReleaseComponent;
+    currentVersion: string | null;
+    targetVersion: string | null;
+    /** forced = agent.upgrade 指定的版本 */
+    targetSource: 'forced' | 'ring' | null;
+    state: EndpointUpgradeState | null;
+    attempts: number;
+    errorCode: string | null;
+    errorMessage: string | null;
+    forcedBy: string | null;
+    updatedAt: string | null;
+  }[];
+}
+
 export type EndpointAlertRule =
   'offline_long' | 'disk_low' | 'hardware_changed' | 'agent_restarts' | 'cert_expiring' | 'clock_skew' | 'agent_tampered' | 'agent_silent';
 
@@ -225,7 +301,7 @@ export interface EndpointDeviceEventPage {
   nextCursor: string | null;
 }
 /** 端點指令類型(RustIt docs/contracts/command-kinds.md;目前只開放 basic) */
-export type EndpointCommandKind = 'inventory.collect' | 'agent.diagnose' | 'logs.collect' | 'agent.log_level' | 'message.show' | 'agent.restart';
+export type EndpointCommandKind = 'inventory.collect' | 'agent.diagnose' | 'logs.collect' | 'agent.log_level' | 'message.show' | 'agent.restart' | 'agent.upgrade';
 export type EndpointCommandState = 'queued' | 'sent' | 'acked' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'expired';
 
 /** 指令附檔(logs.collect 的日誌 zip;保存 14 天) */

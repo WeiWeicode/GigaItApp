@@ -239,6 +239,7 @@
 | FR-8.4 | Gateway 呼叫集中在 `src/api/gateway.ts`,目前只有唯讀 GET;加入下指令等寫入功能時改用 `@giganexus/web-kit`(CSRF、Token 自動更新) | 程式審查 |
 | FR-8.5 | 對電腦下指令、查詢指令結果(ENDPOINT-AGENT-GUIDE §8.3–§8.4;RustIt P4-3):電腦詳情分「概要」「指令」兩個 Tab;「指令」Tab 有遠端診斷、收集日誌(1–14 天)、立即蒐集資產、調整日誌等級、傳送訊息、重新啟動 Agent(需確認)六個按鈕(按鈕 `it.endpoint-device.command` ∧ `endpoint.command.basic`,停用的電腦不顯示),下指令後每 2 秒更新狀態並依類型顯示結果(一律文字,不用 `v-html`),日誌可下載(保存 14 天);這台電腦的指令紀錄(「載入更多」)與取消自己建立且排隊中的指令。「端點管理 › 指令紀錄」Tab(`it.endpoint-command.list`)列出所有電腦的指令,依狀態、類型篩選 | `endpoint/commands.feature`(`@manual`) |
 | FR-8.6 | 端點監測(RustIt P5-3;P5-MONITOR-DESIGN §7):電腦清單「健康」欄(CPU / 記憶體 / 磁碟剩餘)與未結束告警數;詳情「健康與 Agent」Tab(目前健康、Agent / Watchdog 狀態、24 小時走勢、此台未結束告警);事件 Tab 顯示監測事件中文名稱;「端點管理 › 告警」Tab(`it.endpoint-alert.list`)依狀態 / 規則 / 嚴重度篩選,關閉告警(按鈕 `it.endpoint-alert.resolve` ∧ `endpoint.command.basic`,說明必填) | `endpoint/monitor.feature`(`@manual`) |
+| FR-8.7 | Agent 版本與發佈環(RustIt P6-5;P6-UPGRADE-DESIGN §7):「電腦清單」第 4 個 Tab「Agent 版本」(`it.endpoint-release.list` ∧ `endpoint.device.read`):發佈環表(pilot / it / all × Agent / Watchdog 的目標版本與進度)、版本清單(元件 / 狀態篩選);管理按鈕(`it.endpoint-release.manage` ∧ `endpoint.software.manage`,主機另要求可管理所有公司):登錄版本(從版本檔目錄挑未登錄的檔案、填預期簽章者指紋)、發佈、撤回、設定環的目標版本(pilot 可設草稿,it / all 只能已發佈;pilot 未滿 24 小時回 409 時確認後 `force`)。電腦詳情「健康與 Agent」Tab 的「版本與升級」:所屬環(`it.endpoint-device.admin` ∧ `endpoint.command.admin`)、各元件目前 / 目標版本與升級狀態、立即升級(`agent.upgrade`) | `endpoint/releases.feature` |
 
 ---
 

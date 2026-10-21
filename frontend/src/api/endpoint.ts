@@ -7,6 +7,8 @@
  * 指令只開放固定類型;結果一律以文字顯示(不用 v-html,RustIt P4-COMMAND-DESIGN §6.1)。
  * 電腦(RustIt P3,P3-DATA-DESIGN §3):清單分頁與篩選、事件、下載資產 JSON(endpoint.device.read);
  *   停用 / 啟用 / 退役 PUT /devices/{id}/status、合併 POST /devices/{id}/merge(endpoint.command.admin)。
+ * 升級(RustIt P6,P6-UPGRADE-DESIGN §2、§7):版本登錄 / 發佈 / 撤回、發佈環目標版本(endpoint.software.manage;讀取 endpoint.device.read)、
+ *   電腦所屬環 PUT /devices/{id}/ring 與立即升級 agent.upgrade(POST /devices/{id}/admin-commands,endpoint.command.admin)。
  * 監測(RustIt P5,P5-MONITOR-DESIGN §3.3):健康走勢 GET /devices/{id}/health、告警 GET /alerts(endpoint.device.read)、
  *   關閉告警 POST /alerts/{id}/resolve(endpoint.command.basic)。告警的 detail 來自端點回報,一律以文字顯示。
  */
@@ -22,7 +24,15 @@ import type {
   EndpointAlertRule,
   EndpointDeviceEventPage,
   EndpointDevicePage,
+  EndpointDeviceUpgrade,
   EndpointHealthSeries,
+  EndpointRelease,
+  EndpointReleaseComponent,
+  EndpointReleaseFile,
+  EndpointReleaseStatus,
+  EndpointRing,
+  EndpointRingTarget,
+  EndpointUpgradeState,
 } from '@/api/types';
 
 const base = '/api/endpoint';
@@ -34,6 +44,7 @@ export const KIND_LABELS: Record<EndpointCommandKind, string> = {
   'agent.log_level': '調整日誌等級',
   'message.show': '傳送訊息',
   'agent.restart': '重新啟動 Agent',
+  'agent.upgrade': '立即升級',
 };
 
 export const STATE_LABELS: Record<EndpointCommandState, string> = {
@@ -74,6 +85,9 @@ export const ERROR_LABELS: Record<string, string> = {
 export const isFinal = (s: EndpointCommandState) => !['queued', 'sent', 'acked', 'running'].includes(s);
 
 export const endpointApi = {
+  /** 管理等級指令(目前只有 agent.upgrade,P6;endpoint.command.admin) */
+  createAdmin: (deviceId: string, kind: EndpointCommandKind, params: Record<string, unknown> = {}) =>
+    http.post<EndpointCommand>(`${base}/devices/${encodeURIComponent(deviceId)}/admin-commands`, { kind, params }),
   create: (deviceId: string, kind: EndpointCommandKind, params: Record<string, unknown> = {}) =>
     http.post<EndpointCommand>(`${base}/devices/${encodeURIComponent(deviceId)}/basic-commands`, { kind, params }),
   get: (commandId: string) => http.get<EndpointCommand>(`${base}/commands/${encodeURIComponent(commandId)}`),
@@ -268,9 +282,80 @@ export const deviceApi = {
     http.post<MergeResponse>(`${base}/devices/${encodeURIComponent(deviceId)}/merge`, { sourceDeviceId, reason, force }),
   /** 健康走勢(RustIt P5;hours 1–24) */
   health: (deviceId: string, hours = 24) => http.get<EndpointHealthSeries>(`${base}/devices/${encodeURIComponent(deviceId)}/health`, { query: { hours } }),
+  /** 升級狀態(RustIt P6):所屬環、各元件目前 / 目標版本與最後錯誤 */
+  upgrade: (deviceId: string) => http.get<EndpointDeviceUpgrade>(`${base}/devices/${encodeURIComponent(deviceId)}/upgrade`),
+  /** 調整所屬環(endpoint.command.admin;進出 pilot 另需可管理所有公司) */
+  setRing: (deviceId: string, ring: EndpointRing) =>
+    http.put<EndpointDeviceUpgrade>(`${base}/devices/${encodeURIComponent(deviceId)}/ring`, { ring }),
 };
 
 /** 資產 JSON 下載網址(同網域,瀏覽器以 Cookie 驗證;BFF 權限 endpoint.device.read) */
 export function inventoryJsonUrl(deviceId: string): string {
   return `${base}/devices/${encodeURIComponent(deviceId)}/inventory.json`;
 }
+
+// ---------- Agent 版本與發佈環(RustIt P6) ----------
+
+export const RELEASE_COMPONENT_LABELS: Record<EndpointReleaseComponent, string> = { agent: 'Agent', watchdog: 'Watchdog' };
+export const RELEASE_STATUS_LABELS: Record<EndpointReleaseStatus, string> = { draft: '草稿', published: '已發佈', revoked: '已撤回' };
+export const RELEASE_STATUS_TONES: Record<EndpointReleaseStatus, 'neutral' | 'success' | 'danger'> = { draft: 'neutral', published: 'success', revoked: 'danger' };
+export const RING_LABELS: Record<EndpointRing, string> = { pilot: 'pilot(IT 測試機)', it: 'it(IT 部門)', all: 'all(全公司)' };
+export const RING_SHORT: Record<EndpointRing, string> = { pilot: 'pilot', it: 'it', all: 'all' };
+
+export const UPGRADE_STATE_LABELS: Record<EndpointUpgradeState, string> = {
+  pending: '等待開始',
+  downloading: '下載中',
+  verifying: '驗證中',
+  installing: '安裝中',
+  succeeded: '已升級',
+  failed: '失敗',
+  rolled_back: '已還原',
+};
+export const UPGRADE_STATE_TONES: Record<EndpointUpgradeState, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
+  pending: 'neutral',
+  downloading: 'info',
+  verifying: 'info',
+  installing: 'info',
+  succeeded: 'success',
+  failed: 'danger',
+  rolled_back: 'warning',
+};
+
+/** 升級錯誤代碼說明(RustIt docs/contracts/event.schema.json UpgradeErrorCode) */
+export const UPGRADE_ERROR_LABELS: Record<string, string> = {
+  DOWNLOAD_FAILED: '下載失敗',
+  HASH_MISMATCH: 'SHA-256 或版本不符',
+  SIGNATURE_INVALID: '簽章無效或未簽章',
+  SIGNER_NOT_TRUSTED: '簽章者不受信任',
+  PREPARE_TIMEOUT: 'Agent 收尾逾時',
+  STOP_TIMEOUT: '停止服務逾時',
+  REPLACE_FAILED: '替換檔案失敗',
+  HEALTH_CHECK_FAILED: '新版啟動後不正常(已還原)',
+  ROLLBACK_FAILED: '還原失敗',
+  DISK_FULL: '磁碟空間不足',
+};
+export const upgradeErrorLabel = (code: string | null) => (code ? (UPGRADE_ERROR_LABELS[code] ?? code) : '');
+
+/** 版本號由小到大比較(核心 x.y.z;預發行字尾較小),選單排序用 */
+export function compareVersion(a: string, b: string): number {
+  const core = (v: string) => (v.split('-')[0] ?? '').split('.').map((n) => Number(n) || 0);
+  const [x, y] = [core(a), core(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
+  const [pa, pb] = [a.includes('-'), b.includes('-')];
+  return pa === pb ? a.localeCompare(b) : pa ? -1 : 1;
+}
+
+export const releaseApi = {
+  list: (query: { component?: EndpointReleaseComponent; status?: EndpointReleaseStatus } = {}) => http.get<{ items: EndpointRelease[] }>(`${base}/releases`, { query }),
+  /** 版本檔目錄中尚未登錄的檔案(簽章人員放進目錄後才會出現) */
+  files: () => http.get<{ items: EndpointReleaseFile[] }>(`${base}/releases/files`),
+  register: (body: { component: EndpointReleaseComponent; version: string; fileName: string; signerThumbprints: string[]; notes?: string }) =>
+    http.post<EndpointRelease>(`${base}/releases`, body),
+  // 後端 schema 不接受沒有 body 的 JSON POST:一律帶 {}
+  publish: (releaseId: string) => http.post<EndpointRelease>(`${base}/releases/${encodeURIComponent(releaseId)}/publish`, {}),
+  revoke: (releaseId: string) => http.post<EndpointRelease>(`${base}/releases/${encodeURIComponent(releaseId)}/revoke`, {}),
+  rings: () => http.get<{ items: EndpointRingTarget[] }>(`${base}/release-rings`),
+  /** targetVersion = null:不升級;pilot 未滿 24 小時就設 it / all 回 409 ITA_RING_TOO_EARLY,確認後帶 force */
+  setRing: (ring: EndpointRing, component: EndpointReleaseComponent, targetVersion: string | null, force = false) =>
+    http.put<EndpointRingTarget>(`${base}/release-rings/${ring}/${component}`, { targetVersion, force }),
+};

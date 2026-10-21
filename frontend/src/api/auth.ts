@@ -75,6 +75,9 @@ export const UI = {
   /** 告警(RustIt P5):清單 Tab、關閉告警按鈕 */
   alertList: 'it.endpoint-alert.list',
   alertResolve: 'it.endpoint-alert.resolve',
+  /** Agent 版本(RustIt P6):清單 Tab、登錄 / 發佈 / 撤回 / 設定發佈環目標版本按鈕 */
+  releaseList: 'it.endpoint-release.list',
+  releaseManage: 'it.endpoint-release.manage',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
   userRevoke: 'it.sys-user.revoke',
@@ -148,6 +151,8 @@ export const EP = {
   commandBasic: 'endpoint.command.basic',
   /** 管理等級(RustIt P3 起:裝置停用 / 啟用 / 退役、合併;指令類型在 P6) */
   commandAdmin: 'endpoint.command.admin',
+  /** 版本登錄、發佈、撤回、設定發佈環目標版本(RustIt P6;主機另要求可管理所有公司) */
+  softwareManage: 'endpoint.software.manage',
 } as const;
 
 const kit = kitUseAuth();
