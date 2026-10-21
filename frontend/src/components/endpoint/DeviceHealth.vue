@@ -5,6 +5,7 @@
  *   - 24 小時走勢:GET /api/endpoint/devices/{id}/health(5 分鐘分桶;Agent 0.5.0 以前沒有健康資料)
  *   - Agent:版本、上次啟動原因不在詳情 API(看事件 Tab)、憑證到期日、時鐘偏差
  *   - Watchdog(P5-2):最近回報、Agent 服務狀態 / 啟動類型、24 小時非正常重啟
+ *   - 版本與升級(RustIt P6,DeviceUpgrade):所屬環、各元件目前 / 目標版本與升級狀態、立即升級
  *   - 此台未結束的告警,可關閉(按鈕 it.endpoint-alert.resolve ∧ endpoint.command.basic)
  * 端點回報的字串一律以文字顯示。
  */
@@ -16,6 +17,7 @@ import { describeError } from '@/api/http';
 import type { EndpointAlert, EndpointDeviceDetail } from '@/api/types';
 import { useAsync } from '@/composables/useAsync';
 import AlertResolve from './AlertResolve.vue';
+import DeviceUpgrade from './DeviceUpgrade.vue';
 
 const props = defineProps<{ device: EndpointDeviceDetail }>();
 const emit = defineEmits<{ changed: [] }>();
@@ -149,6 +151,8 @@ function onResolved() {
         </dl>
       </GCard>
     </div>
+
+    <DeviceUpgrade :device="device" @changed="emit('changed')" />
 
     <GCard title="24 小時走勢" icon="activity" padding="sm" :subtitle="points.length ? '5 分鐘平均(磁碟取最低)' : ''">
       <GSkeleton v-if="trend.loading.value && !trend.data.value" :lines="4" />

@@ -202,6 +202,7 @@ const routes: RouteRecordRaw[] = [
             { label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList },
             { label: '指令紀錄', to: '/endpoint/devices/commands', icon: 'list', permission: UI.cmdList },
             { label: '告警', to: '/endpoint/devices/alerts', icon: 'bell', permission: UI.alertList },
+            { label: 'Agent 版本', to: '/endpoint/devices/releases', icon: 'package', permission: UI.releaseList },
           ],
         },
         children: [
@@ -211,6 +212,11 @@ const routes: RouteRecordRaw[] = [
             path: 'alerts',
             component: () => import('./pages/endpoint/Alerts.vue'),
             meta: { tab: '告警', permission: UI.alertList, requires: [EP.deviceRead] },
+          },
+          {
+            path: 'releases',
+            component: () => import('./pages/endpoint/Releases.vue'),
+            meta: { tab: 'Agent 版本', permission: UI.releaseList, requires: [EP.deviceRead] },
           },
         ],
       },
