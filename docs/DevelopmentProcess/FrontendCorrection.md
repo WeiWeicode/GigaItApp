@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-22 軟體派送畫面(RustIt P7-5)
+- 內容:「電腦清單」新增第 5 個 Tab「軟體派送」:待核可批次(核可 / 駁回 / 檢視)、軟體目錄(清單、登錄、修改、標記測試完成、發佈、撤回、詳情含覆核內容與 pilot 測試機結果)、派送對話框(單台走 admin-commands、多台走 /software/{id}/deploy,`ignorePower`)。電腦詳情「指令」Tab 新增「管理指令」:派送軟體、重新開機(`delay_sec`、`message`、`force` 二次確認)、取消重新開機;指令結果顯示軟體安裝 / 重開機結果,`CommandView.batchState` 待核可徽章(電腦指令 Tab、指令紀錄 Tab、結果元件)。軟體批次核可走 `/batches/{id}/approve|reject`(endpoint.software.manage),非軟體批次走 `/approve-command|/reject-command`(endpoint.command.admin);核可人不得是建立人(建立人只能撤回)。待核可清單使用 RustIt 新增的 `GET /batches?state=pending_approval`(需求方 2026-10-22 同意跨 repo 修改,RustIt 分支 `feature/p7-5-batch-list`)。新節點 `it.endpoint-software.list|manage|deploy|approve`、`it.endpoint-device.reboot`(`deploy/gateway-rbac.yaml`,it-admin 擁有)。
+- 檔案:`frontend/src/pages/endpoint/Software.vue`、`frontend/src/components/endpoint/{SoftwareRegister,SoftwareDetail,SoftwareDeploy,BatchApprovals}.vue`、`frontend/src/pages/endpoint/{DeviceCommands,Commands}.vue`、`frontend/src/components/endpoint/CommandResult.vue`、`frontend/src/api/{endpoint,types,auth}.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/PRD.md`(FR-8.8)、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`
+- 驗證:`npm run typecheck` 通過;瀏覽器驗證見下方補記。
+
 ## 2026-10-19 人員明細:本機帳號建立 / 重置密碼
 - 內容:需求方要求 it-admin 可在「人員與部門 › 人員」為人員建立本機帳號或重置密碼(禾迅等無 AD 網域公司;配合 giga-api-gateway-bff 同日「reset-password 擴充為建立帳號 / 重置密碼」)。明細對話框新增按鈕(AD 帳號不顯示;已有啟用 / 鎖定的本機帳號顯示「重置密碼」,否則「建立帳號」),對話框可指定密碼(留空由系統產生);完成後顯示寄送對象,沒寄出(或非正式區)才顯示明文。新按鈕權限 `it.sys-user.password`(includes `gw.admin.local.write`,`deploy/gateway-rbac.yaml`,it-admin 擁有);`LOCAL` 狀態對照改為 BFF 實際值(`pending_approval` / `pending_verify`)
 - 檔案:`frontend/src/pages/system/Users.vue`、`frontend/src/api/admin.ts`、`frontend/src/api/auth.ts`、`deploy/gateway-rbac.yaml`

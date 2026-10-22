@@ -84,6 +84,14 @@ permissions:
   #   管理按鈕綁 endpoint.software.manage:主機另要求「可管理所有公司」的角色(環是全公司共用,P6-UPGRADE-DESIGN §9-5),只授予 IT 管理員
   - { code: it.endpoint-release.list, name: Agent 版本, kind: tab, parent: it.endpoint-device.read, sort: 40, includes: [endpoint.device.read] }
   - { code: it.endpoint-release.manage, name: 版本與發佈環管理, kind: button, parent: it.endpoint-release.list, sort: 10, includes: [endpoint.software.manage] }
+  # 軟體派送(RustIt P7:軟體目錄、派送、第二人核可、重新開機;ItAgentBack OpenAPI v56 起發佈,endpoint.software.* / endpoint.command.admin 已存在)。
+  #   目錄管理與核可軟體批次綁 endpoint.software.manage(主機另要求可管理所有公司的角色,登錄 / 發佈 / 撤回);派送與重新開機綁 endpoint.command.admin。
+  #   核可非軟體批次(system.reboot)走 /approve-command,權限 endpoint.command.admin,隨「重新開機」節點授予。核可人不得是建立人(主機檢查)
+  - { code: it.endpoint-software.list, name: 軟體派送, kind: tab, parent: it.endpoint-device.read, sort: 50, includes: [endpoint.device.read] }
+  - { code: it.endpoint-software.manage, name: 軟體目錄管理(登錄、修改、測試完成、發佈、撤回), kind: button, parent: it.endpoint-software.list, sort: 10, includes: [endpoint.software.manage] }
+  - { code: it.endpoint-software.deploy, name: 派送軟體(安裝、移除), kind: button, parent: it.endpoint-software.list, sort: 20, includes: [endpoint.command.admin] }
+  - { code: it.endpoint-software.approve, name: 核可 / 駁回軟體派送批次, kind: button, parent: it.endpoint-software.list, sort: 30, includes: [endpoint.software.manage] }
+  - { code: it.endpoint-device.reboot, name: 重新開機與核可重開機批次, kind: button, parent: it.endpoint-device.list, sort: 30, includes: [endpoint.command.admin] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
   - { code: it.sys-user.revoke, name: 強制登出, kind: button, parent: it.sys-user.users, sort: 20, includes: [gw.admin.user.write] }
@@ -159,6 +167,11 @@ roles:
       - it.endpoint-alert.resolve
       - it.endpoint-release.list
       - it.endpoint-release.manage
+      - it.endpoint-software.list
+      - it.endpoint-software.manage
+      - it.endpoint-software.deploy
+      - it.endpoint-software.approve
+      - it.endpoint-device.reboot
       - it.sys-user.users
       - it.sys-user.roles
       - it.sys-user.revoke

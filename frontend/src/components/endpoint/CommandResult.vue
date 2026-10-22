@@ -57,7 +57,10 @@ const timeline = computed(() =>
       <span class="faint small">{{ c.createdBy.name ?? c.createdBy.emp }}({{ c.createdBy.emp }})· {{ fmtTime(c.createdAt) }}</span>
     </div>
 
-    <p v-if="c.state === 'queued'" class="small muted" style="margin: 0">電腦連線後送出;{{ fmtTime(c.expiresAt) }} 前未送達即過期,不會執行。</p>
+    <p v-if="c.batchState === 'pending_approval'" class="small" style="margin: 0">
+      <GBadge tone="warning">待核可</GBadge> 此指令所屬批次需要另一位 IT 核可後才會送出(24 小時內未核可會自動取消)。
+    </p>
+    <p v-else-if="c.state === 'queued'" class="small muted" style="margin: 0">電腦連線後送出;{{ fmtTime(c.expiresAt) }} 前未送達即過期,不會執行。</p>
     <p v-else-if="c.state === 'expired'" class="small muted" style="margin: 0">電腦在有效期限內沒有連線,指令未執行。</p>
 
     <div v-if="c.state === 'failed'" class="small">
@@ -123,6 +126,28 @@ const timeline = computed(() =>
       </p>
       <p v-else-if="c.kind === 'message.show'" class="small" style="margin: 0">已顯示在電腦主控台的使用者畫面(工作階段 {{ text(r.session_id) }})</p>
       <p v-else-if="c.kind === 'agent.restart'" class="small" style="margin: 0">Agent 已於 {{ fmtTime(text(r.restarted_at)) }} 重新啟動</p>
+      <!-- 軟體派送(RustIt P7):結束代碼、簽章者、偵測結果;log_tail 來自安裝程式記錄(已遮罩),以文字顯示 -->
+      <template v-else-if="c.kind === 'software.install' || c.kind === 'software.uninstall'">
+        <p class="small" style="margin: 0">
+          <template v-if="r.already_installed">已經安裝,未重複執行。</template>
+          <template v-else-if="r.already_absent">本來就沒有安裝,未執行移除。</template>
+          <template v-else>{{ c.kind === 'software.install' ? '安裝' : '移除' }}完成,結束代碼 {{ text(r.exit_code) }},耗時 {{ Math.round(Number(r.duration_ms ?? 0) / 1000) }} 秒。</template>
+          <GBadge v-if="r.reboot_required" tone="warning">需要重新開機</GBadge>
+          <GBadge v-if="r.detected === true" tone="success">偵測到已安裝</GBadge>
+        </p>
+        <p v-if="r.signer" class="faint small" style="margin: 0">
+          簽章者 <span class="mono">{{ text(r.signer) }}</span>
+          <template v-if="r.signer_subject">({{ text(r.signer_subject) }})</template>
+        </p>
+        <pre v-if="r.log_tail && !compact" class="small mono result-raw">{{ text(r.log_tail) }}</pre>
+      </template>
+      <p v-else-if="c.kind === 'system.reboot'" class="small" style="margin: 0">
+        <template v-if="r.rebooted">電腦已重新開機({{ fmtTime(text(r.recovered_at)) }} 確認)。</template>
+        <template v-else
+          >已排程於 {{ text(r.delay_sec) }} 秒後重新開機{{ r.force ? '(強制關閉應用程式)' : '' }}{{ r.notified ? ',已通知使用者' : ',未顯示通知(沒有登入者或不倒數)' }}。</template
+        >
+      </p>
+      <p v-else-if="c.kind === 'system.reboot.cancel'" class="small" style="margin: 0">{{ r.aborted ? '已取消重新開機倒數。' : '沒有進行中的倒數,未取消。' }}</p>
       <pre v-else class="small mono result-raw">{{ JSON.stringify(r, null, 2) }}</pre>
     </template>
 

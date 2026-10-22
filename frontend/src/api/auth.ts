@@ -78,6 +78,12 @@ export const UI = {
   /** Agent 版本(RustIt P6):清單 Tab、登錄 / 發佈 / 撤回 / 設定發佈環目標版本按鈕 */
   releaseList: 'it.endpoint-release.list',
   releaseManage: 'it.endpoint-release.manage',
+  /** 軟體派送(RustIt P7):清單 Tab;目錄管理(登錄 / 修改 / 測試完成 / 發佈 / 撤回)、派送、核可軟體批次、重新開機與核可非軟體批次 */
+  swList: 'it.endpoint-software.list',
+  swManage: 'it.endpoint-software.manage',
+  swDeploy: 'it.endpoint-software.deploy',
+  swApprove: 'it.endpoint-software.approve',
+  devReboot: 'it.endpoint-device.reboot',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
   userRevoke: 'it.sys-user.revoke',
