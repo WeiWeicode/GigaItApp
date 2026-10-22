@@ -13,7 +13,7 @@
  *   關閉告警 POST /alerts/{id}/resolve(endpoint.command.basic)。告警的 detail 來自端點回報,一律以文字顯示。
  */
 import { fmtTime, fromNow } from '@/api/format';
-import { http, type Query } from '@/api/http';
+import { ApiError, describeError, http, type Query } from '@/api/http';
 import type {
   EndpointCommand,
   EndpointCommandKind,
@@ -22,6 +22,14 @@ import type {
   EndpointAlert,
   EndpointAlertPage,
   EndpointAlertRule,
+  EndpointBatch,
+  EndpointBatchPage,
+  EndpointBatchState,
+  EndpointDeployResult,
+  EndpointSoftware,
+  EndpointSoftwareDetail,
+  EndpointSoftwareFile,
+  EndpointSoftwareStatus,
   EndpointDeviceEventPage,
   EndpointDevicePage,
   EndpointDeviceUpgrade,
@@ -45,6 +53,10 @@ export const KIND_LABELS: Record<EndpointCommandKind, string> = {
   'message.show': '傳送訊息',
   'agent.restart': '重新啟動 Agent',
   'agent.upgrade': '立即升級',
+  'software.install': '安裝軟體',
+  'software.uninstall': '移除軟體',
+  'system.reboot': '重新開機',
+  'system.reboot.cancel': '取消重新開機',
 };
 
 export const STATE_LABELS: Record<EndpointCommandState, string> = {
@@ -80,6 +92,26 @@ export const ERROR_LABELS: Record<string, string> = {
   NO_LOGS: '指定天數內沒有日誌',
   UPLOAD_FAILED: '日誌上傳失敗',
   EXECUTION_FAILED: '執行失敗',
+  // 軟體派送與重新開機(RustIt P7,command-kinds.md)
+  DOWNLOAD_FAILED: '安裝檔下載失敗',
+  HASH_MISMATCH: '安裝檔 SHA-256 不符,未安裝',
+  SIGNATURE_INVALID: '安裝檔簽章無效或未簽章,未安裝',
+  SIGNER_NOT_TRUSTED: '簽章者不在這台電腦的信任清單,未安裝',
+  DISK_FULL: '磁碟空間不足',
+  INSTALL_FAILED: '安裝 / 移除程式回報失敗(看結束代碼)',
+  INSTALL_TIMEOUT: '安裝逾時,已結束安裝程式',
+  INSTALL_BUSY: '另一個安裝進行中(1618),重試後仍失敗',
+  DETECT_FAILED: '結束代碼成功,但偵測結果與預期不符',
+  UNINSTALL_NOT_SUPPORTED: '找不到可用的移除方式,或此軟體不允許移除',
+  DEFERRED_TIMEOUT: '電池 / 計量網路延後下載超過上限',
+  REBOOT_LIMITED: '超過這台電腦的重新開機上限(開機未滿 30 分鐘、24 小時內 3 次,或有人登入時倒數少於 60 秒)',
+  REBOOT_PENDING: '電腦重新開機倒數中,未執行',
+  AGENT_UPGRADING: 'Agent 升級中,未執行',
+  PACKAGE_REVOKED: '套件已撤回,指令取消',
+  PACKAGE_CHANGED: '套件內容已修改,指令取消',
+  PACKAGE_FILE_CHANGED: '軟體庫安裝檔被換掉,指令取消',
+  BATCH_REJECTED: '批次被駁回,指令取消',
+  APPROVAL_EXPIRED: '批次 24 小時無人核可,指令取消',
 };
 
 export const isFinal = (s: EndpointCommandState) => !['queued', 'sent', 'acked', 'running'].includes(s);
@@ -358,4 +390,101 @@ export const releaseApi = {
   /** targetVersion = null:不升級;pilot 未滿 24 小時就設 it / all 回 409 ITA_RING_TOO_EARLY,確認後帶 force */
   setRing: (ring: EndpointRing, component: EndpointReleaseComponent, targetVersion: string | null, force = false) =>
     http.put<EndpointRingTarget>(`${base}/release-rings/${ring}/${component}`, { targetVersion, force }),
+};
+
+/** 管理 API 錯誤代碼說明(軟體派送;錯誤提示補充用,describeError 之外的人話) */
+export const SOFTWARE_API_ERRORS: Record<string, string> = {
+  ITA_PACKAGE_NOT_PUBLISHED: '此套件尚未發佈,只能派送到 pilot 環的測試機',
+  ITA_PACKAGE_REVOKED: '此套件已撤回,不能再安裝',
+  ITA_PACKAGE_NOT_FOUND: '找不到此套件',
+  ITA_PACKAGE_EXISTS: '同名同版本或同一檔案已登錄過',
+  ITA_PACKAGE_NOT_TESTED: '還沒有 pilot 測試機以目前的檔案與參數安裝成功的紀錄',
+  ITA_SIGNER_NOT_OBSERVED: '簽章者必須是測試機回報的實際簽章者',
+  ITA_LICENSE_EXCEEDED: '超過授權數',
+  ITA_APPROVER_SAME_AS_CREATOR: '核可人不可是批次建立人,請由另一位 IT 核可',
+  ITA_APPROVAL_ROUTE_MISMATCH: '批次類型與核可路徑不符',
+  ITA_BATCH_NOT_PENDING: '批次不是待核可,或已超過 24 小時核可期限',
+  ITA_REVIEWER_SAME_AS_CREATOR: '發佈人不可是登錄人,請由另一位 IT 發佈',
+  ITA_REVIEWER_SAME_AS_EDITOR: '發佈人不可是上次發佈以來修改過安裝參數的人',
+  ITA_REVIEWER_NOT_PERSON: '發佈者需要有工號',
+  ITA_SCOPE_ALL_REQUIRED: '需要可管理所有公司的角色',
+  ITA_COMMAND_LIMIT: '這台電腦同類型的未結束指令已達上限',
+};
+
+/** 錯誤訊息:已知的管理 API 錯誤代碼補人話,其餘用 describeError */
+export function softwareErrorText(e: unknown): string {
+  const known = e instanceof ApiError ? SOFTWARE_API_ERRORS[e.code] : undefined;
+  return known ? `${known}(${describeError(e)})` : describeError(e);
+}
+
+// ---------- 軟體派送(RustIt P7) ----------
+
+export const SOFTWARE_STATUS_LABELS: Record<EndpointSoftwareStatus, string> = { draft: '草稿', tested: '已測試', published: '已發佈', revoked: '已撤回' };
+export const SOFTWARE_STATUS_TONES: Record<EndpointSoftwareStatus, 'neutral' | 'info' | 'success' | 'danger'> = {
+  draft: 'neutral',
+  tested: 'info',
+  published: 'success',
+  revoked: 'danger',
+};
+export const INSTALLER_LABELS: Record<string, string> = { msi: 'MSI', inno: 'Inno Setup', nsis: 'NSIS', burn: 'WiX Burn', exe: '其他 exe(參數完全自訂)' };
+export const DETECT_LABELS: Record<string, string> = { msi_product_code: 'MSI 產品代碼', display_name: '登錄檔顯示名稱(% 為萬用字元)' };
+export const REBOOT_POLICY_LABELS: Record<string, string> = { never: '不需要(3010 只標記)', required: '安裝後需要重新開機' };
+export const BATCH_STATE_LABELS: Record<EndpointBatchState, string> = {
+  pending_approval: '待核可',
+  running: '進行中',
+  done: '已完成',
+  rejected: '已駁回',
+  expired: '逾期未核可',
+};
+export const BATCH_STATE_TONES: Record<EndpointBatchState, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
+  pending_approval: 'warning',
+  running: 'info',
+  done: 'success',
+  rejected: 'danger',
+  expired: 'neutral',
+};
+
+/** 軟體派送批次走 /approve、/reject(endpoint.software.manage);其他批次(system.reboot)走 -command(endpoint.command.admin) */
+export const isSoftwareBatchKind = (kind: string) => kind === 'software.install' || kind === 'software.uninstall';
+
+export interface SoftwareBody {
+  name: string;
+  version: string;
+  fileName: string;
+  installerType: string;
+  installArgs?: string;
+  uninstallArgs?: string;
+  detectType: string;
+  detectValue: string;
+  rebootPolicy: string;
+  licenseLimit: number | null;
+  notes?: string;
+}
+
+export const softwareApi = {
+  list: (query: { status?: EndpointSoftwareStatus; q?: string } = {}) => http.get<{ items: EndpointSoftware[] }>(`${base}/software`, { query }),
+  /** 軟體庫中尚未登錄的安裝檔(endpoint.software.manage) */
+  files: () => http.get<{ items: EndpointSoftwareFile[] }>(`${base}/software/files`),
+  get: (packageId: string) => http.get<EndpointSoftwareDetail>(`${base}/software/${encodeURIComponent(packageId)}`),
+  register: (body: SoftwareBody) => http.post<EndpointSoftware>(`${base}/software`, body),
+  update: (packageId: string, body: Partial<Pick<SoftwareBody, 'installArgs' | 'uninstallArgs' | 'detectType' | 'detectValue' | 'rebootPolicy' | 'licenseLimit' | 'notes'>>) =>
+    http.put<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}`, body),
+  markTested: (packageId: string, signerThumbprints: string[]) =>
+    http.post<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}/mark-tested`, { signerThumbprints }),
+  // 後端 schema 不接受沒有 body 的 JSON POST:一律帶 {}
+  publish: (packageId: string) => http.post<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}/publish`, {}),
+  revoke: (packageId: string) => http.post<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}/revoke`, {}),
+  /** 多台批次派送(endpoint.command.admin);> 20 台進入待核可。同一個 Idempotency-Key 重送回傳同一批 */
+  deploy: (packageId: string, body: { action: 'install' | 'uninstall'; deviceIds: string[]; ignorePower?: boolean }, idempotencyKey?: string) =>
+    http.post<EndpointDeployResult>(`${base}/software/${encodeURIComponent(packageId)}/deploy`, body, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+};
+
+export const batchApi = {
+  /** 批次清單(新到舊;RustIt P7-5 補);待核可清單用 state=pending_approval */
+  list: (query: { state?: EndpointBatchState; cursor?: string; limit?: number } = {}) => http.get<EndpointBatchPage>(`${base}/batches`, { query }),
+  get: (batchId: string) => http.get<EndpointBatch>(`${base}/batches/${encodeURIComponent(batchId)}`),
+  approve: (batch: Pick<EndpointBatch, 'batchId' | 'kind'>) =>
+    http.post<EndpointBatch>(`${base}/batches/${encodeURIComponent(batch.batchId)}/approve${isSoftwareBatchKind(batch.kind) ? '' : '-command'}`, {}),
+  reject: (batch: Pick<EndpointBatch, 'batchId' | 'kind'>, reason: string) =>
+    http.post<EndpointBatch>(`${base}/batches/${encodeURIComponent(batch.batchId)}/reject${isSoftwareBatchKind(batch.kind) ? '' : '-command'}`, { reason }),
 };

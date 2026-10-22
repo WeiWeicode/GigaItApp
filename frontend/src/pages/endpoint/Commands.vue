@@ -95,7 +95,8 @@ const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
           >
           <template #cell-kind="{ row }">{{ kindLabel(row.kind) }}</template>
           <template #cell-state="{ row }"
-            ><GBadge :tone="STATE_TONES[row.state as keyof typeof STATE_TONES]" dot>{{ STATE_LABELS[row.state as keyof typeof STATE_LABELS] }}</GBadge></template
+            ><GBadge :tone="STATE_TONES[row.state as keyof typeof STATE_TONES]" dot>{{ STATE_LABELS[row.state as keyof typeof STATE_LABELS] }}</GBadge>
+            <GBadge v-if="row.batchState === 'pending_approval'" tone="warning">待核可</GBadge></template
           >
           <template #cell-createdBy="{ row }"
             ><span class="small">{{ row.createdBy.name ?? row.createdBy.emp }}</span></template

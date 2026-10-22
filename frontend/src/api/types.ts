@@ -301,7 +301,18 @@ export interface EndpointDeviceEventPage {
   nextCursor: string | null;
 }
 /** 端點指令類型(RustIt docs/contracts/command-kinds.md;目前只開放 basic) */
-export type EndpointCommandKind = 'inventory.collect' | 'agent.diagnose' | 'logs.collect' | 'agent.log_level' | 'message.show' | 'agent.restart' | 'agent.upgrade';
+export type EndpointCommandKind =
+  | 'inventory.collect'
+  | 'agent.diagnose'
+  | 'logs.collect'
+  | 'agent.log_level'
+  | 'message.show'
+  | 'agent.restart'
+  | 'agent.upgrade'
+  | 'software.install'
+  | 'software.uninstall'
+  | 'system.reboot'
+  | 'system.reboot.cancel';
 export type EndpointCommandState = 'queued' | 'sent' | 'acked' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'expired';
 
 /** 指令附檔(logs.collect 的日誌 zip;保存 14 天) */
@@ -319,6 +330,8 @@ export interface EndpointCommandFile {
 export interface EndpointCommand {
   commandId: string;
   batchId: string | null;
+  /** 所屬批次狀態(RustIt P7);待核可的單台批次(同一人 24 小時累計超過門檻)也會是 pending_approval */
+  batchState?: EndpointBatchState | null;
   deviceId: string;
   computerName: string;
   kind: EndpointCommandKind | string;
@@ -345,5 +358,110 @@ export interface EndpointCommand {
 /** 指令清單(新到舊;nextCursor 為下一頁游標) */
 export interface EndpointCommandPage {
   items: EndpointCommand[];
+  nextCursor: string | null;
+}
+
+// ---------- 軟體派送(RustIt P7;P7-SOFTWARE-DESIGN §3.5) ----------
+
+export type EndpointSoftwareStatus = 'draft' | 'tested' | 'published' | 'revoked';
+export type EndpointInstallerType = 'msi' | 'inno' | 'nsis' | 'burn' | 'exe';
+export type EndpointDetectType = 'msi_product_code' | 'display_name';
+export type EndpointRebootPolicy = 'never' | 'required';
+export type EndpointBatchState = 'pending_approval' | 'running' | 'done' | 'rejected' | 'expired';
+
+export interface EndpointSoftware {
+  packageId: string;
+  name: string;
+  version: string;
+  /** 軟體庫內相對路徑 {軟體}/{版本}/{檔名} */
+  fileName: string;
+  sha256: string;
+  sizeBytes: number;
+  installerType: EndpointInstallerType;
+  installArgs: string | null;
+  uninstallArgs: string | null;
+  detectType: EndpointDetectType;
+  detectValue: string;
+  rebootPolicy: EndpointRebootPolicy;
+  signerThumbprints: string[];
+  observedSigners: string[];
+  licenseLimit: number | null;
+  /** 資料範圍內已安裝台數;只有已發佈套件才算,MSI 產品代碼無法計算為 null */
+  installedCount: number | null;
+  status: EndpointSoftwareStatus;
+  notes: string | null;
+  createdBy: { emp: string; name: string | null };
+  createdAt: string;
+  updatedByEmp: string | null;
+  updatedAt: string | null;
+  testedByEmp: string | null;
+  testedAt: string | null;
+  publishedBy: { emp: string; name: string | null } | null;
+  publishedAt: string | null;
+  revokedByEmp: string | null;
+  revokedAt: string | null;
+  /** 撤回時尚未送出而取消的安裝指令數(只有 revoke 回應有) */
+  canceledCommands?: number;
+}
+
+export interface EndpointSoftwareFile {
+  fileName: string;
+  software: string;
+  version: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface EndpointSoftwareTestResult {
+  commandId: string;
+  deviceId: string;
+  computerName: string;
+  state: string;
+  errorCode: string | null;
+  exitCode: number | null;
+  signer: string | null;
+  signerSubject: string | null;
+  detected: boolean | null;
+  /** 可作為 mark-tested 的依據 */
+  qualifies: boolean;
+  createdByEmp: string;
+  finishedAt: string | null;
+}
+
+export interface EndpointSoftwareDetail extends EndpointSoftware {
+  testResults: EndpointSoftwareTestResult[];
+  installedDevices: { deviceId: string; computerName: string; name: string; version: string | null }[];
+}
+
+export interface EndpointDeployResult {
+  batchId: string;
+  state: EndpointBatchState;
+  requiresApproval: boolean;
+  commands: { deviceId: string; commandId: string; state: string }[];
+}
+
+/** 指令批次(GET /batches、/batches/{id};params 為建立批次時的參數) */
+export interface EndpointBatch {
+  batchId: string;
+  kind: string;
+  level: string;
+  params: Record<string, unknown>;
+  targetCount: number;
+  maxConcurrent: number;
+  state: EndpointBatchState;
+  requiresApproval: boolean;
+  approvalExpiresAt: string | null;
+  approvedBy: { emp: string; name: string | null } | null;
+  approvedAt: string | null;
+  rejectedBy: { emp: string; name: string | null } | null;
+  rejectedAt: string | null;
+  rejectReason: string | null;
+  createdBy: { emp: string; name: string | null };
+  createdAt: string;
+  counts: Record<string, number>;
+}
+
+export interface EndpointBatchPage {
+  items: EndpointBatch[];
   nextCursor: string | null;
 }
