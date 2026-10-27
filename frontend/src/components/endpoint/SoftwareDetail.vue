@@ -18,6 +18,7 @@ import {
   SOFTWARE_STATUS_TONES,
   softwareApi,
   softwareErrorText,
+  softwareTimeoutError,
 } from '@/api/endpoint';
 import { fmtBytes, fmtTime, fromNow } from '@/api/format';
 import { describeError } from '@/api/http';
@@ -48,10 +49,26 @@ watch(
 
 const who = (w: { emp: string; name: string | null } | null | undefined) => (w ? `${w.name ?? w.emp}(${w.emp})` : '—');
 const isCreator = computed(() => !!d.value && d.value.createdBy.emp.toUpperCase() === me.value);
+// 軟體目錄是全公司共用:發佈需可管理所有公司的角色(it-admin 等,主機回 ITA_SCOPE_ALL_REQUIRED);舊版主機沒有此欄位時不擋(P7 VM 驗收 B-5)
+const lacksScopeAll = computed(() => d.value?.viewerScopeAll === false);
+const SCOPE_ALL_HINT = '軟體目錄的變更需要可管理所有公司的角色(例如 it-admin)';
+const publishBlocked = computed(() =>
+  lacksScopeAll.value ? '發佈需要可管理所有公司的角色(例如 it-admin),請具備此角色的 IT 發佈。' : isCreator.value ? '登錄人不能發佈,請另一位 IT 發佈。' : null,
+);
 
 // ---------- 修改參數 ----------
 const editing = ref(false);
-const edit = reactive({ installArgs: '', uninstallArgs: '', detectType: 'display_name', detectValue: '', rebootPolicy: 'never', licenseLimit: '', notes: '' });
+const edit = reactive({
+  installArgs: '',
+  uninstallArgs: '',
+  detectType: 'display_name',
+  detectValue: '',
+  rebootPolicy: 'never',
+  timeoutSec: '',
+  licenseLimit: '',
+  notes: '',
+});
+const editTimeoutError = computed(() => softwareTimeoutError(edit.timeoutSec));
 function startEdit() {
   const x = d.value;
   if (!x) return;
@@ -61,6 +78,7 @@ function startEdit() {
     detectType: x.detectType,
     detectValue: x.detectValue,
     rebootPolicy: x.rebootPolicy,
+    timeoutSec: String(x.timeoutSec ?? 1800),
     licenseLimit: x.licenseLimit === null ? '' : String(x.licenseLimit),
     notes: x.notes ?? '',
   });
@@ -93,12 +111,15 @@ async function saveEdit() {
   if (!x) return;
   const limit = edit.licenseLimit.trim() === '' ? null : Number(edit.licenseLimit);
   if (limit !== null && !(Number.isInteger(limit) && limit >= 0)) return toast.warning('授權數請填 0 以上的整數,或留空');
+  if (editTimeoutError.value) return toast.warning(`安裝逾時${editTimeoutError.value}`);
   const body = {
     installArgs: edit.installArgs.trim(),
     uninstallArgs: edit.uninstallArgs.trim(),
     detectType: edit.detectType,
     detectValue: edit.detectValue.trim(),
     rebootPolicy: edit.rebootPolicy,
+    // 逾時不需重新覆核(不退回草稿);沒改就不送(舊主機不認得此欄位)
+    ...(Number(edit.timeoutSec) !== (x.timeoutSec ?? 1800) ? { timeoutSec: Number(edit.timeoutSec) } : {}),
     licenseLimit: limit,
     notes: edit.notes.trim(),
   };
@@ -194,6 +215,8 @@ async function revoke() {
           <dd>{{ DETECT_LABELS[d.detectType] ?? d.detectType }}:<span class="mono">{{ d.detectValue }}</span></dd>
           <dt>重新開機</dt>
           <dd>{{ REBOOT_POLICY_LABELS[d.rebootPolicy] ?? d.rebootPolicy }}</dd>
+          <dt>安裝逾時</dt>
+          <dd>{{ d.timeoutSec ?? 1800 }} 秒</dd>
           <dt>預期簽章者</dt>
           <dd>
             <template v-if="d.signerThumbprints.length"
@@ -231,10 +254,11 @@ async function revoke() {
             <GSelect v-model="edit.rebootPolicy" label="重新開機" :options="REBOOT_OPTIONS" />
             <GInput v-model="edit.licenseLimit" label="授權數(留空 = 不限)" />
           </div>
+          <GInput v-model="edit.timeoutSec" label="安裝逾時(秒)" :error="editTimeoutError" hint="300–7200;修改逾時不會退回草稿" />
           <GInput v-model="edit.notes" label="備註" />
           <div class="row" style="--gap: 8px; justify-content: flex-end">
             <GButton variant="ghost" @click="editing = false">取消</GButton>
-            <GButton variant="primary" :loading="busy === 'edit'" :disabled="!edit.detectValue.trim()" @click="saveEdit">儲存</GButton>
+            <GButton variant="primary" :loading="busy === 'edit'" :disabled="!edit.detectValue.trim() || !!editTimeoutError" @click="saveEdit">儲存</GButton>
           </div>
         </div>
       </GCard>
@@ -259,6 +283,11 @@ async function revoke() {
               row.qualifies ? '可作為依據' : row.state === 'succeeded' ? '成功(不符現行內容)' : row.state
             }}</GBadge>
             <div v-if="row.errorCode" class="faint xs">{{ ERROR_LABELS[row.errorCode] ?? row.errorCode }}</div>
+            <div v-if="row.installedVersion" class="faint xs">
+              偵測到 <span class="mono">{{ row.installedVersion }}</span
+              ><template v-if="row.previousVersion">(原 <span class="mono">{{ row.previousVersion }}</span>)</template
+              ><template v-if="row.alreadyInstalled">,已安裝未重裝</template>
+            </div>
           </template>
           <template #cell-signer="{ row }"
             ><span class="mono xs" style="overflow-wrap: anywhere">{{ row.signer ?? '—' }}</span
@@ -303,11 +332,26 @@ async function revoke() {
       </GCard>
     </div>
     <template #footer>
-      <p v-if="d && canManage && d.status === 'tested' && isCreator" class="small muted" style="margin: 0 auto 0 0">登錄人不能發佈,請另一位 IT 發佈。</p>
+      <p v-if="d && canManage && d.status === 'tested' && publishBlocked" class="small muted" style="margin: 0 auto 0 0">{{ publishBlocked }}</p>
       <GButton v-if="d && canDeploy && d.status !== 'revoked'" icon="send" @click="emit('deploy', d)">派送…</GButton>
-      <GButton v-if="d && canManage && d.status !== 'revoked'" icon="edit" :disabled="editing" @click="startEdit">修改</GButton>
-      <GButton v-if="d && canManage && d.status === 'tested'" variant="primary" icon="rocket" :loading="busy === 'publish'" :disabled="isCreator" @click="publish">發佈</GButton>
-      <GButton v-if="d && canManage && d.status !== 'revoked'" variant="danger" :loading="busy === 'revoke'" @click="revoke">撤回</GButton>
+      <GButton
+        v-if="d && canManage && d.status !== 'revoked'"
+        icon="edit"
+        :disabled="editing || lacksScopeAll"
+        :title="lacksScopeAll ? SCOPE_ALL_HINT : undefined"
+        @click="startEdit"
+        >修改</GButton
+      >
+      <GButton v-if="d && canManage && d.status === 'tested'" variant="primary" icon="rocket" :loading="busy === 'publish'" :disabled="!!publishBlocked" :title="publishBlocked ?? undefined" @click="publish">發佈</GButton>
+      <GButton
+        v-if="d && canManage && d.status !== 'revoked'"
+        variant="danger"
+        :loading="busy === 'revoke'"
+        :disabled="lacksScopeAll"
+        :title="lacksScopeAll ? SCOPE_ALL_HINT : undefined"
+        @click="revoke"
+        >撤回</GButton
+      >
       <GButton @click="open = false">關閉</GButton>
     </template>
   </GModal>

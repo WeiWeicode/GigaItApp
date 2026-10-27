@@ -457,9 +457,23 @@ export interface SoftwareBody {
   detectType: string;
   detectValue: string;
   rebootPolicy: string;
+  /** 安裝逾時(秒,300–7200;省略 = 1800) */
+  timeoutSec?: number;
   licenseLimit: number | null;
   notes?: string;
 }
+
+/** 套件安裝逾時範圍(與 RustIt ItAgentBack 相同;主機會再驗) */
+export const SOFTWARE_TIMEOUT_MIN = 300;
+export const SOFTWARE_TIMEOUT_MAX = 7200;
+export const SOFTWARE_TIMEOUT_DEFAULT = 1800;
+/** 逾時輸入的錯誤訊息;通過回 null */
+export const softwareTimeoutError = (v: string) => {
+  const n = Number(v.trim());
+  return v.trim() !== '' && Number.isInteger(n) && n >= SOFTWARE_TIMEOUT_MIN && n <= SOFTWARE_TIMEOUT_MAX
+    ? null
+    : `請填 ${SOFTWARE_TIMEOUT_MIN}–${SOFTWARE_TIMEOUT_MAX} 秒的整數`;
+};
 
 export const softwareApi = {
   list: (query: { status?: EndpointSoftwareStatus; q?: string } = {}) => http.get<{ items: EndpointSoftware[] }>(`${base}/software`, { query }),
@@ -467,7 +481,7 @@ export const softwareApi = {
   files: () => http.get<{ items: EndpointSoftwareFile[] }>(`${base}/software/files`),
   get: (packageId: string) => http.get<EndpointSoftwareDetail>(`${base}/software/${encodeURIComponent(packageId)}`),
   register: (body: SoftwareBody) => http.post<EndpointSoftware>(`${base}/software`, body),
-  update: (packageId: string, body: Partial<Pick<SoftwareBody, 'installArgs' | 'uninstallArgs' | 'detectType' | 'detectValue' | 'rebootPolicy' | 'licenseLimit' | 'notes'>>) =>
+  update: (packageId: string, body: Partial<Pick<SoftwareBody, 'installArgs' | 'uninstallArgs' | 'detectType' | 'detectValue' | 'rebootPolicy' | 'timeoutSec' | 'licenseLimit' | 'notes'>>) =>
     http.put<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}`, body),
   markTested: (packageId: string, signerThumbprints: string[]) =>
     http.post<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}/mark-tested`, { signerThumbprints }),
