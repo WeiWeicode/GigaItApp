@@ -129,10 +129,15 @@ async function submit() {
           :placeholder="files.loading.value ? '讀取中…' : options.length ? '請選擇' : '軟體庫中沒有尚未登錄的安裝檔'"
           :disabled="files.loading.value || !options.length"
         />
-        <p class="faint xs" style="margin: 0">安裝檔放進軟體庫的 {軟體}/{版本}/{檔名}(.msi 或 .exe);登錄後不得覆寫該檔案,換版本請放新資料夾。SHA-256 與大小由主機讀檔計算。</p>
+        <p class="faint xs" style="margin: 0">安裝檔放進軟體庫的 {軟體}/{版本}/{檔名}(.msi 或 .exe);登錄後不得覆寫該檔案,換版本請放新資料夾;套件撤回後,同一個檔案可重新登錄(版本號不可重用)。SHA-256 與大小由主機讀檔計算。</p>
         <div class="grid2">
           <GInput v-model="form.name" label="軟體名稱" required />
-          <GInput v-model="form.version" label="版本" required />
+          <GInput
+            v-model="form.version"
+            label="版本"
+            required
+            hint="要和安裝後電腦上「新增 / 移除程式」的版本(DisplayVersion)一致,例:7-Zip 是 26.05,不是 26.05.2.0.0;不一致會 DETECT_FAILED"
+          />
         </div>
         <div class="grid2">
           <GSelect v-model="form.installerType" label="安裝程式類型" :options="INSTALLER_OPTIONS" required />

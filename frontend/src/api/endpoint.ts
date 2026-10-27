@@ -81,6 +81,30 @@ export const STATE_TONES: Record<EndpointCommandState, 'neutral' | 'info' | 'suc
   expired: 'warning',
 };
 
+/** 軟體安裝 A6 延後原因(Agent 0.9.3 `result.deferred.reason`) */
+export const DEFER_LABELS: Record<string, string> = { battery: '電池供電', metered: '計量網路' };
+
+/** 延後中的軟體安裝(running + result.deferred);其他回 null */
+export function deferredOf(c: Pick<EndpointCommand, 'state' | 'result'>): { reason: string; nextCheckAt: string | null } | null {
+  if (c.state !== 'running') return null;
+  const d = c.result?.deferred as { reason?: unknown; next_check_at?: unknown } | undefined;
+  if (!d || typeof d !== 'object') return null;
+  const reason = typeof d.reason === 'string' ? d.reason : '';
+  return { reason: DEFER_LABELS[reason] ?? reason, nextCheckAt: typeof d.next_check_at === 'string' ? d.next_check_at : null };
+}
+
+/** 指令狀態文字:延後中的軟體安裝顯示「延後中(原因)」而不是「執行中」(P7 驗收 §5-4) */
+export function commandStateLabel(c: Pick<EndpointCommand, 'state' | 'result'>): string {
+  const d = deferredOf(c);
+  return d ? `延後中(${d.reason})` : STATE_LABELS[c.state];
+}
+export function commandStateTone(c: Pick<EndpointCommand, 'state' | 'result'>): (typeof STATE_TONES)[EndpointCommandState] {
+  return deferredOf(c) ? 'warning' : STATE_TONES[c.state];
+}
+
+/** 參數 / payload 的值:物件與陣列用 JSON 顯示(不顯示 [object Object],P7 驗收 §6) */
+export const paramText = (v: unknown): string => (v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v));
+
 /** 錯誤代碼說明(command-kinds.md) */
 export const ERROR_LABELS: Record<string, string> = {
   UNSUPPORTED_COMMAND: 'Agent 版本不支援此指令',
@@ -100,7 +124,7 @@ export const ERROR_LABELS: Record<string, string> = {
   DISK_FULL: '磁碟空間不足',
   INSTALL_FAILED: '安裝 / 移除程式回報失敗(看結束代碼)',
   INSTALL_TIMEOUT: '安裝逾時,已結束安裝程式',
-  INSTALL_BUSY: '另一個安裝進行中(1618),重試後仍失敗',
+  INSTALL_BUSY: 'Windows Installer 仍在執行(等待後未啟動安裝,或 1618 重試後仍失敗)',
   DETECT_FAILED: '結束代碼成功,但偵測結果與預期不符',
   UNINSTALL_NOT_SUPPORTED: '找不到可用的移除方式,或此軟體不允許移除',
   DEFERRED_TIMEOUT: '電池 / 計量網路延後下載超過上限',

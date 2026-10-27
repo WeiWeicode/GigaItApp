@@ -6,7 +6,7 @@
  * 端點事件的時間是端點上的發生時間(離線期間的事件連線後才補傳);內容一律以文字顯示。
  */
 import { ref, shallowRef } from 'vue';
-import { deviceApi, EVENT_LABELS, EVENT_TONES, startTypeLabel } from '@/api/endpoint';
+import { deviceApi, EVENT_LABELS, EVENT_TONES, paramText, startTypeLabel } from '@/api/endpoint';
 import { fmtBytes, fmtTime } from '@/api/format';
 import { describeError } from '@/api/http';
 import type { EndpointDeviceEvent } from '@/api/types';
@@ -55,7 +55,7 @@ const RESTART_CAUSE: Record<string, string> = { crashed: '當掉後重新啟動'
 const HW: Record<string, string> = { memory: '記憶體', disk: '磁碟', gpu: '顯示卡', bios: 'BIOS', board: '主機板', cpu: 'CPU' };
 
 type Data = Record<string, unknown>;
-const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : paramText(v));
 
 /** 端點事件的 data 摘要成一行文字(event.schema.json:offline_period、usb_*) */
 function summary(e: EndpointDeviceEvent): string {

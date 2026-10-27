@@ -4,7 +4,7 @@
  * 點列開結果(單筆查詢含日誌附檔,可下載)。權限:Tab it.endpoint-command.list ∧ BFF endpoint.device.read。
  */
 import { reactive, ref, shallowRef, watch } from 'vue';
-import { endpointApi, KIND_LABELS, STATE_LABELS, STATE_TONES } from '@/api/endpoint';
+import { commandStateLabel, commandStateTone, endpointApi, KIND_LABELS, STATE_LABELS } from '@/api/endpoint';
 import { fmtTime, fromNow } from '@/api/format';
 import { describeError } from '@/api/http';
 import type { EndpointCommand, EndpointCommandKind } from '@/api/types';
@@ -95,7 +95,7 @@ const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
           >
           <template #cell-kind="{ row }">{{ kindLabel(row.kind) }}</template>
           <template #cell-state="{ row }"
-            ><GBadge :tone="STATE_TONES[row.state as keyof typeof STATE_TONES]" dot>{{ STATE_LABELS[row.state as keyof typeof STATE_LABELS] }}</GBadge>
+            ><GBadge :tone="commandStateTone(row as EndpointCommand)" dot>{{ commandStateLabel(row as EndpointCommand) }}</GBadge>
             <GBadge v-if="row.batchState === 'pending_approval'" tone="warning">待核可</GBadge></template
           >
           <template #cell-createdBy="{ row }"

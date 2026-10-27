@@ -4,7 +4,7 @@
  * result 由 Agent 回報,一律以文字顯示(不用 v-html,RustIt P4-COMMAND-DESIGN §6.1)。
  */
 import { computed } from 'vue';
-import { commandFileUrl, ERROR_LABELS, KIND_LABELS, STATE_LABELS, STATE_TONES } from '@/api/endpoint';
+import { commandFileUrl, commandStateLabel, commandStateTone, deferredOf, ERROR_LABELS, KIND_LABELS, paramText } from '@/api/endpoint';
 import { fmtSize, fmtTime } from '@/api/format';
 import type { EndpointCommand, EndpointCommandKind } from '@/api/types';
 
@@ -29,13 +29,14 @@ const CHECK_LABELS: Record<string, string> = {
 };
 const CHECK_TONES: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = { ok: 'success', warn: 'warning', fail: 'danger', skipped: 'neutral' };
 const checks = computed(() => (Array.isArray(r.value.checks) ? (r.value.checks as Check[]) : []));
-const text = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : String(v));
+const text = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : paramText(v));
 const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
-const paramText = computed(() => {
+const paramsLine = computed(() => {
   const p = c.value.params ?? {};
   const keys = Object.keys(p);
-  return keys.length ? keys.map((k) => `${k} = ${String(p[k])}`).join(',') : '';
+  return keys.length ? keys.map((k) => `${k} = ${paramText(p[k])}`).join(',') : '';
 });
+const deferred = computed(() => deferredOf(c.value));
 const timeline = computed(() =>
   [
     ['建立', c.value.createdAt],
@@ -50,9 +51,9 @@ const timeline = computed(() =>
 <template>
   <div class="stack" style="--gap: 12px">
     <div class="row" style="--gap: 8px">
-      <GBadge :tone="STATE_TONES[c.state]" dot>{{ STATE_LABELS[c.state] }}</GBadge>
+      <GBadge :tone="commandStateTone(c)" dot>{{ commandStateLabel(c) }}</GBadge>
       <strong>{{ kindLabel(c.kind) }}</strong>
-      <span v-if="paramText" class="faint small mono">{{ paramText }}</span>
+      <span v-if="paramsLine" class="faint small mono">{{ paramsLine }}</span>
       <span class="spacer" />
       <span class="faint small">{{ c.createdBy.name ?? c.createdBy.emp }}({{ c.createdBy.emp }})· {{ fmtTime(c.createdAt) }}</span>
     </div>
@@ -62,6 +63,11 @@ const timeline = computed(() =>
     </p>
     <p v-else-if="c.state === 'queued'" class="small muted" style="margin: 0">電腦連線後送出;{{ fmtTime(c.expiresAt) }} 前未送達即過期,不會執行。</p>
     <p v-else-if="c.state === 'expired'" class="small muted" style="margin: 0">電腦在有效期限內沒有連線,指令未執行。</p>
+    <p v-else-if="deferred" class="small muted" style="margin: 0">
+      電腦目前{{ deferred.reason }},Agent 延後下載(每 5 分鐘重新檢查,最多 4 小時;計量網路不因「略過電池延後」而略過){{
+        deferred.nextCheckAt ? `;下次檢查 ${fmtTime(deferred.nextCheckAt)}` : ''
+      }}。
+    </p>
 
     <div v-if="c.state === 'failed'" class="small">
       <GBadge tone="danger" mono>{{ c.errorCode ?? 'FAILED' }}</GBadge>
@@ -142,6 +148,9 @@ const timeline = computed(() =>
           <template v-if="r.previous_version">(安裝前 <span class="mono">{{ text(r.previous_version) }}</span>)</template>
         </p>
         <p v-if="r.interrupted" class="faint small" style="margin: 0">Agent 在確認結果期間停止(服務停止或關機),請重新派送確認。</p>
+        <p v-if="r.installer_busy" class="faint small" style="margin: 0">
+          Windows Installer 仍在執行(可能是逾時的 MSI 在背景繼續);同一台的下一筆 MSI 會先等它結束(最多 15 分鐘),逾時前的變更不會回復。
+        </p>
         <p v-if="r.signer" class="faint small" style="margin: 0">
           簽章者 <span class="mono">{{ text(r.signer) }}</span>
           <template v-if="r.signer_subject">({{ text(r.signer_subject) }})</template>
