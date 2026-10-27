@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-27 軟體派送驗收後修正(RustIt Agent 0.9.3)
+- 內容:配合 RustIt `feature/p7-0.9.3`(設計 `docs/P7-SOFTWARE-DESIGN.md` §8.1.5,需求方 2026-10-27 決定)。(1)延後中:`running` 的軟體安裝帶 `result.deferred` 時,狀態顯示「延後中(電池供電 / 計量網路)」(`commandStateLabel` / `commandStateTone`,指令清單、電腦指令、指令詳情),詳情加下次檢查時間;(2)指令參數、結果、批次摘要、事件內容的物件改用 JSON 顯示(`paramText`;原本 `detect = [object Object]`);(3)登錄畫面版本欄提示與 DisplayVersion 一致(7-Zip 是 26.05,不是 26.05.2.0.0)、撤回後同一檔案可重新登錄;(4)`INSTALL_BUSY` 說明與 `result.installer_busy` 提示。
+- 檔案:`frontend/src/api/endpoint.ts`、`components/endpoint/CommandResult.vue`、`BatchApprovals.vue`、`DeviceEvents.vue`、`SoftwareRegister.vue`、`pages/endpoint/Commands.vue`、`DeviceCommands.vue`。
+- 驗證:`npm run typecheck`、`npm run build` 通過。未做瀏覽器操作:測試區主機尚無延後回報與 0010,RustIt MR 合併部署後於 VM 重測(L3、#9、#11)時一併確認。舊主機 / 舊 Agent 沒有 `deferred` 時照舊顯示「執行中」。
+
 ## 2026-10-27 軟體派送 VM 驗收修正(RustIt P7 B-1 / B-2 / B-4 / B-5)
 - 內容:需求方 2026-10-27 決定(RustIt 設計 `docs/P7-SOFTWARE-DESIGN.md` §8.1.4),配合 RustIt 分支 `feature/p7-acceptance-fixes`。
   - B-1:登錄 / 修改套件加「安裝逾時(秒)」(300–7200,預設 1800,主機再驗;修改逾時不退回草稿,沒改就不送);詳情覆核內容顯示逾時。

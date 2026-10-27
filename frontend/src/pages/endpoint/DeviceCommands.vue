@@ -9,7 +9,7 @@
  */
 import { computed, onBeforeUnmount, reactive, ref, shallowRef } from 'vue';
 import { can, EP, UI, useAuth } from '@/api/auth';
-import { BATCH_STATE_LABELS, endpointApi, isFinal, KIND_LABELS, STATE_LABELS, STATE_TONES, softwareErrorText } from '@/api/endpoint';
+import { BATCH_STATE_LABELS, commandStateLabel, commandStateTone, endpointApi, isFinal, KIND_LABELS, softwareErrorText } from '@/api/endpoint';
 import { fmtTime, fromNow } from '@/api/format';
 import { describeError } from '@/api/http';
 import type { EndpointCommand, EndpointCommandKind } from '@/api/types';
@@ -301,7 +301,7 @@ const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
           >
           <template #cell-kind="{ row }">{{ kindLabel(row.kind) }}</template>
           <template #cell-state="{ row }"
-            ><GBadge :tone="STATE_TONES[row.state as keyof typeof STATE_TONES]" dot>{{ STATE_LABELS[row.state as keyof typeof STATE_LABELS] }}</GBadge>
+            ><GBadge :tone="commandStateTone(row as EndpointCommand)" dot>{{ commandStateLabel(row as EndpointCommand) }}</GBadge>
             <GBadge v-if="row.batchState === 'pending_approval'" tone="warning" :title="BATCH_STATE_LABELS.pending_approval">待核可</GBadge></template
           >
           <template #cell-createdBy="{ row }"

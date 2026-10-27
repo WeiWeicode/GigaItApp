@@ -9,7 +9,7 @@
  */
 import { computed, reactive, ref, shallowRef, watch } from 'vue';
 import { can, EP, UI, useAuth } from '@/api/auth';
-import { batchApi, BATCH_STATE_LABELS, BATCH_STATE_TONES, endpointApi, isSoftwareBatchKind, KIND_LABELS, softwareApi, softwareErrorText } from '@/api/endpoint';
+import { batchApi, BATCH_STATE_LABELS, BATCH_STATE_TONES, endpointApi, isSoftwareBatchKind, KIND_LABELS, paramText, softwareApi, softwareErrorText } from '@/api/endpoint';
 import { fmtTime, fromNow } from '@/api/format';
 import { describeError } from '@/api/http';
 import type { EndpointBatch, EndpointCommand, EndpointCommandKind } from '@/api/types';
@@ -51,7 +51,7 @@ const summary = (b: EndpointBatch) => {
     const id = (str(b.params.package_id) || str(b.params.packageId)).toLowerCase();
     return str(b.params.name) ? `${str(b.params.name)} ${str(b.params.version)}` : (pkgNames.get(id) ?? id);
   }
-  const p = Object.entries(b.params).map(([k, v]) => `${k} = ${String(v)}`);
+  const p = Object.entries(b.params).map(([k, v]) => `${k} = ${paramText(v)}`);
   return p.join(',') || '—';
 };
 watch(items, (bs) => void loadNames(bs), { immediate: true });
