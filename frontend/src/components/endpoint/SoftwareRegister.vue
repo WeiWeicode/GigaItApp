@@ -6,7 +6,15 @@
  * 登錄後是草稿:只能派到 pilot 環的測試機,測試成功後「標記測試完成」,再由另一位 IT 發佈(兩人覆核)。
  */
 import { computed, reactive, ref, watch } from 'vue';
-import { DETECT_LABELS, INSTALLER_LABELS, REBOOT_POLICY_LABELS, softwareApi, softwareErrorText } from '@/api/endpoint';
+import {
+  DETECT_LABELS,
+  INSTALLER_LABELS,
+  REBOOT_POLICY_LABELS,
+  SOFTWARE_TIMEOUT_DEFAULT,
+  softwareApi,
+  softwareErrorText,
+  softwareTimeoutError,
+} from '@/api/endpoint';
 import { fmtBytes } from '@/api/format';
 import { describeError } from '@/api/http';
 import type { EndpointSoftwareFile } from '@/api/types';
@@ -27,6 +35,7 @@ const form = reactive({
   detectType: 'display_name',
   detectValue: '',
   rebootPolicy: 'never',
+  timeoutSec: String(SOFTWARE_TIMEOUT_DEFAULT),
   licenseLimit: '',
   notes: '',
 });
@@ -44,6 +53,7 @@ watch(open, (v) => {
     detectType: 'display_name',
     detectValue: '',
     rebootPolicy: 'never',
+    timeoutSec: String(SOFTWARE_TIMEOUT_DEFAULT),
     licenseLimit: '',
     notes: '',
   });
@@ -54,13 +64,13 @@ const options = computed(() =>
   (files.data.value?.items ?? []).map((f: EndpointSoftwareFile) => ({ label: `${f.fileName} · ${fmtBytes(f.sizeBytes)}`, value: f.fileName })),
 );
 const picked = computed(() => (files.data.value?.items ?? []).find((f) => f.fileName === form.pick) ?? null);
-// 挑檔後帶入軟體名稱 / 版本,並依副檔名猜安裝程式類型(.msi → MSI;其他請自行確認)
+// 挑檔後帶入軟體名稱 / 版本,並依副檔名猜安裝程式類型(.msi → MSI;其他請自行確認)。
+// 判斷值不預填:資料夾名稱常與登錄檔的 DisplayName 不同,照預設派送會 DETECT_FAILED(P7 VM 驗收 B-4)
 watch(picked, (f) => {
   if (!f) return;
   form.name = f.software;
   form.version = f.version;
   form.installerType = f.fileName.toLowerCase().endsWith('.msi') ? 'msi' : 'exe';
-  if (!form.detectValue) form.detectValue = `${f.software}%`;
 });
 
 const INSTALLER_OPTIONS = Object.entries(INSTALLER_LABELS).map(([value, label]) => ({ label, value }));
@@ -69,7 +79,10 @@ const REBOOT_OPTIONS = Object.entries(REBOOT_POLICY_LABELS).map(([value, label])
 
 const limitNumber = computed(() => (form.licenseLimit.trim() === '' ? null : Number(form.licenseLimit)));
 const limitError = computed(() => (limitNumber.value !== null && !(Number.isInteger(limitNumber.value) && limitNumber.value >= 0) ? '請填 0 以上的整數,或留空表示不限' : null));
-const valid = computed(() => !!picked.value && !!form.name.trim() && !!form.version.trim() && !!form.detectValue.trim() && !limitError.value);
+const timeoutError = computed(() => softwareTimeoutError(form.timeoutSec));
+const valid = computed(
+  () => !!picked.value && !!form.name.trim() && !!form.version.trim() && !!form.detectValue.trim() && !limitError.value && !timeoutError.value,
+);
 
 async function submit() {
   const f = picked.value;
@@ -86,6 +99,7 @@ async function submit() {
       detectType: form.detectType,
       detectValue: form.detectValue.trim(),
       rebootPolicy: form.rebootPolicy,
+      timeoutSec: Number(form.timeoutSec),
       licenseLimit: limitNumber.value,
       notes: form.notes.trim() || undefined,
     });
@@ -135,7 +149,21 @@ async function submit() {
             :placeholder="form.detectType === 'msi_product_code' ? '{GUID}' : '例:7-Zip%'"
           />
         </div>
-        <GInput v-model="form.licenseLimit" label="授權數(選填)" placeholder="留空 = 不限" :error="limitError" />
+        <p class="faint xs" style="margin: 0">
+          判斷值要對照<strong>測試機登錄檔</strong>「新增 / 移除程式」的實際名稱(DisplayName,% 為萬用字元,例 <span class="mono">7-Zip%</span>)或 MSI
+          產品代碼,不一定等於資料夾名稱;不符時安裝後會 DETECT_FAILED。名稱不含版本的軟體(例如 Notepad++)建議用 MSI 產品代碼。Agent 0.9.2
+          起找到項目會再比對版本:較舊就升級,相同或較新才算已安裝。
+        </p>
+        <div class="grid2">
+          <GInput
+            v-model="form.timeoutSec"
+            label="安裝逾時(秒)"
+            required
+            :error="timeoutError"
+            hint="300–7200;安裝 / 移除程式超過就結束並回報 INSTALL_TIMEOUT"
+          />
+          <GInput v-model="form.licenseLimit" label="授權數(選填)" placeholder="留空 = 不限" :error="limitError" />
+        </div>
         <GInput v-model="form.notes" label="備註(選填)" placeholder="安裝檔來源網址、取得日期、授權、已知問題" />
         <p class="faint xs" style="margin: 0">登錄後是「草稿」:只能派到 pilot 環的測試機;測試成功後標記測試完成,再由<strong>另一位</strong> IT 發佈。需要可管理所有公司的角色。</p>
       </template>

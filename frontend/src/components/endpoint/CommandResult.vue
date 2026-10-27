@@ -129,12 +129,19 @@ const timeline = computed(() =>
       <!-- 軟體派送(RustIt P7):結束代碼、簽章者、偵測結果;log_tail 來自安裝程式記錄(已遮罩),以文字顯示 -->
       <template v-else-if="c.kind === 'software.install' || c.kind === 'software.uninstall'">
         <p class="small" style="margin: 0">
-          <template v-if="r.already_installed">已經安裝,未重複執行。</template>
+          <template v-if="r.already_installed"
+            >已經安裝{{ r.installed_version ? `(偵測到 ${text(r.installed_version)}${r.version_unknown ? ',無法比較版本' : ''})` : '' }},未重複執行。</template
+          >
           <template v-else-if="r.already_absent">本來就沒有安裝,未執行移除。</template>
           <template v-else>{{ c.kind === 'software.install' ? '安裝' : '移除' }}完成,結束代碼 {{ text(r.exit_code) }},耗時 {{ Math.round(Number(r.duration_ms ?? 0) / 1000) }} 秒。</template>
           <GBadge v-if="r.reboot_required" tone="warning">需要重新開機</GBadge>
           <GBadge v-if="r.detected === true" tone="success">偵測到已安裝</GBadge>
         </p>
+        <p v-if="!r.already_installed && (r.installed_version || r.previous_version)" class="faint small" style="margin: 0">
+          偵測到版本 <span class="mono">{{ text(r.installed_version) || '—' }}</span>
+          <template v-if="r.previous_version">(安裝前 <span class="mono">{{ text(r.previous_version) }}</span>)</template>
+        </p>
+        <p v-if="r.interrupted" class="faint small" style="margin: 0">Agent 在確認結果期間停止(服務停止或關機),請重新派送確認。</p>
         <p v-if="r.signer" class="faint small" style="margin: 0">
           簽章者 <span class="mono">{{ text(r.signer) }}</span>
           <template v-if="r.signer_subject">({{ text(r.signer_subject) }})</template>

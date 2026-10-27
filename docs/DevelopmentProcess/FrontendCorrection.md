@@ -2,6 +2,15 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-27 軟體派送 VM 驗收修正(RustIt P7 B-1 / B-2 / B-4 / B-5)
+- 內容:需求方 2026-10-27 決定(RustIt 設計 `docs/P7-SOFTWARE-DESIGN.md` §8.1.4),配合 RustIt 分支 `feature/p7-acceptance-fixes`。
+  - B-1:登錄 / 修改套件加「安裝逾時(秒)」(300–7200,預設 1800,主機再驗;修改逾時不退回草稿,沒改就不送);詳情覆核內容顯示逾時。
+  - B-4:登錄時「判斷值」不再預填套件名稱(資料夾名稱常與登錄檔 DisplayName 不同,照預設派送會 DETECT_FAILED),加提示:對照測試機登錄檔的實際名稱、名稱不含版本的用 MSI 產品代碼、Agent 0.9.2 起會比對版本。
+  - B-5:詳情 API 回 `viewerScopeAll = false`(沒有可管理所有公司的角色,例如 it-admin)時,「發佈」停用並顯示原因;「修改」「撤回」同樣停用(code-reviewer 建議)。舊主機沒有此欄位時不擋。
+  - B-2:pilot 測試機結果與指令結果顯示 Agent 偵測到的版本(`installedVersion` / `installed_version`)、升級前版本、`version_unknown`、`interrupted`(確認期間 Agent 停止)。
+- 檔案:`frontend/src/api/{endpoint,types}.ts`、`frontend/src/components/endpoint/{SoftwareRegister,SoftwareDetail,CommandResult}.vue`
+- 驗證:`npm run typecheck`、`npm run build` 通過。**未做瀏覽器操作**:本機 dev 經 proxy 連測試區,測試區 endpoint-server 尚未部署這些欄位(RustIt MR 合併、套 0009 後再驗;VM 驗收時一併確認)。
+
 ## 2026-10-22 軟體派送畫面(RustIt P7-5)
 - 內容:「電腦清單」新增第 5 個 Tab「軟體派送」:待核可批次(核可 / 駁回 / 檢視)、軟體目錄(清單、登錄、修改、標記測試完成、發佈、撤回、詳情含覆核內容與 pilot 測試機結果)、派送對話框(單台走 admin-commands、多台走 /software/{id}/deploy,`ignorePower`)。電腦詳情「指令」Tab 新增「管理指令」:派送軟體、重新開機(`delay_sec`、`message`、`force` 二次確認)、取消重新開機;指令結果顯示軟體安裝 / 重開機結果,`CommandView.batchState` 待核可徽章(電腦指令 Tab、指令紀錄 Tab、結果元件)。軟體批次核可走 `/batches/{id}/approve|reject`(endpoint.software.manage),非軟體批次走 `/approve-command|/reject-command`(endpoint.command.admin);核可人不得是建立人(建立人只能撤回)。待核可清單使用 RustIt 新增的 `GET /batches?state=pending_approval`(需求方 2026-10-22 同意跨 repo 修改,RustIt 分支 `feature/p7-5-batch-list`)。新節點 `it.endpoint-software.list|manage|deploy|approve`、`it.endpoint-device.reboot`(`deploy/gateway-rbac.yaml`,it-admin 擁有)。
 - 檔案:`frontend/src/pages/endpoint/Software.vue`、`frontend/src/components/endpoint/{SoftwareRegister,SoftwareDetail,SoftwareDeploy,BatchApprovals}.vue`、`frontend/src/pages/endpoint/{DeviceCommands,Commands}.vue`、`frontend/src/components/endpoint/CommandResult.vue`、`frontend/src/api/{endpoint,types,auth}.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/PRD.md`(FR-8.8)、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`

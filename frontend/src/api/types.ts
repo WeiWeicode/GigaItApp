@@ -383,6 +383,8 @@ export interface EndpointSoftware {
   detectType: EndpointDetectType;
   detectValue: string;
   rebootPolicy: EndpointRebootPolicy;
+  /** Agent 執行安裝 / 移除程式的逾時(秒,300–7200;RustIt 0009) */
+  timeoutSec: number;
   signerThumbprints: string[];
   observedSigners: string[];
   licenseLimit: number | null;
@@ -422,6 +424,11 @@ export interface EndpointSoftwareTestResult {
   signer: string | null;
   signerSubject: string | null;
   detected: boolean | null;
+  /** Agent 偵測到的已安裝版本(Agent 0.9.2 起;已安裝時或安裝後) */
+  installedVersion?: string | null;
+  /** 安裝前偵測到的較舊版本(升級時) */
+  previousVersion?: string | null;
+  alreadyInstalled?: boolean | null;
   /** 可作為 mark-tested 的依據 */
   qualifies: boolean;
   createdByEmp: string;
@@ -429,6 +436,8 @@ export interface EndpointSoftwareTestResult {
 }
 
 export interface EndpointSoftwareDetail extends EndpointSoftware {
+  /** 查詢者有可管理所有公司的角色(才能登錄 / 修改 / 標記測試完成 / 發佈 / 撤回;舊版主機沒有此欄位) */
+  viewerScopeAll?: boolean;
   testResults: EndpointSoftwareTestResult[];
   installedDevices: { deviceId: string; computerName: string; name: string; version: string | null }[];
 }
