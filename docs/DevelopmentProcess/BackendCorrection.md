@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-29 新增正式區部署 build-prod / deploy-prod / rbac-prod
+- 內容:`main` 原本沒有正式區部署。正式區主機 3 的 WSL 查不到外部 DNS(Docker Hub、npmjs 都不通),不能像測試區在主機上建置,改為:① `build-prod`(`main`,主機 2)以主機 2 的 `itapp.env` 解析 compose,建置 `itapp-api`、`spa-it-admin` 並推送 `$CI_REGISTRY_IMAGE`(tag = commit SHA);② `deploy-prod`(`main` 手動,tag `prod-deploy`)拉取映像、`up --no-build --wait itapp-api`、`run --no-build spa-it` 發佈 /it/,冒煙測試同測試區;③ `rbac-prod`(`main` 手動)以正式區 Gateway 映像套用 `deploy/gateway-rbac.yaml`。compose 的映像名稱改為 `${ITAPP_IMAGE_PREFIX:-giganexus}/...`,測試區不設定、行為不變。正式區 `itapp.env` 維持 `BFF_MODE=mock`(§6),資料仍為 `DATA_DIR/itapp.json` 單一實例(§7.5 改接資料庫前的過渡)
+- 檔案:`.gitlab-ci.yml`、`deploy/docker-compose.yml`、`AGENT.md`
+- 驗證:`.gitlab-ci.yml` YAML 解析通過;在主機 3 以正式區 `itapp.env` 執行 `docker compose --profile publish config --images`,映像為 `10.10.130.123:5050/giganexus/gigaitapp/{itapp-api,spa-it-admin}:<SHA>`、`IT_ENV=prod`、`BFF_MODE=mock`、網路 `giganexus-gw_default`。Pipeline 尚未實際執行
+
 ## 2026-10-12 配合入口網郵件審核退場:it-admin 移除 portal.release-mail.*
 - 內容:主管確認郵件審核已不實施(giga-Portal `docs/PORTAL-API-PLAN.md` Q-D9),入口網移除「郵件審核資訊」頁與 `portal.release-mail.read` / `.list`。`deploy/gateway-rbac.yaml` 的 it-admin 角色同步移除這兩個代碼,避免測試區以 giga-Portal `deploy/sql/2026-10-12-portal-release-mail-remove.sql` 刪除代碼後,本專案 apply 因代碼不存在而整批失敗。經使用者同意後由 giga-Portal 的工作階段修改
 - 檔案:`deploy/gateway-rbac.yaml`
