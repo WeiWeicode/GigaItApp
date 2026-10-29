@@ -112,7 +112,8 @@ deploy-prod:
     # 1. 後端:更新並等待 healthcheck(/healthz)
     - $IT up -d --no-build --wait itapp-api
     # 2. 前端:發佈到 gw_www 的 it-admin(保留上一版供回滾:$IT run --rm spa-it rollback it-admin)
-    - $IT run --rm --no-build spa-it
+    # compose run 沒有 --no-build;映像已在上一步拉取,--pull never 確保不重拉,run 不加 --build 就不會建置
+    - $IT run --rm --pull never spa-it
     # 3. 冒煙測試(經 Gateway Nginx)
     - curl -skf -o /dev/null https://127.0.0.1/it/ && echo "OK   /it/"
     - curl -sk -o /dev/null -w '%{http_code}\n' https://127.0.0.1/api/auth/me | grep -q 401 && echo "OK   /api/auth/me → 401(單一入口)"
