@@ -3,7 +3,8 @@
  * 電腦清單:經 Gateway BFF 取得 Agent 基本資料(Gateway ENDPOINT-AGENT-GUIDE §8;RustIt ItAgentBack,INTEGRATION-PLAN M3)。
  * 單一入口後本系統的登入就是 Gateway 登入(同一工號);資料權限以 BFF 的 endpoint.device.read 為準(§8.6)。
  * RustIt P3:後端分頁(每頁 50 台,依電腦名稱排序)與篩選(關鍵字:名稱、使用者、IP、MAC、裝置代碼;軟體名稱;作業系統;在線;顯示退役)。
- * 點列開詳情(DeviceDetail:概要 / 硬體 / 網路 / 軟體 / 安全與周邊 / 事件 / 指令)。
+ * RustIt P5:健康欄(CPU / 記憶體 / 最滿的固定磁碟剩餘;在線取最近一則心跳,離線為最後一次)、名稱旁的未結束告警數。
+ * 點列開詳情(DeviceDetail:概要 / 硬體 / 網路 / 軟體 / 安全與周邊 / 健康與 Agent / 事件 / 指令)。
  */
 import { computed, reactive, ref } from 'vue';
 import { can, EP, useAuth } from '@/api/auth';
@@ -56,6 +57,11 @@ function onChanged() {
   void load();
 }
 
+// 健康欄(RustIt P5):使用率 ≥ 90% 標紅、≥ 75% 標黃;磁碟剩餘 < 5% 標紅、< 10% 標黃(與告警門檻一致)
+const pct = (v: number | undefined) => (v === undefined ? '—' : `${v}%`);
+const usageClass = (v: number | undefined) => (v === undefined ? '' : v >= 90 ? 'tone-danger' : v >= 75 ? 'tone-warning' : '');
+const freeClass = (v: number | undefined) => (v === undefined ? '' : v < 5 ? 'tone-danger' : v < 10 ? 'tone-warning' : '');
+
 const statusBadge = (d: EndpointDevice): { tone: 'danger' | 'success' | 'neutral'; text: string } =>
   d.status === 'retired'
     ? { tone: 'neutral', text: d.mergedInto ? '已合併' : '已退役' }
@@ -97,7 +103,7 @@ const errorTitle = computed(() => {
         <GInput v-model="filters.software" icon="package" placeholder="軟體名稱" clearable />
         <GInput v-model="filters.os" placeholder="作業系統(例:Windows 11、24H2)" clearable />
         <GSelect v-model="filters.online" :options="ONLINE_OPTIONS" placeholder="在線 / 離線" />
-        <GCheckbox v-model="filters.retired">顯示退役</GCheckbox>
+        <GCheckbox v-model="filters.retired" label="顯示退役" />
         <GButton v-if="hasFilter" size="sm" variant="ghost" icon="x" @click="clearFilters">清除</GButton>
       </div>
 
@@ -120,6 +126,7 @@ const errorTitle = computed(() => {
           { key: 'online', label: '狀態', width: '96px' },
           { key: 'userName', label: '使用者', hideSm: true },
           { key: 'ips', label: 'IP' },
+          { key: 'health', label: '健康', hideSm: true },
           { key: 'osName', label: '作業系統', hideSm: true },
           { key: 'cpuName', label: 'CPU', hideSm: true },
           { key: 'memoryTotal', label: '記憶體', align: 'right', hideSm: true },
@@ -131,7 +138,16 @@ const errorTitle = computed(() => {
           <span class="row" style="--gap: 6px">
             <strong class="nowrap" :title="row.certDn">{{ row.computerName }}</strong>
             <GBadge v-if="row.suspectedDuplicate" tone="warning" title="有其他裝置硬體指紋相同(重灌、改名或換憑證),可在詳情確認合併">疑似同一台</GBadge>
+            <GBadge v-if="row.openAlerts" tone="danger" icon="bell" title="未結束的告警數,詳情「健康與 Agent」或「告警」Tab 查看">{{ row.openAlerts }}</GBadge>
           </span>
+        </template>
+        <template #cell-health="{ row }">
+          <span v-if="row.health" class="nowrap small" :title="`取樣 ${fmtTime(row.health.at)}`">
+            <span :class="usageClass(row.health.cpuPct)">CPU {{ pct(row.health.cpuPct) }}</span> ·
+            <span :class="usageClass(row.health.memUsedPct)">記憶體 {{ pct(row.health.memUsedPct) }}</span> ·
+            <span :class="freeClass(row.health.diskMinFreePct)">磁碟剩 {{ pct(row.health.diskMinFreePct) }}</span>
+          </span>
+          <span v-else class="faint small">—</span>
         </template>
         <template #cell-online="{ row }">
           <GBadge :tone="statusBadge(row).tone" dot>{{ statusBadge(row).text }}</GBadge>
@@ -159,7 +175,7 @@ const errorTitle = computed(() => {
       </GTable>
     </GCard>
 
-    <GModal v-model:open="detailOpen" :title="selected?.computerName ?? ''" :subtitle="selected?.deviceId" icon="monitor" width="960px">
+    <GModal v-model:open="detailOpen" :title="selected?.computerName ?? ''" :subtitle="selected?.deviceId" icon="monitor" width="960px" height="85vh">
       <DeviceDetail v-if="selected" :key="selected.deviceId" :device-id="selected.deviceId" @changed="onChanged" />
     </GModal>
   </div>
@@ -167,16 +183,26 @@ const errorTitle = computed(() => {
 
 <style scoped>
 .filters {
-  display: grid;
-  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(120px, 0.8fr) auto auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
-@media (max-width: 900px) {
-  .filters {
-    grid-template-columns: 1fr 1fr;
-  }
+/* 欄寬不足時自動換行,「顯示退役」與「清除」不被擠掉 */
+.filters > :nth-child(1) {
+  flex: 2 1 240px;
+}
+.filters > :nth-child(2),
+.filters > :nth-child(3) {
+  flex: 1 1 160px;
+}
+.filters > :nth-child(4) {
+  flex: 0 1 140px;
+}
+.filters > :nth-child(n + 5) {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 </style>

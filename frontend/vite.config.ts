@@ -48,7 +48,7 @@ function observeLocalProxy(): Record<string, ProxyOptions> {
  *   - /api/auth/me 補上電腦清單的選單 / Tab 與 endpoint.device.read,只影響本機畫面;測試區要等 M4 在 gateway-rbac.yaml 補 includes
  */
 const ENDPOINT_LOCAL = process.env.ENDPOINT_LOCAL;
-const ENDPOINT_PERMS = ['it.endpoint-device.read', 'it.endpoint-device.list', 'endpoint.device.read'];
+const ENDPOINT_PERMS = ['it.endpoint-device.read', 'it.endpoint-device.list', 'it.endpoint-release.list', 'it.endpoint-release.manage', 'endpoint.device.read', 'endpoint.software.manage'];
 function endpointLocalProxy(): Record<string, ProxyOptions> {
   if (!ENDPOINT_LOCAL) return {};
   return { '/api/endpoint': { target: ENDPOINT_LOCAL, changeOrigin: true, rewrite: (p) => p.replace(/^\/api\/endpoint/, '/v1') } };

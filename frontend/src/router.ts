@@ -201,11 +201,35 @@ const routes: RouteRecordRaw[] = [
           tabs: [
             { label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList },
             { label: '指令紀錄', to: '/endpoint/devices/commands', icon: 'list', permission: UI.cmdList },
+            { label: '告警', to: '/endpoint/devices/alerts', icon: 'bell', permission: UI.alertList },
+            { label: 'Agent 版本', to: '/endpoint/devices/releases', icon: 'package', permission: UI.releaseList },
+            { label: '軟體派送', to: '/endpoint/devices/software', icon: 'send', permission: UI.swList },
+            { label: '上傳與簽章', to: '/endpoint/devices/software-uploads', icon: 'shield', permission: UI.swUpload },
           ],
         },
         children: [
           { path: '', component: () => import('./pages/endpoint/Devices.vue'), meta: { tab: '電腦清單', permission: UI.devList } },
           { path: 'commands', component: () => import('./pages/endpoint/Commands.vue'), meta: { tab: '指令紀錄', permission: UI.cmdList, requires: [EP.deviceRead] } },
+          {
+            path: 'alerts',
+            component: () => import('./pages/endpoint/Alerts.vue'),
+            meta: { tab: '告警', permission: UI.alertList, requires: [EP.deviceRead] },
+          },
+          {
+            path: 'releases',
+            component: () => import('./pages/endpoint/Releases.vue'),
+            meta: { tab: 'Agent 版本', permission: UI.releaseList, requires: [EP.deviceRead] },
+          },
+          {
+            path: 'software',
+            component: () => import('./pages/endpoint/Software.vue'),
+            meta: { tab: '軟體派送', permission: UI.swList, requires: [EP.deviceRead] },
+          },
+          {
+            path: 'software-uploads',
+            component: () => import('./pages/endpoint/SoftwareUploads.vue'),
+            meta: { tab: '上傳與簽章', permission: UI.swUpload, requires: [EP.softwareManage] },
+          },
         ],
       },
       {

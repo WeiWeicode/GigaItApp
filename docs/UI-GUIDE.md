@@ -37,7 +37,7 @@
 | `GSwitch` / `GCheckbox` | 開關 / 核取 | `v-model`、`label` 或 `ariaLabel`、`disabled`、`size` |
 | `GSegmented` | 小型篩選 | `v-model`、`options: { label, value, icon? }[]`、`size` |
 | `GBadge` | 標籤 | `tone`、`variant` soft / outline / solid、`dot`、`icon`、`mono` |
-| `GModal` | 對話框 | `v-model:open`、`title`、`subtitle`、`icon`、`tone`、`width`、`persistent`;slot `footer`。後開的在上層(z-index 依開啟順序遞增,confirm / 公告閱讀可疊在其他對話框上),Esc 只關最上層 |
+| `GModal` | 對話框 | `v-model:open`、`title`、`subtitle`、`icon`、`tone`、`width`、`height`(固定高度,例 `85vh`;內容在內部捲動,多 Tab 的詳情切換時不跳動)、`persistent`;slot `footer`。後開的在上層(z-index 依開啟順序遞增,confirm / 公告閱讀可疊在其他對話框上),Esc 只關最上層 |
 | `GEmpty` | 空狀態 / 錯誤 | `icon`、`title`、`description`、`tone`(載入失敗用 danger,slot 放「重試」) |
 | `GSkeleton` | 載入骨架 | `lines` 或 `height` |
 | `GAvatar` / `GLogo` | 頭像 / 品牌標誌 | `name`、`size` |

@@ -2,10 +2,11 @@
 /**
  * 電腦詳情「事件」Tab(RustIt P3;GET /api/endpoint/devices/{deviceId}/events,新到舊,「載入更多」):
  * 主機稽核(登錄、憑證指紋變更、停用 / 啟用 / 退役、合併、時鐘偏差、疑似同一台)與 Agent 端點事件(USB 插拔、離線期間、Agent 啟動)。
+ * RustIt P5:主機比對資產的軟硬體變更、Watchdog / Agent 互相看守的事件(服務被停止、啟動類型被改、程式不見或被換、重新啟動原因)。
  * 端點事件的時間是端點上的發生時間(離線期間的事件連線後才補傳);內容一律以文字顯示。
  */
 import { ref, shallowRef } from 'vue';
-import { deviceApi, EVENT_LABELS, EVENT_TONES } from '@/api/endpoint';
+import { deviceApi, EVENT_LABELS, EVENT_TONES, paramText, startTypeLabel } from '@/api/endpoint';
 import { fmtBytes, fmtTime } from '@/api/format';
 import { describeError } from '@/api/http';
 import type { EndpointDeviceEvent } from '@/api/types';
@@ -43,8 +44,18 @@ const REASONS: Record<string, string> = {
   unknown: '未知',
 };
 
+const PREVIOUS_EXIT: Record<string, string> = {
+  stop: '服務被停止',
+  shutdown: 'Windows 關機',
+  restart_command: '指令重啟',
+  unexpected: '沒有正常結束',
+  first_run: '第一次執行',
+};
+const RESTART_CAUSE: Record<string, string> = { crashed: '當掉後重新啟動', hung: '沒有回應,Watchdog 強制重啟', restart_command: '指令重啟' };
+const HW: Record<string, string> = { memory: '記憶體', disk: '磁碟', gpu: '顯示卡', bios: 'BIOS', board: '主機板', cpu: 'CPU' };
+
 type Data = Record<string, unknown>;
-const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : paramText(v));
 
 /** 端點事件的 data 摘要成一行文字(event.schema.json:offline_period、usb_*) */
 function summary(e: EndpointDeviceEvent): string {
@@ -66,6 +77,31 @@ function summary(e: EndpointDeviceEvent): string {
       .filter(Boolean)
       .join(' · ');
   }
+  if (e.type === 'agent_started' && d.agent_version)
+    return [`Agent 版本 ${str(d.agent_version)}`, d.previous_exit ? `上次結束:${PREVIOUS_EXIT[str(d.previous_exit)] ?? str(d.previous_exit)}` : '']
+      .filter(Boolean)
+      .join(',');
+  if (e.type === 'software_installed' || e.type === 'software_removed') return [str(d.name), str(d.version), str(d.publisher)].filter(Boolean).join(' · ');
+  if (e.type === 'software_updated') return `${str(d.name)}:${str(d.from)} → ${str(d.to)}`;
+  if (e.type === 'software_changed_bulk')
+    return `安裝 ${str(d.installed)}、移除 ${str(d.removed)}、更新 ${str(d.updated)} 項${Array.isArray(d.names) && d.names.length ? `(${d.names.map(str).join('、')}…)` : ''}`;
+  if (e.type === 'hardware_changed')
+    return `${HW[str(d.component)] ?? str(d.component)}:${Array.isArray(d.before) ? d.before.map(str).join('、') : ''} → ${Array.isArray(d.after) ? d.after.map(str).join('、') : ''}`;
+  if (e.type === 'agent_restarted')
+    return `${RESTART_CAUSE[str(d.cause)] ?? str(d.cause)}${d.previous_pid !== undefined ? `(PID ${str(d.previous_pid)} → ${str(d.pid)})` : ''}`;
+  if (['agent_service_stopped', 'watchdog_stopped'].includes(e.type))
+    return [
+      // restarted=false 且 state=running:服務仍在執行(例如只被改了啟動類型),不是重啟失敗
+      d.restarted === true ? '已重新啟動' : d.restarted === false && d.state !== 'running' ? '未能重新啟動' : '',
+      d.start_type ? `啟動類型 ${startTypeLabel(str(d.start_type))}` : '',
+      str(d.error),
+    ]
+      .filter(Boolean)
+      .join(',');
+  if (e.type === 'agent_start_type_changed')
+    return `${startTypeLabel(str(d.from))} → ${startTypeLabel(str(d.to) || 'auto')}${d.restored === true ? '(已改回自動)' : ''}`;
+  if (['agent_binary_changed', 'watchdog_binary_changed'].includes(e.type)) return `${str(d.path)}${d.expected ? `(應為 ${str(d.expected)})` : ''}`;
+  if (e.type === 'agent_start_failed') return `${str(d.error)}(第 ${str(d.attempts)} 次)`;
   if (e.detail) return e.detail;
   if (e.data && typeof e.data === 'object' && Object.keys(e.data).length) return JSON.stringify(e.data);
   return '';

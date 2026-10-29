@@ -3,21 +3,26 @@
  * 電腦詳情「指令」Tab(RustIt P4-3;指令類型 RustIt docs/contracts/command-kinds.md):
  *   - 指令按鈕:需要按鈕權限 it.endpoint-device.command 與 BFF endpoint.command.basic;停用的電腦不顯示
  *   - 下指令後每 2 秒查詢狀態直到結束;離線電腦排隊,連線後送出(預設 1 小時內有效)
+ *   - 管理等級(RustIt P7;endpoint.command.admin):重新開機 system.reboot(delay_sec、message、force 需二次確認)與取消重新開機 system.reboot.cancel
+ *     —— it.endpoint-device.reboot;派送軟體(單台)—— it.endpoint-software.deploy;超過 20 台的 24 小時累計會進「待核可」(CommandView.batchState)
  *   - 這台電腦的指令紀錄(新到舊,「載入更多」);點列看結果、下載日誌;自己建立且仍在排隊的可取消
  */
 import { computed, onBeforeUnmount, reactive, ref, shallowRef } from 'vue';
 import { can, EP, UI, useAuth } from '@/api/auth';
-import { endpointApi, isFinal, KIND_LABELS, STATE_LABELS, STATE_TONES } from '@/api/endpoint';
+import { BATCH_STATE_LABELS, commandStateLabel, commandStateTone, endpointApi, isFinal, KIND_LABELS, softwareErrorText } from '@/api/endpoint';
 import { fmtTime, fromNow } from '@/api/format';
 import { describeError } from '@/api/http';
 import type { EndpointCommand, EndpointCommandKind } from '@/api/types';
 import CommandResult from '@/components/endpoint/CommandResult.vue';
+import SoftwareDeploy from '@/components/endpoint/SoftwareDeploy.vue';
 import { confirm, toast } from '@/ui';
 
 const props = defineProps<{ deviceId: string; computerName: string; online: boolean; active: boolean }>();
 const { user } = useAuth();
 const me = computed(() => user.value?.employeeNo ?? '');
 const canCommand = computed(() => props.active && can(UI.devCommand) && can(EP.commandBasic));
+const canReboot = computed(() => props.active && can(UI.devReboot) && can(EP.commandAdmin));
+const canDeploy = computed(() => props.active && can(UI.swDeploy) && can(EP.commandAdmin));
 
 // ---------- 目前執行中的指令(每 2 秒輪詢) ----------
 const current = shallowRef<EndpointCommand | null>(null);
@@ -66,6 +71,71 @@ async function restart() {
   });
   if (ok) await send('agent.restart');
 }
+
+// ---------- 管理等級指令(重新開機、取消重新開機;endpoint.command.admin) ----------
+const rebootOpen = ref(false);
+const reboot = reactive({ delay: '300', message: '', force: false });
+const DELAY_OPTIONS = [
+  { label: '立即(不倒數)', value: '0' },
+  { label: '1 分鐘', value: '60' },
+  { label: '5 分鐘(預設)', value: '300' },
+  { label: '15 分鐘', value: '900' },
+  { label: '1 小時', value: '3600' },
+];
+const rebootMsgError = computed(() => {
+  const t = reboot.message.trim();
+  if (!t) return null;
+  if (t.length > 200) return '最多 200 字';
+  return UNSAFE.test(t) || t.includes('\n') ? '只能單行,不可含控制字元' : null;
+});
+async function sendAdmin(kind: EndpointCommandKind, params: Record<string, unknown> = {}) {
+  sending.value = kind;
+  try {
+    const c = await endpointApi.createAdmin(props.deviceId, kind, params);
+    current.value = c;
+    if (c.batchState === 'pending_approval') toast.info(`${KIND_LABELS[kind]}等待另一位 IT 核可`, '同一人 24 小時內累計超過 20 台');
+    else if (c.state === 'queued') toast.info(`${KIND_LABELS[kind]}已排隊`, props.online ? undefined : '電腦離線,連線後送出(有效期限依指令類型)');
+    await reloadHistory();
+    void track(c.commandId);
+    return true;
+  } catch (e) {
+    toast.error(`${KIND_LABELS[kind]}失敗`, softwareErrorText(e));
+    return false;
+  } finally {
+    sending.value = null;
+  }
+}
+async function sendReboot() {
+  if (rebootMsgError.value) return;
+  const force = reboot.force;
+  const ok = await confirm({
+    title: `重新開機 ${props.computerName}?`,
+    message:
+      `${Number(reboot.delay) ? `${Number(reboot.delay) / 60} 分鐘後` : '立即'}重新開機。` +
+      (force ? '\n【強制】會直接結束使用者尚未儲存的應用程式,資料可能遺失。' : '\n不強制關閉應用程式,使用者可儲存工作;應用程式也可能拒絕關閉。') +
+      '\n電腦開機未滿 30 分鐘、24 小時內已重開 3 次,或有人登入時倒數少於 60 秒,Agent 會拒絕。',
+    tone: 'danger',
+    confirmText: force ? '強制重新開機' : '重新開機',
+  });
+  if (!ok) return;
+  const params: Record<string, unknown> = { delay_sec: Number(reboot.delay), force };
+  if (reboot.message.trim()) params.message = reboot.message.trim();
+  if (await sendAdmin('system.reboot', params)) {
+    rebootOpen.value = false;
+    Object.assign(reboot, { delay: '300', message: '', force: false });
+  }
+}
+async function cancelReboot() {
+  const ok = await confirm({
+    title: `取消 ${props.computerName} 的重新開機?`,
+    message: '取消倒數中的重新開機並通知使用者;沒有倒數時不會有動作。',
+    confirmText: '取消重新開機',
+  });
+  if (ok) await sendAdmin('system.reboot.cancel');
+}
+
+// ---------- 派送軟體(單台) ----------
+const deployOpen = ref(false);
 
 // ---------- 需要參數的指令 ----------
 const logsOpen = ref(false);
@@ -186,7 +256,14 @@ const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
         <p v-if="!online" class="small muted" style="margin: 0">電腦目前離線:指令會排隊,連線後送出;1 小時內未連線即過期,不會執行。</p>
       </div>
     </GCard>
-    <p v-else-if="!active" class="small muted" style="margin: 0">此電腦已停用,不能下指令。</p>
+    <GCard v-if="canReboot || canDeploy" title="管理指令" icon="shield" padding="sm" subtitle="需要管理權限;超過 20 台的 24 小時累計需第二人核可">
+      <div class="row wrap" style="--gap: 8px">
+        <GButton v-if="canDeploy" icon="send" :disabled="!!sending" @click="deployOpen = true">派送軟體…</GButton>
+        <GButton v-if="canReboot" icon="reset" variant="danger" :disabled="!!sending" @click="rebootOpen = true">重新開機…</GButton>
+        <GButton v-if="canReboot" icon="ban" :loading="sending === 'system.reboot.cancel'" :disabled="!!sending" @click="cancelReboot">取消重新開機</GButton>
+      </div>
+    </GCard>
+    <p v-if="!active" class="small muted" style="margin: 0">此電腦已停用,不能下指令。</p>
 
     <GCard v-if="current" :title="kindLabel(current.kind)" icon="activity" padding="sm">
       <template #actions>
@@ -224,7 +301,8 @@ const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
           >
           <template #cell-kind="{ row }">{{ kindLabel(row.kind) }}</template>
           <template #cell-state="{ row }"
-            ><GBadge :tone="STATE_TONES[row.state as keyof typeof STATE_TONES]" dot>{{ STATE_LABELS[row.state as keyof typeof STATE_LABELS] }}</GBadge></template
+            ><GBadge :tone="commandStateTone(row as EndpointCommand)" dot>{{ commandStateLabel(row as EndpointCommand) }}</GBadge>
+            <GBadge v-if="row.batchState === 'pending_approval'" tone="warning" :title="BATCH_STATE_LABELS.pending_approval">待核可</GBadge></template
           >
           <template #cell-createdBy="{ row }"
             ><span class="small">{{ row.createdBy.name ?? row.createdBy.emp }}</span></template
@@ -243,6 +321,24 @@ const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
         <GButton @click="detailOpen = false">關閉</GButton>
       </template>
     </GModal>
+
+    <GModal v-model:open="rebootOpen" title="重新開機" :subtitle="computerName" icon="reset" width="480px" tone="danger">
+      <div class="stack" style="--gap: 12px">
+        <GSelect v-model="reboot.delay" label="倒數時間" :options="DELAY_OPTIONS" />
+        <GInput v-model="reboot.message" label="給使用者的說明(選填)" placeholder="例 系統更新需要重新開機" :error="rebootMsgError" />
+        <GSwitch v-model="reboot.force" label="強制關閉應用程式(使用者未儲存的資料會遺失)" />
+        <p v-if="reboot.force" class="small" style="margin: 0"><GBadge tone="danger">強制</GBadge> 送出前會再確認一次。</p>
+        <p class="small muted" style="margin: 0">
+          電腦會先顯示「【IT 部門通知】」倒數訊息(有登入者且倒數不為 0 時)。倒數中可用「取消重新開機」取消;倒數期間軟體安裝與 Agent 升級會被拒絕。
+        </p>
+      </div>
+      <template #footer>
+        <GButton @click="rebootOpen = false">取消</GButton>
+        <GButton variant="danger" icon="reset" :loading="sending === 'system.reboot'" :disabled="!!rebootMsgError || !!sending" @click="sendReboot">重新開機</GButton>
+      </template>
+    </GModal>
+
+    <SoftwareDeploy v-model:open="deployOpen" :device="{ deviceId, computerName }" @deployed="reloadHistory" />
 
     <GModal v-model:open="logsOpen" title="收集日誌" :subtitle="computerName" icon="download" width="440px">
       <div class="stack" style="--gap: 12px">

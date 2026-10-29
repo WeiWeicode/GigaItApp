@@ -1,11 +1,14 @@
 <script setup lang="ts">
-/** 對話框:v-model:open 控制;Esc 與點背景關閉(persistent 時不關);footer slot 放按鈕 */
+/** 對話框:v-model:open 控制;Esc 與點背景關閉(persistent 時不關);footer slot 放按鈕;height 設定時固定高度(內容在內部捲動,切換 Tab 不跳動) */
 import { onBeforeUnmount, ref, watch } from 'vue';
 
-const props = withDefaults(defineProps<{ title?: string; subtitle?: string; icon?: string; width?: string; persistent?: boolean; tone?: string }>(), {
-  width: '520px',
-  tone: 'primary',
-});
+const props = withDefaults(
+  defineProps<{ title?: string; subtitle?: string; icon?: string; width?: string; height?: string; persistent?: boolean; tone?: string }>(),
+  {
+    width: '520px',
+    tone: 'primary',
+  },
+);
 const open = defineModel<boolean>('open', { default: false });
 /** 後開的對話框在上層(confirm、公告閱讀可能疊在其他對話框之上;Teleport 的 DOM 順序不代表開啟順序) */
 const z = ref(100);
@@ -47,7 +50,14 @@ const openZ = new Set<number>();
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="open" class="g-modal-backdrop" :style="{ zIndex: z }" @mousedown.self="close">
-        <div class="g-modal glass glass-edge" :class="`tone-${tone}`" role="dialog" aria-modal="true" :aria-label="title" :style="{ width }">
+        <div
+          class="g-modal glass glass-edge"
+          :class="[`tone-${tone}`, { fixed: !!height }]"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="title"
+          :style="{ width, height }"
+        >
           <header v-if="title" class="head">
             <span v-if="icon" class="ic"><GIcon :name="icon" :size="18" /></span>
             <div>
@@ -112,6 +122,11 @@ h3 {
 .body {
   padding: 16px 22px;
   overflow: auto;
+}
+/* 固定高度:body 撐滿剩餘空間並在內部捲動 */
+.g-modal.fixed .body {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .foot {
   display: flex;

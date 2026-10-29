@@ -2,6 +2,45 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-29 上傳與簽章:刪除上傳區檔案(配合 RustIt feature/s1-incoming-delete)
+- 內容:被駁回的上傳原始檔留在 NAS 上傳區,同路徑無法再上傳,原本只能請主機管理員刪除。需求方 2026-10-29 決定:只有已駁回可刪、也可刪除未登錄的檔案、紀錄保留並記錄刪除人(RustIt migration 0012)、沿用 `endpoint.software.manage` 不另設按鈕節點。「上傳與簽章」清單與詳情對已駁回且原始檔還在的紀錄顯示「刪除檔案」(二次確認,`DELETE /software/uploads/{id}/file`),詳情顯示原始檔狀態(已刪除 · 刪除人 · 時間);「上傳安裝檔 › 從上傳區登錄」可刪除選取的檔案(`DELETE /software/uploads/incoming?fileName=`),刪除後重新整理清單。錯誤代碼 `ITA_UPLOAD_FILE_IN_USE`、`ITA_UPLOAD_FILE_DELETED`、`ITA_UPLOAD_NOT_FILE`、`ITA_UPLOAD_FILE_MISMATCH`、`ITA_UPLOAD_FILE_NOT_FOUND` 文案。
+- 檔案:`frontend/src/pages/endpoint/SoftwareUploads.vue`、`components/endpoint/UploadInstaller.vue`、`api/endpoint.ts`(`uploadApi.deleteFile` / `deleteIncoming`、錯誤代碼)、`api/types.ts`;`docs/PRD.md` FR-8.9、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`。無新權限節點(`deploy/gateway-rbac.yaml` 不變)。
+- 驗證:`npm run typecheck`、`npm run build` 通過。**未做瀏覽器操作**:需 RustIt 分支合併、測試區套用 migration 0012 並發佈新路由後,照 Gherkin「刪除已駁回上傳的原始檔」等三個場景實測(清理 `winrar-x64/7.23.0`、`7.23.1`、`7.23.2`)。
+
+## 2026-10-29 上傳與簽章 Tab(RustIt S1-4)
+- 內容:「電腦清單」新增第 6 個 Tab「上傳與簽章」(PRD FR-8.9,RustIt `docs/S1-SIGNING-DESIGN.md` §5;需求方 2026-10-28 同意跨 repo)。上傳安裝檔用 XHR 串流(web-kit `http` 只送 JSON / FormData、無進度):`application/octet-stream`、手動帶 `X-CSRF-Token`、401 換發一次後重送;路徑規則與主機 `SEGMENT_RE` 相同。另可從 NAS 上傳區登錄檔案(含備註)。清單 / 詳情 / 核可(上傳者本人停用)/ 駁回(需原因);工作站回報欄位標「未驗證」,備註與駁回原因以文字顯示。「軟體派送」登錄對話框與套件詳情顯示上傳紀錄(RustIt !76 的 `upload` 欄位;舊主機沒有此欄位時不顯示)。新節點 `it.endpoint-software.upload`(tab,includes `endpoint.software.manage`,it-admin 擁有)。
+- 檔案:`frontend/src/pages/endpoint/SoftwareUploads.vue`(新)、`components/endpoint/UploadInstaller.vue`(新)、`api/endpoint.ts`(`uploadApi`、`uploadInstaller`、狀態 / 駁回代碼標籤、錯誤代碼)、`api/types.ts`、`api/auth.ts`、`router.ts`、`components/endpoint/SoftwareRegister.vue`、`SoftwareDetail.vue`;`deploy/gateway-rbac.yaml`;`docs/PRD.md` FR-8.9、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`。
+- 驗證:`npm run typecheck`、`npm run build` 通過。**未做瀏覽器操作**:測試區尚未套用 migration 0011、未發佈 `endpoint.software.upload.*` 路由、新節點要合併後 CI rbac-test 才登記;上述完成後照 Gherkin「上傳與簽章」四個場景實測(需兩個 IT 帳號)。security-auditor:無 High / Medium;L1 已修(401 換發期間按取消不再重送、上傳結束移除 abort 監聽)。
+
+## 2026-10-27 軟體派送驗收後修正(RustIt Agent 0.9.3)
+- 內容:配合 RustIt `feature/p7-0.9.3`(設計 `docs/P7-SOFTWARE-DESIGN.md` §8.1.5,需求方 2026-10-27 決定)。(1)延後中:`running` 的軟體安裝帶 `result.deferred` 時,狀態顯示「延後中(電池供電 / 計量網路)」(`commandStateLabel` / `commandStateTone`,指令清單、電腦指令、指令詳情),詳情加下次檢查時間;(2)指令參數、結果、批次摘要、事件內容的物件改用 JSON 顯示(`paramText`;原本 `detect = [object Object]`);(3)登錄畫面版本欄提示與 DisplayVersion 一致(7-Zip 是 26.05,不是 26.05.2.0.0)、撤回後同一檔案可重新登錄;(4)`INSTALL_BUSY` 說明與 `result.installer_busy` 提示。
+- 檔案:`frontend/src/api/endpoint.ts`、`components/endpoint/CommandResult.vue`、`BatchApprovals.vue`、`DeviceEvents.vue`、`SoftwareRegister.vue`、`pages/endpoint/Commands.vue`、`DeviceCommands.vue`。
+- 驗證:`npm run typecheck`、`npm run build` 通過。未做瀏覽器操作:測試區主機尚無延後回報與 0010,RustIt MR 合併部署後於 VM 重測(L3、#9、#11)時一併確認。舊主機 / 舊 Agent 沒有 `deferred` 時照舊顯示「執行中」。
+
+## 2026-10-27 軟體派送 VM 驗收修正(RustIt P7 B-1 / B-2 / B-4 / B-5)
+- 內容:需求方 2026-10-27 決定(RustIt 設計 `docs/P7-SOFTWARE-DESIGN.md` §8.1.4),配合 RustIt 分支 `feature/p7-acceptance-fixes`。
+  - B-1:登錄 / 修改套件加「安裝逾時(秒)」(300–7200,預設 1800,主機再驗;修改逾時不退回草稿,沒改就不送);詳情覆核內容顯示逾時。
+  - B-4:登錄時「判斷值」不再預填套件名稱(資料夾名稱常與登錄檔 DisplayName 不同,照預設派送會 DETECT_FAILED),加提示:對照測試機登錄檔的實際名稱、名稱不含版本的用 MSI 產品代碼、Agent 0.9.2 起會比對版本。
+  - B-5:詳情 API 回 `viewerScopeAll = false`(沒有可管理所有公司的角色,例如 it-admin)時,「發佈」停用並顯示原因;「修改」「撤回」同樣停用(code-reviewer 建議)。舊主機沒有此欄位時不擋。
+  - B-2:pilot 測試機結果與指令結果顯示 Agent 偵測到的版本(`installedVersion` / `installed_version`)、升級前版本、`version_unknown`、`interrupted`(確認期間 Agent 停止)。
+- 檔案:`frontend/src/api/{endpoint,types}.ts`、`frontend/src/components/endpoint/{SoftwareRegister,SoftwareDetail,CommandResult}.vue`
+- 驗證:`npm run typecheck`、`npm run build` 通過。**未做瀏覽器操作**:本機 dev 經 proxy 連測試區,測試區 endpoint-server 尚未部署這些欄位(RustIt MR 合併、套 0009 後再驗;VM 驗收時一併確認)。
+
+## 2026-10-22 軟體派送畫面(RustIt P7-5)
+- 內容:「電腦清單」新增第 5 個 Tab「軟體派送」:待核可批次(核可 / 駁回 / 檢視)、軟體目錄(清單、登錄、修改、標記測試完成、發佈、撤回、詳情含覆核內容與 pilot 測試機結果)、派送對話框(單台走 admin-commands、多台走 /software/{id}/deploy,`ignorePower`)。電腦詳情「指令」Tab 新增「管理指令」:派送軟體、重新開機(`delay_sec`、`message`、`force` 二次確認)、取消重新開機;指令結果顯示軟體安裝 / 重開機結果,`CommandView.batchState` 待核可徽章(電腦指令 Tab、指令紀錄 Tab、結果元件)。軟體批次核可走 `/batches/{id}/approve|reject`(endpoint.software.manage),非軟體批次走 `/approve-command|/reject-command`(endpoint.command.admin);核可人不得是建立人(建立人只能撤回)。待核可清單使用 RustIt 新增的 `GET /batches?state=pending_approval`(需求方 2026-10-22 同意跨 repo 修改,RustIt 分支 `feature/p7-5-batch-list`)。新節點 `it.endpoint-software.list|manage|deploy|approve`、`it.endpoint-device.reboot`(`deploy/gateway-rbac.yaml`,it-admin 擁有)。
+- 檔案:`frontend/src/pages/endpoint/Software.vue`、`frontend/src/components/endpoint/{SoftwareRegister,SoftwareDetail,SoftwareDeploy,BatchApprovals}.vue`、`frontend/src/pages/endpoint/{DeviceCommands,Commands}.vue`、`frontend/src/components/endpoint/CommandResult.vue`、`frontend/src/api/{endpoint,types,auth}.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/PRD.md`(FR-8.8)、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`
+- 驗證:`npm run typecheck` 通過;瀏覽器驗證見下方補記。
+
+## 2026-10-19 人員明細:本機帳號建立 / 重置密碼
+- 內容:需求方要求 it-admin 可在「人員與部門 › 人員」為人員建立本機帳號或重置密碼(禾迅等無 AD 網域公司;配合 giga-api-gateway-bff 同日「reset-password 擴充為建立帳號 / 重置密碼」)。明細對話框新增按鈕(AD 帳號不顯示;已有啟用 / 鎖定的本機帳號顯示「重置密碼」,否則「建立帳號」),對話框可指定密碼(留空由系統產生);完成後顯示寄送對象,沒寄出(或非正式區)才顯示明文。新按鈕權限 `it.sys-user.password`(includes `gw.admin.local.write`,`deploy/gateway-rbac.yaml`,it-admin 擁有);`LOCAL` 狀態對照改為 BFF 實際值(`pending_approval` / `pending_verify`)
+- 檔案:`frontend/src/pages/system/Users.vue`、`frontend/src/api/admin.ts`、`frontend/src/api/auth.ts`、`deploy/gateway-rbac.yaml`
+- 驗證:`npm run typecheck`、`npm run build` 通過;瀏覽器實測需 BFF 新版部署到測試區後進行(未執行)
+
+## 2026-10-16 電腦詳情固定高度、篩選列換行、Agent 啟動事件文字(RustIt P3 測試區實測後)
+- 內容:需求方要求詳情對話框不隨 Tab 內容改變高度 → `GModal` 新增 `height`(固定高度、內容在內部捲動),電腦詳情設 `85vh`,Tab 列在捲動時固定在上方;電腦清單篩選列改為可換行(1280px 寬時「顯示退役」被擠掉),`GCheckbox` 改用 `label` 參數(原寫法 slot 不顯示文字);事件「Agent 啟動」顯示「Agent 版本 x.y.z」而非原始 JSON。
+- 檔案:`frontend/src/ui/components/GModal.vue`、`frontend/src/pages/endpoint/Devices.vue`、`DeviceDetail.vue`、`frontend/src/components/endpoint/DeviceEvents.vue`、`docs/UI-GUIDE.md`
+- 驗證:`npm run typecheck`、`npm run build` 通過;測試區瀏覽器(1280×860)以相同樣式暫時套用確認:詳情高度固定 731px(85vh),內容短的 Tab 不縮小;篩選列不再溢出。部署後需求方再確認。
+
 ## 2026-10-16 端點電腦清單分頁與篩選、詳情分 Tab、停用 / 退役 / 合併(RustIt P3)
 - 內容:配合 RustIt ItAgentBack P3(RustIt `docs/P3-DATA-DESIGN.md`,分支 `feature/p3-data`)。電腦清單改後端分頁(每頁 50 台,`usePaged`)與篩選(關鍵字:名稱 / 使用者 / IP / MAC / 裝置代碼;軟體名稱;作業系統;在線;顯示退役),標示「疑似同一台」「已退役 / 已合併」;詳情分 Tab:概要(時鐘偏差、開機時間、裝置代碼、疑似同一台提示)、硬體(CPU、記憶體模組、主機板與 BIOS、磁碟、實體磁碟、顯示卡)、網路(閘道、DNS)、軟體(名稱 / 發行者篩選)、安全與周邊(防毒、Windows 更新、USB 原則與使用過的裝置、RustDesk)、事件(主機稽核與端點事件,載入更多)、指令(既有);「下載資產 JSON」。管理操作(按鈕節點 `it.endpoint-device.admin` ∧ `endpoint.command.admin`):停用 / 啟用 / 退役、合併疑似同一台(首次連線較早者為舊裝置;後端回指紋不同或時間重疊時再確認一次後 force),原因必填。Agent 回報的字串一律文字顯示。`deviceApi.list` 相容 P3 前只回 `items` 的 ItAgentBack。新增圖示 package、hard-drive、merge、archive、ban。
 - 檔案:`frontend/src/pages/endpoint/Devices.vue`、`DeviceDetail.vue`、`frontend/src/components/endpoint/DeviceEvents.vue`(新)、`DeviceAdminActions.vue`(新)、`frontend/src/api/endpoint.ts`、`types.ts`、`auth.ts`、`frontend/src/ui/icons.ts`、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/device-inventory.feature`、`docs/PROJECT-MAP.md`

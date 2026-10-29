@@ -88,6 +88,143 @@ export interface EndpointDevice {
   /** 已併入的目標裝置 */
   mergedInto?: string | null;
   retiredAt?: string | null;
+  /** 健康摘要(RustIt P5;在線取最近一則心跳,離線取最後落盤;舊版 Agent 為 null) */
+  health?: EndpointHealth | null;
+  /** 未結束的告警數(RustIt P5) */
+  openAlerts?: number;
+}
+
+/** 健康摘要(RustIt P5-MONITOR-DESIGN §2.1;取不到的欄位省略) */
+export interface EndpointHealth {
+  at: string;
+  cpuPct?: number;
+  memUsedPct?: number;
+  /** 最滿的固定磁碟剩餘百分比 */
+  diskMinFreePct?: number;
+  diskMinFreeDrive?: string;
+  uptimeS?: number;
+  agentRssMb?: number;
+}
+
+/** Watchdog 最近一次回報(RustIt P5-2) */
+export interface EndpointWatchdog {
+  version: string | null;
+  reportAt: string | null;
+  agentServiceState: string | null;
+  agentStartType: string | null;
+  agentStatusOk: boolean | null;
+  agentLastError: string | null;
+  agentRestarts24h: number | null;
+}
+
+// ---------- Agent 版本與升級(RustIt P6;P6-UPGRADE-DESIGN §1、§2、§7) ----------
+
+export type EndpointReleaseComponent = 'agent' | 'watchdog';
+export type EndpointReleaseStatus = 'draft' | 'published' | 'revoked';
+export type EndpointRing = 'pilot' | 'it' | 'all';
+
+/** 版本登錄(GET /api/endpoint/releases);sha256、sizeBytes 由主機讀檔計算 */
+export interface EndpointRelease {
+  releaseId: string;
+  component: EndpointReleaseComponent;
+  version: string;
+  fileName: string;
+  sha256: string;
+  sizeBytes: number;
+  signerThumbprints: string[];
+  status: EndpointReleaseStatus;
+  notes: string | null;
+  createdBy: { emp: string; name: string | null };
+  createdAt: string;
+  publishedByEmp: string | null;
+  publishedAt: string | null;
+  revokedByEmp: string | null;
+  revokedAt: string | null;
+  /** 撤回回應才有:因此被改為「不升級」的環 */
+  clearedRings?: EndpointRing[];
+}
+
+/** 版本檔目錄中尚未登錄的檔案(GET /api/endpoint/releases/files) */
+export interface EndpointReleaseFile {
+  component: EndpointReleaseComponent;
+  version: string;
+  fileName: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface EndpointRingProgress {
+  total: number;
+  atTarget: number;
+  inProgress: number;
+  failed: number;
+  waiting: number;
+}
+
+/** 發佈環 × 元件的目標版本與進度(GET /api/endpoint/release-rings) */
+export interface EndpointRingTarget {
+  ring: EndpointRing;
+  component: EndpointReleaseComponent;
+  targetVersion: string | null;
+  targetSetAt: string | null;
+  updatedBy: { emp: string | null; name: string | null };
+  updatedAt: string;
+  progress: EndpointRingProgress;
+}
+
+export type EndpointUpgradeState = 'pending' | 'downloading' | 'verifying' | 'installing' | 'succeeded' | 'failed' | 'rolled_back';
+
+/** 電腦的升級狀態(GET /api/endpoint/devices/{id}/upgrade) */
+export interface EndpointDeviceUpgrade {
+  deviceId: string;
+  ring: EndpointRing;
+  upgrades: {
+    component: EndpointReleaseComponent;
+    currentVersion: string | null;
+    targetVersion: string | null;
+    /** forced = agent.upgrade 指定的版本 */
+    targetSource: 'forced' | 'ring' | null;
+    state: EndpointUpgradeState | null;
+    attempts: number;
+    errorCode: string | null;
+    errorMessage: string | null;
+    forcedBy: string | null;
+    updatedAt: string | null;
+  }[];
+}
+
+export type EndpointAlertRule =
+  'offline_long' | 'disk_low' | 'hardware_changed' | 'agent_restarts' | 'cert_expiring' | 'clock_skew' | 'agent_tampered' | 'agent_silent';
+
+/** 告警(GET /api/endpoint/alerts;RustIt P5-MONITOR-DESIGN §4) */
+export interface EndpointAlert {
+  alertId: string;
+  deviceId: string;
+  computerName: string;
+  rule: EndpointAlertRule | string;
+  severity: 'warn' | 'critical';
+  state: 'open' | 'resolved';
+  openedAt: string;
+  lastSeenAt: string;
+  resolvedAt: string | null;
+  resolvedBy: 'auto' | 'manual' | null;
+  resolvedByEmp: string | null;
+  resolvedByName: string | null;
+  resolveNote: string | null;
+  /** 規則的數值與依據(端點回報的內容,一律以文字顯示) */
+  detail: unknown;
+}
+
+export interface EndpointAlertPage {
+  items: EndpointAlert[];
+  nextCursor: string | null;
+}
+
+/** 健康走勢(GET /api/endpoint/devices/{deviceId}/health;5 分鐘分桶) */
+export interface EndpointHealthSeries {
+  deviceId: string;
+  bucketSec: number;
+  points: { at: string; cpuPct: number | null; memUsedPct: number | null; diskMinFreePct: number | null }[];
 }
 
 /** 電腦清單(GET /api/endpoint/devices;後端分頁,依電腦名稱排序) */
@@ -139,6 +276,12 @@ export interface EndpointDeviceDetail extends EndpointDevice {
   clockSkewMs?: number | null;
   /** 硬體指紋相同、未合併、未退役的其他裝置(RustIt P3) */
   suspectedDuplicates?: { deviceId: string; computerName: string; status: string; firstSeenAt: string; lastSeenAt: string }[];
+  /** 裝置憑證到期日(RustIt P5) */
+  certNotAfter?: string | null;
+  /** Watchdog 最近一次回報(RustIt P5-2;尚未回報為 null) */
+  watchdog?: EndpointWatchdog | null;
+  /** 未結束的告警(RustIt P5) */
+  alerts?: EndpointAlert[];
 }
 
 /** 電腦事件(GET /api/endpoint/devices/{deviceId}/events;新到舊,nextCursor 分頁) */
@@ -158,7 +301,18 @@ export interface EndpointDeviceEventPage {
   nextCursor: string | null;
 }
 /** 端點指令類型(RustIt docs/contracts/command-kinds.md;目前只開放 basic) */
-export type EndpointCommandKind = 'inventory.collect' | 'agent.diagnose' | 'logs.collect' | 'agent.log_level' | 'message.show' | 'agent.restart';
+export type EndpointCommandKind =
+  | 'inventory.collect'
+  | 'agent.diagnose'
+  | 'logs.collect'
+  | 'agent.log_level'
+  | 'message.show'
+  | 'agent.restart'
+  | 'agent.upgrade'
+  | 'software.install'
+  | 'software.uninstall'
+  | 'system.reboot'
+  | 'system.reboot.cancel';
 export type EndpointCommandState = 'queued' | 'sent' | 'acked' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'expired';
 
 /** 指令附檔(logs.collect 的日誌 zip;保存 14 天) */
@@ -176,6 +330,8 @@ export interface EndpointCommandFile {
 export interface EndpointCommand {
   commandId: string;
   batchId: string | null;
+  /** 所屬批次狀態(RustIt P7);待核可的單台批次(同一人 24 小時累計超過門檻)也會是 pending_approval */
+  batchState?: EndpointBatchState | null;
   deviceId: string;
   computerName: string;
   kind: EndpointCommandKind | string;
@@ -202,5 +358,180 @@ export interface EndpointCommand {
 /** 指令清單(新到舊;nextCursor 為下一頁游標) */
 export interface EndpointCommandPage {
   items: EndpointCommand[];
+  nextCursor: string | null;
+}
+
+// ---------- 軟體派送(RustIt P7;P7-SOFTWARE-DESIGN §3.5) ----------
+
+export type EndpointSoftwareStatus = 'draft' | 'tested' | 'published' | 'revoked';
+export type EndpointInstallerType = 'msi' | 'inno' | 'nsis' | 'burn' | 'exe';
+export type EndpointDetectType = 'msi_product_code' | 'display_name';
+export type EndpointRebootPolicy = 'never' | 'required';
+export type EndpointBatchState = 'pending_approval' | 'running' | 'done' | 'rejected' | 'expired';
+
+export interface EndpointSoftware {
+  packageId: string;
+  name: string;
+  version: string;
+  /** 軟體庫內相對路徑 {軟體}/{版本}/{檔名} */
+  fileName: string;
+  sha256: string;
+  sizeBytes: number;
+  installerType: EndpointInstallerType;
+  installArgs: string | null;
+  uninstallArgs: string | null;
+  detectType: EndpointDetectType;
+  detectValue: string;
+  rebootPolicy: EndpointRebootPolicy;
+  /** Agent 執行安裝 / 移除程式的逾時(秒,300–7200;RustIt 0009) */
+  timeoutSec: number;
+  signerThumbprints: string[];
+  observedSigners: string[];
+  licenseLimit: number | null;
+  /** 資料範圍內已安裝台數;只有已發佈套件才算,MSI 產品代碼無法計算為 null */
+  installedCount: number | null;
+  status: EndpointSoftwareStatus;
+  notes: string | null;
+  createdBy: { emp: string; name: string | null };
+  createdAt: string;
+  updatedByEmp: string | null;
+  updatedAt: string | null;
+  testedByEmp: string | null;
+  testedAt: string | null;
+  publishedBy: { emp: string; name: string | null } | null;
+  publishedAt: string | null;
+  revokedByEmp: string | null;
+  revokedAt: string | null;
+  /** 撤回時尚未送出而取消的安裝指令數(只有 revoke 回應有) */
+  canceledCommands?: number;
+}
+
+export interface EndpointSoftwareFile {
+  fileName: string;
+  software: string;
+  version: string;
+  sizeBytes: number;
+  modifiedAt: string;
+  /** 該路徑最新一筆上傳紀錄(RustIt S1-3;null = 直接放進軟體庫;舊版主機沒有此欄位) */
+  upload?: EndpointUploadRef | null;
+}
+
+// ---------- 套件上傳與送簽(RustIt S1-3 / S1-4;S1-SIGNING-DESIGN §4) ----------
+
+export type EndpointUploadState = 'uploaded' | 'queued' | 'signed' | 'rejected';
+
+/** 安裝檔對應的上傳紀錄摘要;簽章者欄位為簽章工作站回報(未驗證) */
+export interface EndpointUploadRef {
+  uploadId: string;
+  state: EndpointUploadState;
+  uploadedBy: { emp: string; name: string | null };
+  approvedBy: { emp: string; name: string | null } | null;
+  vendorSigner: string | null;
+  vendorSignerSubject: string | null;
+  vendorCheck: string | null;
+  signedSigner: string | null;
+  signedAt: string | null;
+  rejectCode: string | null;
+}
+
+export interface EndpointUpload {
+  uploadId: string;
+  /** {軟體}/{版本}/{安裝檔};簽章後放進軟體庫的同一路徑 */
+  fileName: string;
+  /** 原始檔(未重簽)的 SHA-256,主機計算 */
+  sha256: string;
+  sizeBytes: number;
+  state: EndpointUploadState;
+  source: 'upload' | 'incoming';
+  notes: string | null;
+  uploadedBy: { emp: string; name: string | null };
+  uploadedAt: string;
+  approvedBy: { emp: string; name: string | null } | null;
+  approvedAt: string | null;
+  rejectCode: string | null;
+  rejectReason: string | null;
+  rejectedByEmp: string | null;
+  rejectedAt: string | null;
+  vendorSigner: string | null;
+  vendorSignerSubject: string | null;
+  vendorCheck: string | null;
+  signedSigner: string | null;
+  signOperator: string | null;
+  /** 軟體庫內重簽後檔案的 SHA-256(主機重算確認) */
+  signedSha256: string | null;
+  signedAt: string | null;
+  /** 刪除上傳區原始檔的人與時間(只有已駁回可刪;RustIt migration 0012);null = 原始檔還在上傳區 */
+  fileDeletedByEmp: string | null;
+  fileDeletedAt: string | null;
+}
+
+export interface EndpointIncomingFile {
+  fileName: string;
+  software: string;
+  version: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface EndpointSoftwareTestResult {
+  commandId: string;
+  deviceId: string;
+  computerName: string;
+  state: string;
+  errorCode: string | null;
+  exitCode: number | null;
+  signer: string | null;
+  signerSubject: string | null;
+  detected: boolean | null;
+  /** Agent 偵測到的已安裝版本(Agent 0.9.2 起;已安裝時或安裝後) */
+  installedVersion?: string | null;
+  /** 安裝前偵測到的較舊版本(升級時) */
+  previousVersion?: string | null;
+  alreadyInstalled?: boolean | null;
+  /** 可作為 mark-tested 的依據 */
+  qualifies: boolean;
+  createdByEmp: string;
+  finishedAt: string | null;
+}
+
+export interface EndpointSoftwareDetail extends EndpointSoftware {
+  /** 查詢者有可管理所有公司的角色(才能登錄 / 修改 / 標記測試完成 / 發佈 / 撤回;舊版主機沒有此欄位) */
+  viewerScopeAll?: boolean;
+  /** 登錄檔案對應的 signed 上傳紀錄(RustIt S1-3;null = 直接放進軟體庫;舊版主機沒有此欄位) */
+  upload?: EndpointUploadRef | null;
+  testResults: EndpointSoftwareTestResult[];
+  installedDevices: { deviceId: string; computerName: string; name: string; version: string | null }[];
+}
+
+export interface EndpointDeployResult {
+  batchId: string;
+  state: EndpointBatchState;
+  requiresApproval: boolean;
+  commands: { deviceId: string; commandId: string; state: string }[];
+}
+
+/** 指令批次(GET /batches、/batches/{id};params 為建立批次時的參數) */
+export interface EndpointBatch {
+  batchId: string;
+  kind: string;
+  level: string;
+  params: Record<string, unknown>;
+  targetCount: number;
+  maxConcurrent: number;
+  state: EndpointBatchState;
+  requiresApproval: boolean;
+  approvalExpiresAt: string | null;
+  approvedBy: { emp: string; name: string | null } | null;
+  approvedAt: string | null;
+  rejectedBy: { emp: string; name: string | null } | null;
+  rejectedAt: string | null;
+  rejectReason: string | null;
+  createdBy: { emp: string; name: string | null };
+  createdAt: string;
+  counts: Record<string, number>;
+}
+
+export interface EndpointBatchPage {
+  items: EndpointBatch[];
   nextCursor: string | null;
 }

@@ -72,10 +72,26 @@ export const UI = {
   /** 停用 / 啟用 / 退役、合併疑似同一台(RustIt P3) */
   devAdmin: 'it.endpoint-device.admin',
   cmdList: 'it.endpoint-command.list',
+  /** 告警(RustIt P5):清單 Tab、關閉告警按鈕 */
+  alertList: 'it.endpoint-alert.list',
+  alertResolve: 'it.endpoint-alert.resolve',
+  /** Agent 版本(RustIt P6):清單 Tab、登錄 / 發佈 / 撤回 / 設定發佈環目標版本按鈕 */
+  releaseList: 'it.endpoint-release.list',
+  releaseManage: 'it.endpoint-release.manage',
+  /** 軟體派送(RustIt P7):清單 Tab;目錄管理(登錄 / 修改 / 測試完成 / 發佈 / 撤回)、派送、核可軟體批次、重新開機與核可非軟體批次 */
+  swList: 'it.endpoint-software.list',
+  swManage: 'it.endpoint-software.manage',
+  swDeploy: 'it.endpoint-software.deploy',
+  swApprove: 'it.endpoint-software.approve',
+  /** 上傳與簽章(RustIt S1-4):Tab;上傳、登錄上傳區檔案、核可 / 駁回送簽都在此 Tab(主機另要求可管理所有公司、核可人 ≠ 上傳者) */
+  swUpload: 'it.endpoint-software.upload',
+  devReboot: 'it.endpoint-device.reboot',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
   userRevoke: 'it.sys-user.revoke',
   userDisable: 'it.sys-user.disable',
+  /** 本機帳號建立 / 重置密碼(gw.admin.local.write) */
+  userPassword: 'it.sys-user.password',
   userDepts: 'it.sys-user.depts',
   roleRolePerm: 'it.sys-role.role-perm',
   roleRolePermEdit: 'it.sys-role.role-perm-edit',
@@ -143,6 +159,8 @@ export const EP = {
   commandBasic: 'endpoint.command.basic',
   /** 管理等級(RustIt P3 起:裝置停用 / 啟用 / 退役、合併;指令類型在 P6) */
   commandAdmin: 'endpoint.command.admin',
+  /** 版本登錄、發佈、撤回、設定發佈環目標版本(RustIt P6;主機另要求可管理所有公司) */
+  softwareManage: 'endpoint.software.manage',
 } as const;
 
 const kit = kitUseAuth();

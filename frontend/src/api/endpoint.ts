@@ -7,15 +7,44 @@
  * 指令只開放固定類型;結果一律以文字顯示(不用 v-html,RustIt P4-COMMAND-DESIGN §6.1)。
  * 電腦(RustIt P3,P3-DATA-DESIGN §3):清單分頁與篩選、事件、下載資產 JSON(endpoint.device.read);
  *   停用 / 啟用 / 退役 PUT /devices/{id}/status、合併 POST /devices/{id}/merge(endpoint.command.admin)。
+ * 升級(RustIt P6,P6-UPGRADE-DESIGN §2、§7):版本登錄 / 發佈 / 撤回、發佈環目標版本(endpoint.software.manage;讀取 endpoint.device.read)、
+ *   電腦所屬環 PUT /devices/{id}/ring 與立即升級 agent.upgrade(POST /devices/{id}/admin-commands,endpoint.command.admin)。
+ * 監測(RustIt P5,P5-MONITOR-DESIGN §3.3):健康走勢 GET /devices/{id}/health、告警 GET /alerts(endpoint.device.read)、
+ *   關閉告警 POST /alerts/{id}/resolve(endpoint.command.basic)。告警的 detail 來自端點回報,一律以文字顯示。
  */
-import { http, type Query } from '@/api/http';
+import { fmtTime, fromNow } from '@/api/format';
+import { readCookie, redirectToLogin, refreshSession } from '@giganexus/web-kit';
+import { ApiError, describeError, http, type Query } from '@/api/http';
 import type {
   EndpointCommand,
   EndpointCommandKind,
   EndpointCommandPage,
   EndpointCommandState,
+  EndpointAlert,
+  EndpointAlertPage,
+  EndpointAlertRule,
+  EndpointBatch,
+  EndpointBatchPage,
+  EndpointBatchState,
+  EndpointDeployResult,
+  EndpointSoftware,
+  EndpointSoftwareDetail,
+  EndpointSoftwareFile,
+  EndpointSoftwareStatus,
   EndpointDeviceEventPage,
   EndpointDevicePage,
+  EndpointDeviceUpgrade,
+  EndpointHealthSeries,
+  EndpointIncomingFile,
+  EndpointRelease,
+  EndpointReleaseComponent,
+  EndpointReleaseFile,
+  EndpointReleaseStatus,
+  EndpointRing,
+  EndpointRingTarget,
+  EndpointUpgradeState,
+  EndpointUpload,
+  EndpointUploadState,
 } from '@/api/types';
 
 const base = '/api/endpoint';
@@ -27,6 +56,11 @@ export const KIND_LABELS: Record<EndpointCommandKind, string> = {
   'agent.log_level': '調整日誌等級',
   'message.show': '傳送訊息',
   'agent.restart': '重新啟動 Agent',
+  'agent.upgrade': '立即升級',
+  'software.install': '安裝軟體',
+  'software.uninstall': '移除軟體',
+  'system.reboot': '重新開機',
+  'system.reboot.cancel': '取消重新開機',
 };
 
 export const STATE_LABELS: Record<EndpointCommandState, string> = {
@@ -51,6 +85,30 @@ export const STATE_TONES: Record<EndpointCommandState, 'neutral' | 'info' | 'suc
   expired: 'warning',
 };
 
+/** 軟體安裝 A6 延後原因(Agent 0.9.3 `result.deferred.reason`) */
+export const DEFER_LABELS: Record<string, string> = { battery: '電池供電', metered: '計量網路' };
+
+/** 延後中的軟體安裝(running + result.deferred);其他回 null */
+export function deferredOf(c: Pick<EndpointCommand, 'state' | 'result'>): { reason: string; nextCheckAt: string | null } | null {
+  if (c.state !== 'running') return null;
+  const d = c.result?.deferred as { reason?: unknown; next_check_at?: unknown } | undefined;
+  if (!d || typeof d !== 'object') return null;
+  const reason = typeof d.reason === 'string' ? d.reason : '';
+  return { reason: DEFER_LABELS[reason] ?? reason, nextCheckAt: typeof d.next_check_at === 'string' ? d.next_check_at : null };
+}
+
+/** 指令狀態文字:延後中的軟體安裝顯示「延後中(原因)」而不是「執行中」(P7 驗收 §5-4) */
+export function commandStateLabel(c: Pick<EndpointCommand, 'state' | 'result'>): string {
+  const d = deferredOf(c);
+  return d ? `延後中(${d.reason})` : STATE_LABELS[c.state];
+}
+export function commandStateTone(c: Pick<EndpointCommand, 'state' | 'result'>): (typeof STATE_TONES)[EndpointCommandState] {
+  return deferredOf(c) ? 'warning' : STATE_TONES[c.state];
+}
+
+/** 參數 / payload 的值:物件與陣列用 JSON 顯示(不顯示 [object Object],P7 驗收 §6) */
+export const paramText = (v: unknown): string => (v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v));
+
 /** 錯誤代碼說明(command-kinds.md) */
 export const ERROR_LABELS: Record<string, string> = {
   UNSUPPORTED_COMMAND: 'Agent 版本不支援此指令',
@@ -62,11 +120,34 @@ export const ERROR_LABELS: Record<string, string> = {
   NO_LOGS: '指定天數內沒有日誌',
   UPLOAD_FAILED: '日誌上傳失敗',
   EXECUTION_FAILED: '執行失敗',
+  // 軟體派送與重新開機(RustIt P7,command-kinds.md)
+  DOWNLOAD_FAILED: '安裝檔下載失敗',
+  HASH_MISMATCH: '安裝檔 SHA-256 不符,未安裝',
+  SIGNATURE_INVALID: '安裝檔簽章無效或未簽章,未安裝',
+  SIGNER_NOT_TRUSTED: '簽章者不在這台電腦的信任清單,未安裝',
+  DISK_FULL: '磁碟空間不足',
+  INSTALL_FAILED: '安裝 / 移除程式回報失敗(看結束代碼)',
+  INSTALL_TIMEOUT: '安裝逾時,已結束安裝程式',
+  INSTALL_BUSY: 'Windows Installer 仍在執行(等待後未啟動安裝,或 1618 重試後仍失敗)',
+  DETECT_FAILED: '結束代碼成功,但偵測結果與預期不符',
+  UNINSTALL_NOT_SUPPORTED: '找不到可用的移除方式,或此軟體不允許移除',
+  DEFERRED_TIMEOUT: '電池 / 計量網路延後下載超過上限',
+  REBOOT_LIMITED: '超過這台電腦的重新開機上限(開機未滿 30 分鐘、24 小時內 3 次,或有人登入時倒數少於 60 秒)',
+  REBOOT_PENDING: '電腦重新開機倒數中,未執行',
+  AGENT_UPGRADING: 'Agent 升級中,未執行',
+  PACKAGE_REVOKED: '套件已撤回,指令取消',
+  PACKAGE_CHANGED: '套件內容已修改,指令取消',
+  PACKAGE_FILE_CHANGED: '軟體庫安裝檔被換掉,指令取消',
+  BATCH_REJECTED: '批次被駁回,指令取消',
+  APPROVAL_EXPIRED: '批次 24 小時無人核可,指令取消',
 };
 
 export const isFinal = (s: EndpointCommandState) => !['queued', 'sent', 'acked', 'running'].includes(s);
 
 export const endpointApi = {
+  /** 管理等級指令(目前只有 agent.upgrade,P6;endpoint.command.admin) */
+  createAdmin: (deviceId: string, kind: EndpointCommandKind, params: Record<string, unknown> = {}) =>
+    http.post<EndpointCommand>(`${base}/devices/${encodeURIComponent(deviceId)}/admin-commands`, { kind, params }),
   create: (deviceId: string, kind: EndpointCommandKind, params: Record<string, unknown> = {}) =>
     http.post<EndpointCommand>(`${base}/devices/${encodeURIComponent(deviceId)}/basic-commands`, { kind, params }),
   get: (commandId: string) => http.get<EndpointCommand>(`${base}/commands/${encodeURIComponent(commandId)}`),
@@ -102,6 +183,24 @@ export const EVENT_LABELS: Record<string, string> = {
   usb_removed: 'USB 移除',
   offline_period: '離線期間',
   agent_started: 'Agent 啟動',
+  company_changed: '公司變更',
+  // RustIt P5:主機比對資產
+  software_installed: '安裝軟體',
+  software_removed: '移除軟體',
+  software_updated: '軟體更新',
+  software_changed_bulk: '大量軟體變更',
+  hardware_changed: '硬體變更',
+  // RustIt P5-2:Watchdog 與 Agent 互相看守
+  agent_restarted: 'Agent 重新啟動',
+  agent_service_stopped: 'Agent 服務被停止',
+  agent_start_type_changed: 'Agent 啟動類型被改',
+  agent_binary_missing: 'Agent 程式不見',
+  agent_binary_changed: 'Agent 程式被換',
+  agent_start_failed: 'Agent 無法啟動',
+  agent_pipe_impersonation: '本機管道被冒充',
+  watchdog_stopped: 'Watchdog 被停止',
+  watchdog_missing: 'Watchdog 不存在',
+  watchdog_binary_changed: 'Watchdog 程式被換',
 };
 
 export const EVENT_TONES: Record<string, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
@@ -109,11 +208,103 @@ export const EVENT_TONES: Record<string, 'neutral' | 'info' | 'success' | 'dange
   retired: 'danger',
   enabled: 'success',
   merged: 'info',
+  company_changed: 'info',
   duplicate_connection: 'warning',
   clock_skew: 'warning',
   suspected_duplicate: 'warning',
   fingerprint_changed: 'warning',
   offline_period: 'warning',
+  software_installed: 'info',
+  software_removed: 'info',
+  software_updated: 'info',
+  software_changed_bulk: 'warning',
+  hardware_changed: 'danger',
+  agent_restarted: 'warning',
+  agent_start_failed: 'danger',
+  agent_service_stopped: 'danger',
+  agent_start_type_changed: 'danger',
+  agent_binary_missing: 'danger',
+  agent_binary_changed: 'danger',
+  agent_pipe_impersonation: 'danger',
+  watchdog_stopped: 'danger',
+  watchdog_missing: 'danger',
+  watchdog_binary_changed: 'danger',
+};
+
+/** Windows 服務啟動類型(Watchdog / Agent 回報的 start_type) */
+export const START_TYPE_LABELS: Record<string, string> = { auto: '自動', manual: '手動', disabled: '停用', missing: '—', unknown: '未知' };
+export const startTypeLabel = (v: string) => START_TYPE_LABELS[v] ?? v;
+
+// ---------- 告警(RustIt P5) ----------
+
+export const ALERT_RULE_LABELS: Record<EndpointAlertRule, string> = {
+  offline_long: '離線過久',
+  disk_low: '磁碟空間不足',
+  hardware_changed: '硬體變更',
+  agent_restarts: 'Agent 反覆重啟',
+  cert_expiring: '憑證即將到期',
+  clock_skew: '時鐘偏差',
+  agent_tampered: 'Agent / Watchdog 被變更',
+  agent_silent: 'Agent 沒有回應',
+};
+
+export const ALERT_SEVERITY_LABELS: Record<EndpointAlert['severity'], string> = { critical: '嚴重', warn: '警告' };
+export const ALERT_SEVERITY_TONES: Record<EndpointAlert['severity'], 'danger' | 'warning'> = { critical: 'danger', warn: 'warning' };
+export const alertRuleLabel = (rule: string) => ALERT_RULE_LABELS[rule as EndpointAlertRule] ?? rule;
+
+const HW_COMPONENTS: Record<string, string> = { memory: '記憶體', disk: '磁碟', gpu: '顯示卡', bios: 'BIOS', board: '主機板', cpu: 'CPU' };
+
+type Data = Record<string, unknown>;
+const txt = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+const list = (v: unknown) => (Array.isArray(v) ? v.map(txt).join('、') : txt(v));
+
+/** 事件類規則:同一台已有未結束告警時,後續事件只更新 last_seen_at,detail 保留第一次觸發(RustIt P5-MONITOR-DESIGN §8.1) */
+const FIRST_DETAIL_RULES = new Set<string>(['hardware_changed', 'agent_tampered']);
+export const alertDetailHint = (rule: string) => (FIRST_DETAIL_RULES.has(rule) ? '此為第一次觸發的內容,之後的事件請看電腦詳情的「事件」Tab' : undefined);
+
+/** 告警 detail 摘要成一行文字(RustIt P5-MONITOR-DESIGN §4;內容來自端點,呼叫端以文字顯示) */
+export function alertSummary(a: Pick<EndpointAlert, 'rule' | 'detail'>): string {
+  const d = (a.detail && typeof a.detail === 'object' ? a.detail : {}) as Data;
+  switch (a.rule) {
+    case 'offline_long':
+      return `最後回報 ${fmtTime(txt(d.lastSeenAt))}(${txt(d.days)} 天)`;
+    case 'disk_low':
+      return `${txt(d.drive) || '磁碟'} 剩餘 ${txt(d.freePct)}%`;
+    case 'hardware_changed':
+      return `首次:${HW_COMPONENTS[txt(d.component)] ?? txt(d.component)}:${list(d.before) || '—'} → ${list(d.after) || '—'}`;
+    case 'agent_restarts':
+      return `24 小時內非正常重啟 ${txt(d.restarts24h)} 次`;
+    case 'cert_expiring': {
+      const days = Number(d.days);
+      return `到期 ${fmtTime(txt(d.certNotAfter))}(${Number.isFinite(days) && days < 0 ? '已過期' : `剩 ${txt(d.days)} 天`})`;
+    }
+    case 'clock_skew':
+      return `端點時鐘與主機相差 ${Math.round(Number(d.clockSkewMs) / 1000)} 秒`;
+    case 'agent_tampered': {
+      const ev = EVENT_LABELS[txt(d.type)] ?? txt(d.type);
+      const n = Number(d.count);
+      return `首次:${ev}${Number.isFinite(n) && n > 1 ? `(同批 ${n} 筆)` : ''}`;
+    }
+    case 'agent_silent':
+      return `Watchdog ${fromNow(txt(d.watchdogReportAt))}有回報,Agent 最後回報 ${fromNow(txt(d.lastSeenAt))}`;
+    default:
+      return Object.keys(d).length ? JSON.stringify(d) : '';
+  }
+}
+
+export interface AlertListQuery extends Query {
+  /** open(預設)/ resolved / all */
+  state?: 'open' | 'resolved' | 'all';
+  rule?: string;
+  severity?: string;
+  deviceId?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export const alertApi = {
+  list: (query: AlertListQuery = {}) => http.get<EndpointAlertPage>(`${base}/alerts`, { query }),
+  resolve: (alertId: string, note: string) => http.post<EndpointAlert>(`${base}/alerts/${encodeURIComponent(alertId)}/resolve`, { note }),
 };
 
 export interface DeviceListQuery extends Query {
@@ -149,9 +340,302 @@ export const deviceApi = {
     http.put<{ deviceId: string; status: DeviceStatus; changed: boolean }>(`${base}/devices/${encodeURIComponent(deviceId)}/status`, { status, reason }),
   merge: (deviceId: string, sourceDeviceId: string, reason: string, force = false) =>
     http.post<MergeResponse>(`${base}/devices/${encodeURIComponent(deviceId)}/merge`, { sourceDeviceId, reason, force }),
+  /** 健康走勢(RustIt P5;hours 1–24) */
+  health: (deviceId: string, hours = 24) => http.get<EndpointHealthSeries>(`${base}/devices/${encodeURIComponent(deviceId)}/health`, { query: { hours } }),
+  /** 升級狀態(RustIt P6):所屬環、各元件目前 / 目標版本與最後錯誤 */
+  upgrade: (deviceId: string) => http.get<EndpointDeviceUpgrade>(`${base}/devices/${encodeURIComponent(deviceId)}/upgrade`),
+  /** 調整所屬環(endpoint.command.admin;進出 pilot 另需可管理所有公司) */
+  setRing: (deviceId: string, ring: EndpointRing) =>
+    http.put<EndpointDeviceUpgrade>(`${base}/devices/${encodeURIComponent(deviceId)}/ring`, { ring }),
 };
 
 /** 資產 JSON 下載網址(同網域,瀏覽器以 Cookie 驗證;BFF 權限 endpoint.device.read) */
 export function inventoryJsonUrl(deviceId: string): string {
   return `${base}/devices/${encodeURIComponent(deviceId)}/inventory.json`;
 }
+
+// ---------- Agent 版本與發佈環(RustIt P6) ----------
+
+export const RELEASE_COMPONENT_LABELS: Record<EndpointReleaseComponent, string> = { agent: 'Agent', watchdog: 'Watchdog' };
+export const RELEASE_STATUS_LABELS: Record<EndpointReleaseStatus, string> = { draft: '草稿', published: '已發佈', revoked: '已撤回' };
+export const RELEASE_STATUS_TONES: Record<EndpointReleaseStatus, 'neutral' | 'success' | 'danger'> = { draft: 'neutral', published: 'success', revoked: 'danger' };
+export const RING_LABELS: Record<EndpointRing, string> = { pilot: 'pilot(IT 測試機)', it: 'it(IT 部門)', all: 'all(全公司)' };
+export const RING_SHORT: Record<EndpointRing, string> = { pilot: 'pilot', it: 'it', all: 'all' };
+
+export const UPGRADE_STATE_LABELS: Record<EndpointUpgradeState, string> = {
+  pending: '等待開始',
+  downloading: '下載中',
+  verifying: '驗證中',
+  installing: '安裝中',
+  succeeded: '已升級',
+  failed: '失敗',
+  rolled_back: '已還原',
+};
+export const UPGRADE_STATE_TONES: Record<EndpointUpgradeState, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
+  pending: 'neutral',
+  downloading: 'info',
+  verifying: 'info',
+  installing: 'info',
+  succeeded: 'success',
+  failed: 'danger',
+  rolled_back: 'warning',
+};
+
+/** 升級錯誤代碼說明(RustIt docs/contracts/event.schema.json UpgradeErrorCode) */
+export const UPGRADE_ERROR_LABELS: Record<string, string> = {
+  DOWNLOAD_FAILED: '下載失敗',
+  HASH_MISMATCH: 'SHA-256 或版本不符',
+  SIGNATURE_INVALID: '簽章無效或未簽章',
+  SIGNER_NOT_TRUSTED: '簽章者不受信任',
+  PREPARE_TIMEOUT: 'Agent 收尾逾時',
+  STOP_TIMEOUT: '停止服務逾時',
+  REPLACE_FAILED: '替換檔案失敗',
+  HEALTH_CHECK_FAILED: '新版啟動後不正常(已還原)',
+  ROLLBACK_FAILED: '還原失敗',
+  DISK_FULL: '磁碟空間不足',
+};
+export const upgradeErrorLabel = (code: string | null) => (code ? (UPGRADE_ERROR_LABELS[code] ?? code) : '');
+
+/** 版本號由小到大比較(核心 x.y.z;預發行字尾較小),選單排序用 */
+export function compareVersion(a: string, b: string): number {
+  const core = (v: string) => (v.split('-')[0] ?? '').split('.').map((n) => Number(n) || 0);
+  const [x, y] = [core(a), core(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
+  const [pa, pb] = [a.includes('-'), b.includes('-')];
+  return pa === pb ? a.localeCompare(b) : pa ? -1 : 1;
+}
+
+export const releaseApi = {
+  list: (query: { component?: EndpointReleaseComponent; status?: EndpointReleaseStatus } = {}) => http.get<{ items: EndpointRelease[] }>(`${base}/releases`, { query }),
+  /** 版本檔目錄中尚未登錄的檔案(簽章人員放進目錄後才會出現) */
+  files: () => http.get<{ items: EndpointReleaseFile[] }>(`${base}/releases/files`),
+  register: (body: { component: EndpointReleaseComponent; version: string; fileName: string; signerThumbprints: string[]; notes?: string }) =>
+    http.post<EndpointRelease>(`${base}/releases`, body),
+  // 後端 schema 不接受沒有 body 的 JSON POST:一律帶 {}
+  publish: (releaseId: string) => http.post<EndpointRelease>(`${base}/releases/${encodeURIComponent(releaseId)}/publish`, {}),
+  revoke: (releaseId: string) => http.post<EndpointRelease>(`${base}/releases/${encodeURIComponent(releaseId)}/revoke`, {}),
+  rings: () => http.get<{ items: EndpointRingTarget[] }>(`${base}/release-rings`),
+  /** targetVersion = null:不升級;pilot 未滿 24 小時就設 it / all 回 409 ITA_RING_TOO_EARLY,確認後帶 force */
+  setRing: (ring: EndpointRing, component: EndpointReleaseComponent, targetVersion: string | null, force = false) =>
+    http.put<EndpointRingTarget>(`${base}/release-rings/${ring}/${component}`, { targetVersion, force }),
+};
+
+/** 管理 API 錯誤代碼說明(軟體派送;錯誤提示補充用,describeError 之外的人話) */
+export const SOFTWARE_API_ERRORS: Record<string, string> = {
+  ITA_PACKAGE_NOT_PUBLISHED: '此套件尚未發佈,只能派送到 pilot 環的測試機',
+  ITA_PACKAGE_REVOKED: '此套件已撤回,不能再安裝',
+  ITA_PACKAGE_NOT_FOUND: '找不到此套件',
+  ITA_PACKAGE_EXISTS: '同名同版本或同一檔案已登錄過',
+  ITA_PACKAGE_NOT_TESTED: '還沒有 pilot 測試機以目前的檔案與參數安裝成功的紀錄',
+  ITA_SIGNER_NOT_OBSERVED: '簽章者必須是測試機回報的實際簽章者',
+  ITA_LICENSE_EXCEEDED: '超過授權數',
+  ITA_APPROVER_SAME_AS_CREATOR: '核可人不可是批次建立人,請由另一位 IT 核可',
+  ITA_APPROVAL_ROUTE_MISMATCH: '批次類型與核可路徑不符',
+  ITA_BATCH_NOT_PENDING: '批次不是待核可,或已超過 24 小時核可期限',
+  ITA_REVIEWER_SAME_AS_CREATOR: '發佈人不可是登錄人,請由另一位 IT 發佈',
+  ITA_REVIEWER_SAME_AS_EDITOR: '發佈人不可是上次發佈以來修改過安裝參數的人',
+  ITA_REVIEWER_NOT_PERSON: '發佈者需要有工號',
+  ITA_SCOPE_ALL_REQUIRED: '需要可管理所有公司的角色',
+  ITA_COMMAND_LIMIT: '這台電腦同類型的未結束指令已達上限',
+  ITA_UPLOAD_NOT_SIGNED: '這個安裝檔有上傳紀錄但還沒完成簽章(或簽章後被更換),不能登錄',
+  ITA_UPLOAD_EXISTS: '同一路徑已有待核可或送簽中的上傳',
+  ITA_UPLOAD_FILE_EXISTS: '上傳區或軟體庫已有同一路徑的檔案,換版本請用新的版本資料夾',
+  ITA_UPLOAD_TOO_LARGE: '檔案超過大小上限',
+  ITA_UPLOAD_BUSY: '同時上傳的檔案太多,請等其他上傳完成',
+  ITA_UPLOAD_TIMEOUT: '上傳中斷超過 2 分鐘,請重新上傳',
+  ITA_UPLOAD_SAME_PERSON: '上傳者不能核可自己的上傳,請由另一位 IT 核可',
+  ITA_UPLOAD_STATE: '上傳紀錄的狀態已變更,請重新整理',
+  ITA_UPLOAD_FILE_CHANGED: '上傳區的檔案在核可前被更換,已自動駁回',
+  ITA_UPLOAD_NOT_FOUND: '找不到此上傳紀錄',
+  ITA_UPLOAD_FILE_NOT_FOUND: '上傳區找不到這個檔案(可能已被刪除)',
+  ITA_UPLOAD_FILE_IN_USE: '同一路徑有待核可、送簽中或已簽章的上傳,原始檔不能刪除',
+  ITA_UPLOAD_FILE_DELETED: '原始檔已刪除',
+  ITA_UPLOAD_NOT_FILE: '上傳區的這個路徑不是一般檔案,請由主機管理員處理',
+  ITA_UPLOAD_FILE_MISMATCH: '上傳區的檔案和這筆上傳不同(可能是之後放進來的),請從「上傳安裝檔 › 從上傳區登錄」選該檔案刪除',
+};
+
+/** 錯誤訊息:已知的管理 API 錯誤代碼補人話,其餘用 describeError */
+export function softwareErrorText(e: unknown): string {
+  const known = e instanceof ApiError ? SOFTWARE_API_ERRORS[e.code] : undefined;
+  return known ? `${known}(${describeError(e)})` : describeError(e);
+}
+
+// ---------- 軟體派送(RustIt P7) ----------
+
+export const SOFTWARE_STATUS_LABELS: Record<EndpointSoftwareStatus, string> = { draft: '草稿', tested: '已測試', published: '已發佈', revoked: '已撤回' };
+export const SOFTWARE_STATUS_TONES: Record<EndpointSoftwareStatus, 'neutral' | 'info' | 'success' | 'danger'> = {
+  draft: 'neutral',
+  tested: 'info',
+  published: 'success',
+  revoked: 'danger',
+};
+export const INSTALLER_LABELS: Record<string, string> = { msi: 'MSI', inno: 'Inno Setup', nsis: 'NSIS', burn: 'WiX Burn', exe: '其他 exe(參數完全自訂)' };
+export const DETECT_LABELS: Record<string, string> = { msi_product_code: 'MSI 產品代碼', display_name: '登錄檔顯示名稱(% 為萬用字元)' };
+export const REBOOT_POLICY_LABELS: Record<string, string> = { never: '不需要(3010 只標記)', required: '安裝後需要重新開機' };
+export const BATCH_STATE_LABELS: Record<EndpointBatchState, string> = {
+  pending_approval: '待核可',
+  running: '進行中',
+  done: '已完成',
+  rejected: '已駁回',
+  expired: '逾期未核可',
+};
+export const BATCH_STATE_TONES: Record<EndpointBatchState, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
+  pending_approval: 'warning',
+  running: 'info',
+  done: 'success',
+  rejected: 'danger',
+  expired: 'neutral',
+};
+
+/** 軟體派送批次走 /approve、/reject(endpoint.software.manage);其他批次(system.reboot)走 -command(endpoint.command.admin) */
+export const isSoftwareBatchKind = (kind: string) => kind === 'software.install' || kind === 'software.uninstall';
+
+export interface SoftwareBody {
+  name: string;
+  version: string;
+  fileName: string;
+  installerType: string;
+  installArgs?: string;
+  uninstallArgs?: string;
+  detectType: string;
+  detectValue: string;
+  rebootPolicy: string;
+  /** 安裝逾時(秒,300–7200;省略 = 1800) */
+  timeoutSec?: number;
+  licenseLimit: number | null;
+  notes?: string;
+}
+
+/** 套件安裝逾時範圍(與 RustIt ItAgentBack 相同;主機會再驗) */
+export const SOFTWARE_TIMEOUT_MIN = 300;
+export const SOFTWARE_TIMEOUT_MAX = 7200;
+export const SOFTWARE_TIMEOUT_DEFAULT = 1800;
+/** 逾時輸入的錯誤訊息;通過回 null */
+export const softwareTimeoutError = (v: string) => {
+  const n = Number(v.trim());
+  return v.trim() !== '' && Number.isInteger(n) && n >= SOFTWARE_TIMEOUT_MIN && n <= SOFTWARE_TIMEOUT_MAX
+    ? null
+    : `請填 ${SOFTWARE_TIMEOUT_MIN}–${SOFTWARE_TIMEOUT_MAX} 秒的整數`;
+};
+
+export const softwareApi = {
+  list: (query: { status?: EndpointSoftwareStatus; q?: string } = {}) => http.get<{ items: EndpointSoftware[] }>(`${base}/software`, { query }),
+  /** 軟體庫中尚未登錄的安裝檔(endpoint.software.manage) */
+  files: () => http.get<{ items: EndpointSoftwareFile[] }>(`${base}/software/files`),
+  get: (packageId: string) => http.get<EndpointSoftwareDetail>(`${base}/software/${encodeURIComponent(packageId)}`),
+  register: (body: SoftwareBody) => http.post<EndpointSoftware>(`${base}/software`, body),
+  update: (packageId: string, body: Partial<Pick<SoftwareBody, 'installArgs' | 'uninstallArgs' | 'detectType' | 'detectValue' | 'rebootPolicy' | 'timeoutSec' | 'licenseLimit' | 'notes'>>) =>
+    http.put<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}`, body),
+  markTested: (packageId: string, signerThumbprints: string[]) =>
+    http.post<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}/mark-tested`, { signerThumbprints }),
+  // 後端 schema 不接受沒有 body 的 JSON POST:一律帶 {}
+  publish: (packageId: string) => http.post<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}/publish`, {}),
+  revoke: (packageId: string) => http.post<EndpointSoftware>(`${base}/software/${encodeURIComponent(packageId)}/revoke`, {}),
+  /** 多台批次派送(endpoint.command.admin);> 20 台進入待核可。同一個 Idempotency-Key 重送回傳同一批 */
+  deploy: (packageId: string, body: { action: 'install' | 'uninstall'; deviceIds: string[]; ignorePower?: boolean }, idempotencyKey?: string) =>
+    http.post<EndpointDeployResult>(`${base}/software/${encodeURIComponent(packageId)}/deploy`, body, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+};
+
+// ---------- 套件上傳與送簽(RustIt S1-3 / S1-4) ----------
+
+export const UPLOAD_STATE_LABELS: Record<EndpointUploadState, string> = { uploaded: '待核可', queued: '送簽中', signed: '已簽章', rejected: '已駁回' };
+export const UPLOAD_STATE_TONES: Record<EndpointUploadState, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
+  uploaded: 'warning',
+  queued: 'info',
+  signed: 'success',
+  rejected: 'danger',
+};
+export const UPLOAD_REJECT_LABELS: Record<string, string> = {
+  REJECTED: '人工駁回',
+  INCOMING_CHANGED: '核可前檔案被更換',
+  RESULT_MISMATCH: '簽章結果與軟體庫檔案不符',
+  SIGN_JOB_WRITE_FAILED: '送簽工作單寫入失敗',
+  HASH_MISMATCH: '工作站:檔案雜湊不符',
+  VENDOR_NOT_ALLOWED: '工作站:原廠簽章者不在白名單',
+};
+/** 主機預設上限(SOFTWARE_MAX_BYTES 4 GB);實際以主機回應為準 */
+export const UPLOAD_MAX_BYTES = 4 * 1024 ** 3;
+/** {軟體}/{版本}/{檔名}.msi|.exe:與主機 SEGMENT_RE(RustIt software-files.ts)相同;實際以主機檢查為準 */
+export const UPLOAD_SEGMENT_RE = /^(?:[A-Za-z0-9_+-]|[A-Za-z0-9_+-][A-Za-z0-9._ +-]{0,98}[A-Za-z0-9_+-])$/;
+export function uploadPathError(software: string, version: string, fileName: string): string | null {
+  for (const [label, v] of [
+    ['軟體', software],
+    ['版本', version],
+    ['檔名', fileName],
+  ] as const)
+    if (!UPLOAD_SEGMENT_RE.test(v)) return `${label}只能用英數字、空白與 . _ + -(1–100 字,開頭結尾不可為點或空白)`;
+  return /\.(msi|exe)$/i.test(fileName) ? null : '只接受 .msi 或 .exe';
+}
+
+/**
+ * 串流上傳安裝檔(POST /api/endpoint/software/uploads?fileName=,application/octet-stream):
+ * Gateway Nginx 先向 BFF 驗證(登入、endpoint.software.manage、CSRF)再直送 Endpoint Server(4 GB,不經 BFF 本體上限)。
+ * web-kit http 只送 JSON / FormData、沒有進度,這裡用 XHR:同網域 Cookie、手動帶 X-CSRF-Token;401 換發一次後重送,仍失敗導向登入。
+ */
+export function uploadInstaller(file: File, fileName: string, onProgress: (loaded: number, total: number) => void, signal?: AbortSignal): Promise<EndpointUpload> {
+  const url = withQueryPath(`${base}/software/uploads`, { fileName });
+  const send = (retried: boolean): Promise<EndpointUpload> =>
+    new Promise<{ status: number; text: string; requestId: string | null }>((resolve, reject) => {
+      // 401 換發期間已按取消:不再重送(資安審查 L1)
+      if (signal?.aborted) return reject(new DOMException('已取消上傳', 'AbortError'));
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.setRequestHeader('Accept', 'application/json');
+      const csrf = readCookie('gn_csrf');
+      if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
+      xhr.upload.onprogress = (e) => onProgress(e.loaded, e.lengthComputable ? e.total : file.size);
+      const onAbort = () => xhr.abort();
+      xhr.onloadend = () => signal?.removeEventListener('abort', onAbort);
+      xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText, requestId: xhr.getResponseHeader('X-Request-Id') });
+      xhr.onerror = () => reject(new TypeError('network'));
+      xhr.onabort = () => reject(new DOMException('已取消上傳', 'AbortError'));
+      signal?.addEventListener('abort', onAbort, { once: true });
+      xhr.send(file);
+    }).then(async ({ status, text, requestId }) => {
+      if (status === 401 && !retried) {
+        if (await refreshSession()) return send(true);
+        redirectToLogin();
+      }
+      let data: { code?: string; message?: string; requestId?: string; details?: unknown } | null = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+      if (status < 200 || status >= 300)
+        throw new ApiError(status, data?.code ?? `HTTP_${status}`, data?.message ?? `上傳失敗(HTTP ${status})`, data?.requestId ?? requestId, data?.details);
+      return data as unknown as EndpointUpload;
+    });
+  return send(false);
+}
+function withQueryPath(path: string, query: Record<string, string>): string {
+  return `${path}?${new URLSearchParams(query).toString()}`;
+}
+
+export const uploadApi = {
+  /** 上傳與送簽紀錄(新到舊,最多 500 筆;endpoint.software.manage) */
+  list: (state?: EndpointUploadState) => http.get<{ items: EndpointUpload[] }>(`${base}/software/uploads`, { query: { state } }),
+  /** 網路芳鄰放進 incoming 內尚未登錄的檔案(過渡期) */
+  incoming: () => http.get<{ items: EndpointIncomingFile[] }>(`${base}/software/uploads/incoming`),
+  get: (uploadId: string) => http.get<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}`),
+  register: (fileName: string, notes?: string) => http.post<EndpointUpload>(`${base}/software/uploads/register`, { fileName, ...(notes ? { notes } : {}) }),
+  approve: (uploadId: string) => http.post<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/approve`, {}),
+  reject: (uploadId: string, reason: string) => http.post<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/reject`, { reason }),
+  /** 刪除已駁回上傳的上傳區原始檔(紀錄保留,記錄刪除人) */
+  deleteFile: (uploadId: string) => http.delete<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/file`),
+  /** 刪除上傳區內未登錄的檔案(網路芳鄰放進來的、已駁回後仍在的) */
+  deleteIncoming: (fileName: string) =>
+    http.delete<{ fileName: string; partsRemoved: number; markedUploads: number }>(`${base}/software/uploads/incoming`, { query: { fileName } }),
+};
+
+export const batchApi = {
+  /** 批次清單(新到舊;RustIt P7-5 補);待核可清單用 state=pending_approval */
+  list: (query: { state?: EndpointBatchState; cursor?: string; limit?: number } = {}) => http.get<EndpointBatchPage>(`${base}/batches`, { query }),
+  get: (batchId: string) => http.get<EndpointBatch>(`${base}/batches/${encodeURIComponent(batchId)}`),
+  approve: (batch: Pick<EndpointBatch, 'batchId' | 'kind'>) =>
+    http.post<EndpointBatch>(`${base}/batches/${encodeURIComponent(batch.batchId)}/approve${isSoftwareBatchKind(batch.kind) ? '' : '-command'}`, {}),
+  reject: (batch: Pick<EndpointBatch, 'batchId' | 'kind'>, reason: string) =>
+    http.post<EndpointBatch>(`${base}/batches/${encodeURIComponent(batch.batchId)}/reject${isSoftwareBatchKind(batch.kind) ? '' : '-command'}`, { reason }),
+};

@@ -4,7 +4,7 @@
  * result 由 Agent 回報,一律以文字顯示(不用 v-html,RustIt P4-COMMAND-DESIGN §6.1)。
  */
 import { computed } from 'vue';
-import { commandFileUrl, ERROR_LABELS, KIND_LABELS, STATE_LABELS, STATE_TONES } from '@/api/endpoint';
+import { commandFileUrl, commandStateLabel, commandStateTone, deferredOf, ERROR_LABELS, KIND_LABELS, paramText } from '@/api/endpoint';
 import { fmtSize, fmtTime } from '@/api/format';
 import type { EndpointCommand, EndpointCommandKind } from '@/api/types';
 
@@ -29,13 +29,14 @@ const CHECK_LABELS: Record<string, string> = {
 };
 const CHECK_TONES: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = { ok: 'success', warn: 'warning', fail: 'danger', skipped: 'neutral' };
 const checks = computed(() => (Array.isArray(r.value.checks) ? (r.value.checks as Check[]) : []));
-const text = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : String(v));
+const text = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : paramText(v));
 const kindLabel = (k: string) => KIND_LABELS[k as EndpointCommandKind] ?? k;
-const paramText = computed(() => {
+const paramsLine = computed(() => {
   const p = c.value.params ?? {};
   const keys = Object.keys(p);
-  return keys.length ? keys.map((k) => `${k} = ${String(p[k])}`).join(',') : '';
+  return keys.length ? keys.map((k) => `${k} = ${paramText(p[k])}`).join(',') : '';
 });
+const deferred = computed(() => deferredOf(c.value));
 const timeline = computed(() =>
   [
     ['建立', c.value.createdAt],
@@ -50,15 +51,23 @@ const timeline = computed(() =>
 <template>
   <div class="stack" style="--gap: 12px">
     <div class="row" style="--gap: 8px">
-      <GBadge :tone="STATE_TONES[c.state]" dot>{{ STATE_LABELS[c.state] }}</GBadge>
+      <GBadge :tone="commandStateTone(c)" dot>{{ commandStateLabel(c) }}</GBadge>
       <strong>{{ kindLabel(c.kind) }}</strong>
-      <span v-if="paramText" class="faint small mono">{{ paramText }}</span>
+      <span v-if="paramsLine" class="faint small mono">{{ paramsLine }}</span>
       <span class="spacer" />
       <span class="faint small">{{ c.createdBy.name ?? c.createdBy.emp }}({{ c.createdBy.emp }})· {{ fmtTime(c.createdAt) }}</span>
     </div>
 
-    <p v-if="c.state === 'queued'" class="small muted" style="margin: 0">電腦連線後送出;{{ fmtTime(c.expiresAt) }} 前未送達即過期,不會執行。</p>
+    <p v-if="c.batchState === 'pending_approval'" class="small" style="margin: 0">
+      <GBadge tone="warning">待核可</GBadge> 此指令所屬批次需要另一位 IT 核可後才會送出(24 小時內未核可會自動取消)。
+    </p>
+    <p v-else-if="c.state === 'queued'" class="small muted" style="margin: 0">電腦連線後送出;{{ fmtTime(c.expiresAt) }} 前未送達即過期,不會執行。</p>
     <p v-else-if="c.state === 'expired'" class="small muted" style="margin: 0">電腦在有效期限內沒有連線,指令未執行。</p>
+    <p v-else-if="deferred" class="small muted" style="margin: 0">
+      電腦目前{{ deferred.reason }},Agent 延後下載(每 5 分鐘重新檢查,最多 4 小時;計量網路不因「略過電池延後」而略過){{
+        deferred.nextCheckAt ? `;下次檢查 ${fmtTime(deferred.nextCheckAt)}` : ''
+      }}。
+    </p>
 
     <div v-if="c.state === 'failed'" class="small">
       <GBadge tone="danger" mono>{{ c.errorCode ?? 'FAILED' }}</GBadge>
@@ -123,6 +132,38 @@ const timeline = computed(() =>
       </p>
       <p v-else-if="c.kind === 'message.show'" class="small" style="margin: 0">已顯示在電腦主控台的使用者畫面(工作階段 {{ text(r.session_id) }})</p>
       <p v-else-if="c.kind === 'agent.restart'" class="small" style="margin: 0">Agent 已於 {{ fmtTime(text(r.restarted_at)) }} 重新啟動</p>
+      <!-- 軟體派送(RustIt P7):結束代碼、簽章者、偵測結果;log_tail 來自安裝程式記錄(已遮罩),以文字顯示 -->
+      <template v-else-if="c.kind === 'software.install' || c.kind === 'software.uninstall'">
+        <p class="small" style="margin: 0">
+          <template v-if="r.already_installed"
+            >已經安裝{{ r.installed_version ? `(偵測到 ${text(r.installed_version)}${r.version_unknown ? ',無法比較版本' : ''})` : '' }},未重複執行。</template
+          >
+          <template v-else-if="r.already_absent">本來就沒有安裝,未執行移除。</template>
+          <template v-else>{{ c.kind === 'software.install' ? '安裝' : '移除' }}完成,結束代碼 {{ text(r.exit_code) }},耗時 {{ Math.round(Number(r.duration_ms ?? 0) / 1000) }} 秒。</template>
+          <GBadge v-if="r.reboot_required" tone="warning">需要重新開機</GBadge>
+          <GBadge v-if="r.detected === true" tone="success">偵測到已安裝</GBadge>
+        </p>
+        <p v-if="!r.already_installed && (r.installed_version || r.previous_version)" class="faint small" style="margin: 0">
+          偵測到版本 <span class="mono">{{ text(r.installed_version) || '—' }}</span>
+          <template v-if="r.previous_version">(安裝前 <span class="mono">{{ text(r.previous_version) }}</span>)</template>
+        </p>
+        <p v-if="r.interrupted" class="faint small" style="margin: 0">Agent 在確認結果期間停止(服務停止或關機),請重新派送確認。</p>
+        <p v-if="r.installer_busy" class="faint small" style="margin: 0">
+          Windows Installer 仍在執行(可能是逾時的 MSI 在背景繼續);同一台的下一筆 MSI 會先等它結束(最多 15 分鐘),逾時前的變更不會回復。
+        </p>
+        <p v-if="r.signer" class="faint small" style="margin: 0">
+          簽章者 <span class="mono">{{ text(r.signer) }}</span>
+          <template v-if="r.signer_subject">({{ text(r.signer_subject) }})</template>
+        </p>
+        <pre v-if="r.log_tail && !compact" class="small mono result-raw">{{ text(r.log_tail) }}</pre>
+      </template>
+      <p v-else-if="c.kind === 'system.reboot'" class="small" style="margin: 0">
+        <template v-if="r.rebooted">電腦已重新開機({{ fmtTime(text(r.recovered_at)) }} 確認)。</template>
+        <template v-else
+          >已排程於 {{ text(r.delay_sec) }} 秒後重新開機{{ r.force ? '(強制關閉應用程式)' : '' }}{{ r.notified ? ',已通知使用者' : ',未顯示通知(沒有登入者或不倒數)' }}。</template
+        >
+      </p>
+      <p v-else-if="c.kind === 'system.reboot.cancel'" class="small" style="margin: 0">{{ r.aborted ? '已取消重新開機倒數。' : '沒有進行中的倒數,未取消。' }}</p>
       <pre v-else class="small mono result-raw">{{ JSON.stringify(r, null, 2) }}</pre>
     </template>
 
