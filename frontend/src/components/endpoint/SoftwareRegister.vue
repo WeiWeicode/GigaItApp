@@ -14,6 +14,7 @@ import {
   softwareApi,
   softwareErrorText,
   softwareTimeoutError,
+  UPLOAD_STATE_LABELS,
 } from '@/api/endpoint';
 import { fmtBytes } from '@/api/format';
 import { describeError } from '@/api/http';
@@ -61,7 +62,10 @@ watch(open, (v) => {
 });
 
 const options = computed(() =>
-  (files.data.value?.items ?? []).map((f: EndpointSoftwareFile) => ({ label: `${f.fileName} · ${fmtBytes(f.sizeBytes)}`, value: f.fileName })),
+  (files.data.value?.items ?? []).map((f: EndpointSoftwareFile) => ({
+    label: `${f.fileName} · ${fmtBytes(f.sizeBytes)}${f.upload ? ` · ${UPLOAD_STATE_LABELS[f.upload.state]}` : ''}`,
+    value: f.fileName,
+  })),
 );
 const picked = computed(() => (files.data.value?.items ?? []).find((f) => f.fileName === form.pick) ?? null);
 // 挑檔後帶入軟體名稱 / 版本,並依副檔名猜安裝程式類型(.msi → MSI;其他請自行確認)。
@@ -129,6 +133,15 @@ async function submit() {
           :placeholder="files.loading.value ? '讀取中…' : options.length ? '請選擇' : '軟體庫中沒有尚未登錄的安裝檔'"
           :disabled="files.loading.value || !options.length"
         />
+        <!-- 上傳與送簽紀錄(RustIt S1-3):簽章者為工作站回報(未驗證);非 signed 的主機會拒絕登錄(ITA_UPLOAD_NOT_SIGNED) -->
+        <div v-if="picked?.upload" class="small" style="overflow-wrap: anywhere">
+          <template v-if="picked.upload.state === 'signed'"
+            >上傳 {{ picked.upload.uploadedBy.name ?? picked.upload.uploadedBy.emp }} · 核可 {{ picked.upload.approvedBy?.name ?? picked.upload.approvedBy?.emp ?? '—' }} ·
+            原廠簽章者 {{ picked.upload.vendorSignerSubject ?? '(未簽章)' }}<span class="faint xs">(工作站回報,未驗證)</span></template
+          >
+          <span v-else style="color: var(--c-danger)">此檔案的上傳紀錄為「{{ UPLOAD_STATE_LABELS[picked.upload.state] }}」,完成簽章前不能登錄</span>
+        </div>
+        <p v-else-if="picked && picked.upload === null" class="faint xs" style="margin: 0">此檔案沒有上傳與送簽紀錄(直接放進軟體庫,過渡期允許)。</p>
         <p class="faint xs" style="margin: 0">安裝檔放進軟體庫的 {軟體}/{版本}/{檔名}(.msi 或 .exe);登錄後不得覆寫該檔案,換版本請放新資料夾;套件撤回後,同一個檔案可重新登錄(版本號不可重用)。SHA-256 與大小由主機讀檔計算。</p>
         <div class="grid2">
           <GInput v-model="form.name" label="軟體名稱" required />

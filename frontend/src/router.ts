@@ -204,6 +204,7 @@ const routes: RouteRecordRaw[] = [
             { label: '告警', to: '/endpoint/devices/alerts', icon: 'bell', permission: UI.alertList },
             { label: 'Agent 版本', to: '/endpoint/devices/releases', icon: 'package', permission: UI.releaseList },
             { label: '軟體派送', to: '/endpoint/devices/software', icon: 'send', permission: UI.swList },
+            { label: '上傳與簽章', to: '/endpoint/devices/software-uploads', icon: 'shield', permission: UI.swUpload },
           ],
         },
         children: [
@@ -223,6 +224,11 @@ const routes: RouteRecordRaw[] = [
             path: 'software',
             component: () => import('./pages/endpoint/Software.vue'),
             meta: { tab: '軟體派送', permission: UI.swList, requires: [EP.deviceRead] },
+          },
+          {
+            path: 'software-uploads',
+            component: () => import('./pages/endpoint/SoftwareUploads.vue'),
+            meta: { tab: '上傳與簽章', permission: UI.swUpload, requires: [EP.softwareManage] },
           },
         ],
       },

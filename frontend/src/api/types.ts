@@ -412,6 +412,62 @@ export interface EndpointSoftwareFile {
   version: string;
   sizeBytes: number;
   modifiedAt: string;
+  /** 該路徑最新一筆上傳紀錄(RustIt S1-3;null = 直接放進軟體庫;舊版主機沒有此欄位) */
+  upload?: EndpointUploadRef | null;
+}
+
+// ---------- 套件上傳與送簽(RustIt S1-3 / S1-4;S1-SIGNING-DESIGN §4) ----------
+
+export type EndpointUploadState = 'uploaded' | 'queued' | 'signed' | 'rejected';
+
+/** 安裝檔對應的上傳紀錄摘要;簽章者欄位為簽章工作站回報(未驗證) */
+export interface EndpointUploadRef {
+  uploadId: string;
+  state: EndpointUploadState;
+  uploadedBy: { emp: string; name: string | null };
+  approvedBy: { emp: string; name: string | null } | null;
+  vendorSigner: string | null;
+  vendorSignerSubject: string | null;
+  vendorCheck: string | null;
+  signedSigner: string | null;
+  signedAt: string | null;
+  rejectCode: string | null;
+}
+
+export interface EndpointUpload {
+  uploadId: string;
+  /** {軟體}/{版本}/{安裝檔};簽章後放進軟體庫的同一路徑 */
+  fileName: string;
+  /** 原始檔(未重簽)的 SHA-256,主機計算 */
+  sha256: string;
+  sizeBytes: number;
+  state: EndpointUploadState;
+  source: 'upload' | 'incoming';
+  notes: string | null;
+  uploadedBy: { emp: string; name: string | null };
+  uploadedAt: string;
+  approvedBy: { emp: string; name: string | null } | null;
+  approvedAt: string | null;
+  rejectCode: string | null;
+  rejectReason: string | null;
+  rejectedByEmp: string | null;
+  rejectedAt: string | null;
+  vendorSigner: string | null;
+  vendorSignerSubject: string | null;
+  vendorCheck: string | null;
+  signedSigner: string | null;
+  signOperator: string | null;
+  /** 軟體庫內重簽後檔案的 SHA-256(主機重算確認) */
+  signedSha256: string | null;
+  signedAt: string | null;
+}
+
+export interface EndpointIncomingFile {
+  fileName: string;
+  software: string;
+  version: string;
+  sizeBytes: number;
+  modifiedAt: string;
 }
 
 export interface EndpointSoftwareTestResult {
@@ -438,6 +494,8 @@ export interface EndpointSoftwareTestResult {
 export interface EndpointSoftwareDetail extends EndpointSoftware {
   /** 查詢者有可管理所有公司的角色(才能登錄 / 修改 / 標記測試完成 / 發佈 / 撤回;舊版主機沒有此欄位) */
   viewerScopeAll?: boolean;
+  /** 登錄檔案對應的 signed 上傳紀錄(RustIt S1-3;null = 直接放進軟體庫;舊版主機沒有此欄位) */
+  upload?: EndpointUploadRef | null;
   testResults: EndpointSoftwareTestResult[];
   installedDevices: { deviceId: string; computerName: string; name: string; version: string | null }[];
 }
