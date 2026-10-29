@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-29 上傳與簽章 Tab(RustIt S1-4)
+- 內容:「電腦清單」新增第 6 個 Tab「上傳與簽章」(PRD FR-8.9,RustIt `docs/S1-SIGNING-DESIGN.md` §5;需求方 2026-10-28 同意跨 repo)。上傳安裝檔用 XHR 串流(web-kit `http` 只送 JSON / FormData、無進度):`application/octet-stream`、手動帶 `X-CSRF-Token`、401 換發一次後重送;路徑規則與主機 `SEGMENT_RE` 相同。另可從 NAS 上傳區登錄檔案(含備註)。清單 / 詳情 / 核可(上傳者本人停用)/ 駁回(需原因);工作站回報欄位標「未驗證」,備註與駁回原因以文字顯示。「軟體派送」登錄對話框與套件詳情顯示上傳紀錄(RustIt !76 的 `upload` 欄位;舊主機沒有此欄位時不顯示)。新節點 `it.endpoint-software.upload`(tab,includes `endpoint.software.manage`,it-admin 擁有)。
+- 檔案:`frontend/src/pages/endpoint/SoftwareUploads.vue`(新)、`components/endpoint/UploadInstaller.vue`(新)、`api/endpoint.ts`(`uploadApi`、`uploadInstaller`、狀態 / 駁回代碼標籤、錯誤代碼)、`api/types.ts`、`api/auth.ts`、`router.ts`、`components/endpoint/SoftwareRegister.vue`、`SoftwareDetail.vue`;`deploy/gateway-rbac.yaml`;`docs/PRD.md` FR-8.9、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`。
+- 驗證:`npm run typecheck`、`npm run build` 通過。**未做瀏覽器操作**:測試區尚未套用 migration 0011、未發佈 `endpoint.software.upload.*` 路由、新節點要合併後 CI rbac-test 才登記;上述完成後照 Gherkin「上傳與簽章」四個場景實測(需兩個 IT 帳號)。security-auditor:無 High / Medium;L1 已修(401 換發期間按取消不再重送、上傳結束移除 abort 監聽)。
+
 ## 2026-10-27 軟體派送驗收後修正(RustIt Agent 0.9.3)
 - 內容:配合 RustIt `feature/p7-0.9.3`(設計 `docs/P7-SOFTWARE-DESIGN.md` §8.1.5,需求方 2026-10-27 決定)。(1)延後中:`running` 的軟體安裝帶 `result.deferred` 時,狀態顯示「延後中(電池供電 / 計量網路)」(`commandStateLabel` / `commandStateTone`,指令清單、電腦指令、指令詳情),詳情加下次檢查時間;(2)指令參數、結果、批次摘要、事件內容的物件改用 JSON 顯示(`paramText`;原本 `detect = [object Object]`);(3)登錄畫面版本欄提示與 DisplayVersion 一致(7-Zip 是 26.05,不是 26.05.2.0.0)、撤回後同一檔案可重新登錄;(4)`INSTALL_BUSY` 說明與 `result.installer_busy` 提示。
 - 檔案:`frontend/src/api/endpoint.ts`、`components/endpoint/CommandResult.vue`、`BatchApprovals.vue`、`DeviceEvents.vue`、`SoftwareRegister.vue`、`pages/endpoint/Commands.vue`、`DeviceCommands.vue`。

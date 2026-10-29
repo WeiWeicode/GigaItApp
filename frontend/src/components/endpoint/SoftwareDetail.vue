@@ -228,6 +228,21 @@ async function revoke() {
           <dd v-if="d.observedSigners.length">
             <div v-for="s in d.observedSigners" :key="s" class="mono">{{ s }}</div>
           </dd>
+          <!-- 上傳與送簽紀錄(RustIt S1-3):原廠簽章者為工作站回報(未驗證),實際簽章者以測試機回報為準 -->
+          <template v-if="d.upload">
+            <dt>上傳與送簽</dt>
+            <dd>
+              上傳 {{ who(d.upload.uploadedBy) }} · 核可 {{ who(d.upload.approvedBy) }}{{ d.upload.signedAt ? ` · 簽章 ${fmtTime(d.upload.signedAt)}` : '' }}
+              <div class="small">
+                原廠簽章者 {{ d.upload.vendorSignerSubject ?? '(未簽章)' }}{{ d.upload.vendorCheck === 'manual' ? '(人工確認)' : '' }}
+                <span class="faint xs">工作站回報(未驗證)</span>
+              </div>
+            </dd>
+          </template>
+          <template v-else-if="d.upload === null">
+            <dt>上傳與送簽</dt>
+            <dd class="faint">沒有紀錄(直接放進軟體庫)</dd>
+          </template>
           <dt>登錄</dt>
           <dd>{{ who(d.createdBy) }} · {{ fmtTime(d.createdAt) }}</dd>
           <dt v-if="d.testedAt">測試完成</dt>

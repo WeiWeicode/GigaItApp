@@ -91,6 +91,9 @@ permissions:
   - { code: it.endpoint-software.manage, name: 軟體目錄管理(登錄、修改、測試完成、發佈、撤回), kind: button, parent: it.endpoint-software.list, sort: 10, includes: [endpoint.software.manage] }
   - { code: it.endpoint-software.deploy, name: 派送軟體(安裝、移除), kind: button, parent: it.endpoint-software.list, sort: 20, includes: [endpoint.command.admin] }
   - { code: it.endpoint-software.approve, name: 核可 / 駁回軟體派送批次, kind: button, parent: it.endpoint-software.list, sort: 30, includes: [endpoint.software.manage] }
+  # 上傳與簽章(RustIt S1-4;ItAgentBack /v1/software/uploads*,權限 endpoint.software.manage,主機另要求可管理所有公司;核可人 ≠ 上傳者由主機檢查)。
+  #   工作站確認路由 endpoint.software.sign-check 是 API Key,不授予使用者
+  - { code: it.endpoint-software.upload, name: 上傳與簽章, kind: tab, parent: it.endpoint-device.read, sort: 60, includes: [endpoint.software.manage] }
   - { code: it.endpoint-device.reboot, name: 重新開機與核可重開機批次, kind: button, parent: it.endpoint-device.list, sort: 30, includes: [endpoint.command.admin] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
@@ -171,6 +174,7 @@ roles:
       - it.endpoint-software.manage
       - it.endpoint-software.deploy
       - it.endpoint-software.approve
+      - it.endpoint-software.upload
       - it.endpoint-device.reboot
       - it.sys-user.users
       - it.sys-user.roles

@@ -13,6 +13,7 @@
  *   關閉告警 POST /alerts/{id}/resolve(endpoint.command.basic)。告警的 detail 來自端點回報,一律以文字顯示。
  */
 import { fmtTime, fromNow } from '@/api/format';
+import { readCookie, redirectToLogin, refreshSession } from '@giganexus/web-kit';
 import { ApiError, describeError, http, type Query } from '@/api/http';
 import type {
   EndpointCommand,
@@ -34,6 +35,7 @@ import type {
   EndpointDevicePage,
   EndpointDeviceUpgrade,
   EndpointHealthSeries,
+  EndpointIncomingFile,
   EndpointRelease,
   EndpointReleaseComponent,
   EndpointReleaseFile,
@@ -41,6 +43,8 @@ import type {
   EndpointRing,
   EndpointRingTarget,
   EndpointUpgradeState,
+  EndpointUpload,
+  EndpointUploadState,
 } from '@/api/types';
 
 const base = '/api/endpoint';
@@ -433,6 +437,16 @@ export const SOFTWARE_API_ERRORS: Record<string, string> = {
   ITA_REVIEWER_NOT_PERSON: '發佈者需要有工號',
   ITA_SCOPE_ALL_REQUIRED: '需要可管理所有公司的角色',
   ITA_COMMAND_LIMIT: '這台電腦同類型的未結束指令已達上限',
+  ITA_UPLOAD_NOT_SIGNED: '這個安裝檔有上傳紀錄但還沒完成簽章(或簽章後被更換),不能登錄',
+  ITA_UPLOAD_EXISTS: '同一路徑已有待核可或送簽中的上傳',
+  ITA_UPLOAD_FILE_EXISTS: '上傳區或軟體庫已有同一路徑的檔案,換版本請用新的版本資料夾',
+  ITA_UPLOAD_TOO_LARGE: '檔案超過大小上限',
+  ITA_UPLOAD_BUSY: '同時上傳的檔案太多,請等其他上傳完成',
+  ITA_UPLOAD_TIMEOUT: '上傳中斷超過 2 分鐘,請重新上傳',
+  ITA_UPLOAD_SAME_PERSON: '上傳者不能核可自己的上傳,請由另一位 IT 核可',
+  ITA_UPLOAD_STATE: '上傳紀錄的狀態已變更,請重新整理',
+  ITA_UPLOAD_FILE_CHANGED: '上傳區的檔案在核可前被更換,已自動駁回',
+  ITA_UPLOAD_NOT_FOUND: '找不到此上傳紀錄',
 };
 
 /** 錯誤訊息:已知的管理 API 錯誤代碼補人話,其餘用 describeError */
@@ -515,6 +529,95 @@ export const softwareApi = {
   /** 多台批次派送(endpoint.command.admin);> 20 台進入待核可。同一個 Idempotency-Key 重送回傳同一批 */
   deploy: (packageId: string, body: { action: 'install' | 'uninstall'; deviceIds: string[]; ignorePower?: boolean }, idempotencyKey?: string) =>
     http.post<EndpointDeployResult>(`${base}/software/${encodeURIComponent(packageId)}/deploy`, body, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+};
+
+// ---------- 套件上傳與送簽(RustIt S1-3 / S1-4) ----------
+
+export const UPLOAD_STATE_LABELS: Record<EndpointUploadState, string> = { uploaded: '待核可', queued: '送簽中', signed: '已簽章', rejected: '已駁回' };
+export const UPLOAD_STATE_TONES: Record<EndpointUploadState, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
+  uploaded: 'warning',
+  queued: 'info',
+  signed: 'success',
+  rejected: 'danger',
+};
+export const UPLOAD_REJECT_LABELS: Record<string, string> = {
+  REJECTED: '人工駁回',
+  INCOMING_CHANGED: '核可前檔案被更換',
+  RESULT_MISMATCH: '簽章結果與軟體庫檔案不符',
+  SIGN_JOB_WRITE_FAILED: '送簽工作單寫入失敗',
+  HASH_MISMATCH: '工作站:檔案雜湊不符',
+  VENDOR_NOT_ALLOWED: '工作站:原廠簽章者不在白名單',
+};
+/** 主機預設上限(SOFTWARE_MAX_BYTES 4 GB);實際以主機回應為準 */
+export const UPLOAD_MAX_BYTES = 4 * 1024 ** 3;
+/** {軟體}/{版本}/{檔名}.msi|.exe:與主機 SEGMENT_RE(RustIt software-files.ts)相同;實際以主機檢查為準 */
+export const UPLOAD_SEGMENT_RE = /^(?:[A-Za-z0-9_+-]|[A-Za-z0-9_+-][A-Za-z0-9._ +-]{0,98}[A-Za-z0-9_+-])$/;
+export function uploadPathError(software: string, version: string, fileName: string): string | null {
+  for (const [label, v] of [
+    ['軟體', software],
+    ['版本', version],
+    ['檔名', fileName],
+  ] as const)
+    if (!UPLOAD_SEGMENT_RE.test(v)) return `${label}只能用英數字、空白與 . _ + -(1–100 字,開頭結尾不可為點或空白)`;
+  return /\.(msi|exe)$/i.test(fileName) ? null : '只接受 .msi 或 .exe';
+}
+
+/**
+ * 串流上傳安裝檔(POST /api/endpoint/software/uploads?fileName=,application/octet-stream):
+ * Gateway Nginx 先向 BFF 驗證(登入、endpoint.software.manage、CSRF)再直送 Endpoint Server(4 GB,不經 BFF 本體上限)。
+ * web-kit http 只送 JSON / FormData、沒有進度,這裡用 XHR:同網域 Cookie、手動帶 X-CSRF-Token;401 換發一次後重送,仍失敗導向登入。
+ */
+export function uploadInstaller(file: File, fileName: string, onProgress: (loaded: number, total: number) => void, signal?: AbortSignal): Promise<EndpointUpload> {
+  const url = withQueryPath(`${base}/software/uploads`, { fileName });
+  const send = (retried: boolean): Promise<EndpointUpload> =>
+    new Promise<{ status: number; text: string; requestId: string | null }>((resolve, reject) => {
+      // 401 換發期間已按取消:不再重送(資安審查 L1)
+      if (signal?.aborted) return reject(new DOMException('已取消上傳', 'AbortError'));
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.setRequestHeader('Accept', 'application/json');
+      const csrf = readCookie('gn_csrf');
+      if (csrf) xhr.setRequestHeader('X-CSRF-Token', csrf);
+      xhr.upload.onprogress = (e) => onProgress(e.loaded, e.lengthComputable ? e.total : file.size);
+      const onAbort = () => xhr.abort();
+      xhr.onloadend = () => signal?.removeEventListener('abort', onAbort);
+      xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText, requestId: xhr.getResponseHeader('X-Request-Id') });
+      xhr.onerror = () => reject(new TypeError('network'));
+      xhr.onabort = () => reject(new DOMException('已取消上傳', 'AbortError'));
+      signal?.addEventListener('abort', onAbort, { once: true });
+      xhr.send(file);
+    }).then(async ({ status, text, requestId }) => {
+      if (status === 401 && !retried) {
+        if (await refreshSession()) return send(true);
+        redirectToLogin();
+      }
+      let data: { code?: string; message?: string; requestId?: string; details?: unknown } | null = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+      if (status < 200 || status >= 300)
+        throw new ApiError(status, data?.code ?? `HTTP_${status}`, data?.message ?? `上傳失敗(HTTP ${status})`, data?.requestId ?? requestId, data?.details);
+      return data as unknown as EndpointUpload;
+    });
+  return send(false);
+}
+function withQueryPath(path: string, query: Record<string, string>): string {
+  return `${path}?${new URLSearchParams(query).toString()}`;
+}
+
+export const uploadApi = {
+  /** 上傳與送簽紀錄(新到舊,最多 500 筆;endpoint.software.manage) */
+  list: (state?: EndpointUploadState) => http.get<{ items: EndpointUpload[] }>(`${base}/software/uploads`, { query: { state } }),
+  /** 網路芳鄰放進 incoming 內尚未登錄的檔案(過渡期) */
+  incoming: () => http.get<{ items: EndpointIncomingFile[] }>(`${base}/software/uploads/incoming`),
+  get: (uploadId: string) => http.get<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}`),
+  register: (fileName: string, notes?: string) => http.post<EndpointUpload>(`${base}/software/uploads/register`, { fileName, ...(notes ? { notes } : {}) }),
+  approve: (uploadId: string) => http.post<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/approve`, {}),
+  reject: (uploadId: string, reason: string) => http.post<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/reject`, { reason }),
 };
 
 export const batchApi = {

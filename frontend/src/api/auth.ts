@@ -83,6 +83,8 @@ export const UI = {
   swManage: 'it.endpoint-software.manage',
   swDeploy: 'it.endpoint-software.deploy',
   swApprove: 'it.endpoint-software.approve',
+  /** 上傳與簽章(RustIt S1-4):Tab;上傳、登錄上傳區檔案、核可 / 駁回送簽都在此 Tab(主機另要求可管理所有公司、核可人 ≠ 上傳者) */
+  swUpload: 'it.endpoint-software.upload',
   devReboot: 'it.endpoint-device.reboot',
   userList: 'it.sys-user.users',
   userRoles: 'it.sys-user.roles',
