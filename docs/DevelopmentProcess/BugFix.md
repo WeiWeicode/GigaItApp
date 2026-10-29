@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-29 deploy-prod 發佈前端失敗:compose run 沒有 --no-build
+- 內容:正式區第一次 `deploy-prod`(pipeline #566,job 1648)itapp-api 已更新且 healthy,但 `$IT run --rm --no-build spa-it` 回 `unknown flag: --no-build`(主機 3 Docker Compose v5.6,`run` 只有 `--build` / `--pull`)。改為 `run --rm --pull never spa-it`:映像已由前一步拉取,`run` 不加 `--build` 不會建置
+- 檔案:`.gitlab-ci.yml`
+- 驗證:主機 3 以含 `build:` 的測試 compose 執行 `run --rm --pull never`,使用本機映像、未建置、exit 0;YAML 解析通過
+
 ## 2026-10-29 上傳安裝檔對話框按鈕錯位(「從上傳區登錄」沒有登錄按鈕)
 - 內容:`feature/s1-incoming-delete`(!14)在 footer 的 `v-if` / `v-else` 之間插入「刪除檔案」按鈕,`v-else` 改接到刪除按鈕:「上傳檔案」模式同時出現「上傳」與「登錄」,「從上傳區登錄」模式沒有「登錄」。改為上傳模式只有「上傳」,其他模式以 `<template v-else>` 放「刪除檔案」與「登錄」。測試區瀏覽器實測刪除功能時發現。
 - 檔案:`frontend/src/components/endpoint/UploadInstaller.vue`。
