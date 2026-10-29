@@ -4,6 +4,7 @@
  *   上傳 / 登錄上傳區的安裝檔 → 另一位 IT 核可送簽 → 簽章工作站以公司憑證重簽 → 主機重算雜湊確認(signed)→ 到「軟體派送」登錄套件
  * 權限:Tab it.endpoint-software.upload ∧ BFF endpoint.software.manage(主機另要求可管理所有公司的角色)。
  *   核可:上傳者本人的核可按鈕停用(主機也會擋 ITA_UPLOAD_SAME_PERSON);駁回:待核可 / 送簽中。
+ *   刪除檔案:只對已駁回、原始檔還在的紀錄顯示(刪上傳區 incoming\ 的原始檔,紀錄保留;主機另檢查同路徑沒有進行中或已簽章的上傳)。
  * 原廠簽章者、操作人等是簽章工作站回報、主機未驗證的欄位,畫面標「工作站回報(未驗證)」;備註、駁回原因一律以文字顯示(不用 v-html)。
  */
 import { computed, ref, shallowRef, watch } from 'vue';
@@ -72,6 +73,17 @@ function openReject(u: EndpointUpload) {
   reason.value = '';
   rejectOpen.value = true;
 }
+const canDeleteFile = (u: EndpointUpload) => u.state === 'rejected' && !u.fileDeletedAt;
+async function deleteFile(u: EndpointUpload) {
+  const ok = await confirm({
+    title: `刪除上傳區的 ${u.fileName}?`,
+    message: `刪除 NAS 上傳區(incoming)內這筆已駁回上傳的原始檔,刪除後無法復原;上傳紀錄保留並記錄刪除人。\n刪除後同一路徑可以重新上傳。`,
+    confirmText: '刪除檔案',
+    tone: 'danger',
+  });
+  if (ok) await act(u, () => uploadApi.deleteFile(u.uploadId), '已刪除上傳區的原始檔');
+}
+
 async function reject() {
   const u = rejecting.value;
   if (!u || !reason.value.trim()) return;
@@ -159,12 +171,22 @@ function openView(u: EndpointUpload) {
               @click.stop="openReject(row)"
               >駁回</GButton
             >
+            <GButton
+              v-if="canDeleteFile(row)"
+              size="sm"
+              variant="ghost"
+              icon="trash"
+              :disabled="busyId === row.uploadId"
+              title="刪除上傳區的原始檔(紀錄保留)"
+              @click.stop="deleteFile(row)"
+              >刪除檔案</GButton
+            >
           </div>
         </template>
       </GTable>
     </GCard>
 
-    <UploadInstaller v-model:open="uploading" @uploaded="onUploaded" />
+    <UploadInstaller v-model:open="uploading" @uploaded="onUploaded" @changed="list.reload" />
 
     <GModal v-model:open="rejectOpen" title="駁回上傳" :subtitle="rejecting?.fileName" icon="x" width="480px">
       <div class="stack" style="--gap: 10px">
@@ -207,6 +229,8 @@ function openView(u: EndpointUpload) {
             {{ fmtTime(viewing.rejectedAt) }}
             <div v-if="viewing.rejectReason" class="small" style="white-space: pre-wrap; overflow-wrap: anywhere">{{ viewing.rejectReason }}</div>
           </dd>
+          <dt>原始檔</dt>
+          <dd>{{ viewing.fileDeletedAt ? `已刪除 · ${viewing.fileDeletedByEmp ?? '—'} · ${fmtTime(viewing.fileDeletedAt)}` : '仍在上傳區' }}</dd>
         </template>
         <template v-if="viewing.signedSha256">
           <dt>簽章後 SHA-256</dt>
@@ -245,6 +269,9 @@ function openView(u: EndpointUpload) {
             >核可送簽</GButton
           >
           <GButton v-if="viewing.state === 'uploaded' || viewing.state === 'queued'" variant="ghost" @click="openReject(viewing)">駁回</GButton>
+          <GButton v-if="canDeleteFile(viewing)" variant="ghost" icon="trash" :disabled="busyId === viewing.uploadId" @click="deleteFile(viewing)"
+            >刪除檔案</GButton
+          >
         </template>
         <GButton variant="ghost" @click="viewOpen = false">關閉</GButton>
       </template>

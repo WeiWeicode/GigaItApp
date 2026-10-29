@@ -2,7 +2,8 @@
 /**
  * 上傳安裝檔對話框(RustIt S1-3 / S1-4;S1-SIGNING-DESIGN §4.5,endpoint.software.manage,主機另要求可管理所有公司的角色):
  *   - 上傳檔案:POST /api/endpoint/software/uploads?fileName={軟體}/{版本}/{檔名}(application/octet-stream,Gateway Nginx 直送,上限 4 GB)
- *   - 從上傳區登錄:網路芳鄰放進 NAS incoming\ 的檔案,挑選後 POST /uploads/register(過渡期,可填備註)
+ *   - 從上傳區登錄:網路芳鄰放進 NAS incoming\ 的檔案,挑選後 POST /uploads/register(過渡期,可填備註);
+ *     放錯或不要的檔案可刪除 DELETE /uploads/incoming?fileName=(已駁回後仍在的檔案也列在這裡)
  * 上傳後是「待核可」:由另一位 IT 核可後才送簽章工作站重簽;上傳 API 不收備註(查詢字串會進請求日誌)。
  */
 import { computed, reactive, ref, watch } from 'vue';
@@ -10,10 +11,10 @@ import { softwareErrorText, UPLOAD_MAX_BYTES, uploadApi, uploadInstaller, upload
 import { fmtBytes } from '@/api/format';
 import { describeError } from '@/api/http';
 import { useAsync } from '@/composables/useAsync';
-import { toast } from '@/ui';
+import { confirm, toast } from '@/ui';
 
 const open = defineModel<boolean>('open', { default: false });
-const emit = defineEmits<{ uploaded: [] }>();
+const emit = defineEmits<{ uploaded: []; changed: [] }>();
 
 const MODES = [
   { label: '上傳檔案', value: 'upload', icon: 'upload' },
@@ -87,7 +88,7 @@ function cancelUpload() {
   aborter?.abort();
 }
 
-// ---------- 從上傳區登錄 ----------
+// ---------- 從上傳區登錄 / 刪除 ----------
 const incomingOptions = computed(() =>
   (incoming.data.value?.items ?? []).map((f) => ({ label: `${f.fileName} · ${fmtBytes(f.sizeBytes)}`, value: f.fileName })),
 );
@@ -103,6 +104,29 @@ async function submitIncoming() {
     void incoming.reload();
   } finally {
     busy.value = false;
+  }
+}
+async function deleteIncoming() {
+  const fileName = incomingForm.pick;
+  if (!fileName) return;
+  const ok = await confirm({
+    title: `刪除上傳區的 ${fileName}?`,
+    message: '從 NAS 上傳區(incoming)刪除這個檔案,刪除後無法復原。同一路徑若有已駁回的上傳紀錄,紀錄保留並記錄刪除人。',
+    confirmText: '刪除檔案',
+    tone: 'danger',
+  });
+  if (!ok) return;
+  busy.value = true;
+  try {
+    await uploadApi.deleteIncoming(fileName);
+    toast.success('已刪除上傳區的檔案', fileName);
+    incomingForm.pick = '';
+    emit('changed');
+  } catch (e) {
+    toast.error('無法刪除', softwareErrorText(e));
+  } finally {
+    busy.value = false;
+    void incoming.reload();
   }
 }
 </script>
@@ -169,6 +193,7 @@ async function submitIncoming() {
       <GButton v-if="busy && mode === 'upload'" variant="ghost" @click="cancelUpload">取消上傳</GButton>
       <GButton v-else variant="ghost" @click="open = false">關閉</GButton>
       <GButton v-if="mode === 'upload'" variant="primary" :loading="busy" :disabled="!validUpload" @click="submitUpload">上傳</GButton>
+      <GButton v-if="mode === 'incoming'" variant="ghost" icon="trash" :disabled="busy || !incomingForm.pick" @click="deleteIncoming">刪除檔案</GButton>
       <GButton v-else variant="primary" :loading="busy" :disabled="!incomingForm.pick || incomingForm.notes.length > 1000" @click="submitIncoming"
         >登錄</GButton
       >

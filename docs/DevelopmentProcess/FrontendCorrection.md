@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-29 上傳與簽章:刪除上傳區檔案(配合 RustIt feature/s1-incoming-delete)
+- 內容:被駁回的上傳原始檔留在 NAS 上傳區,同路徑無法再上傳,原本只能請主機管理員刪除。需求方 2026-10-29 決定:只有已駁回可刪、也可刪除未登錄的檔案、紀錄保留並記錄刪除人(RustIt migration 0012)、沿用 `endpoint.software.manage` 不另設按鈕節點。「上傳與簽章」清單與詳情對已駁回且原始檔還在的紀錄顯示「刪除檔案」(二次確認,`DELETE /software/uploads/{id}/file`),詳情顯示原始檔狀態(已刪除 · 刪除人 · 時間);「上傳安裝檔 › 從上傳區登錄」可刪除選取的檔案(`DELETE /software/uploads/incoming?fileName=`),刪除後重新整理清單。錯誤代碼 `ITA_UPLOAD_FILE_IN_USE`、`ITA_UPLOAD_FILE_DELETED`、`ITA_UPLOAD_NOT_FILE`、`ITA_UPLOAD_FILE_MISMATCH`、`ITA_UPLOAD_FILE_NOT_FOUND` 文案。
+- 檔案:`frontend/src/pages/endpoint/SoftwareUploads.vue`、`components/endpoint/UploadInstaller.vue`、`api/endpoint.ts`(`uploadApi.deleteFile` / `deleteIncoming`、錯誤代碼)、`api/types.ts`;`docs/PRD.md` FR-8.9、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`。無新權限節點(`deploy/gateway-rbac.yaml` 不變)。
+- 驗證:`npm run typecheck`、`npm run build` 通過。**未做瀏覽器操作**:需 RustIt 分支合併、測試區套用 migration 0012 並發佈新路由後,照 Gherkin「刪除已駁回上傳的原始檔」等三個場景實測(清理 `winrar-x64/7.23.0`、`7.23.1`、`7.23.2`)。
+
 ## 2026-10-29 上傳與簽章 Tab(RustIt S1-4)
 - 內容:「電腦清單」新增第 6 個 Tab「上傳與簽章」(PRD FR-8.9,RustIt `docs/S1-SIGNING-DESIGN.md` §5;需求方 2026-10-28 同意跨 repo)。上傳安裝檔用 XHR 串流(web-kit `http` 只送 JSON / FormData、無進度):`application/octet-stream`、手動帶 `X-CSRF-Token`、401 換發一次後重送;路徑規則與主機 `SEGMENT_RE` 相同。另可從 NAS 上傳區登錄檔案(含備註)。清單 / 詳情 / 核可(上傳者本人停用)/ 駁回(需原因);工作站回報欄位標「未驗證」,備註與駁回原因以文字顯示。「軟體派送」登錄對話框與套件詳情顯示上傳紀錄(RustIt !76 的 `upload` 欄位;舊主機沒有此欄位時不顯示)。新節點 `it.endpoint-software.upload`(tab,includes `endpoint.software.manage`,it-admin 擁有)。
 - 檔案:`frontend/src/pages/endpoint/SoftwareUploads.vue`(新)、`components/endpoint/UploadInstaller.vue`(新)、`api/endpoint.ts`(`uploadApi`、`uploadInstaller`、狀態 / 駁回代碼標籤、錯誤代碼)、`api/types.ts`、`api/auth.ts`、`router.ts`、`components/endpoint/SoftwareRegister.vue`、`SoftwareDetail.vue`;`deploy/gateway-rbac.yaml`;`docs/PRD.md` FR-8.9、`docs/Gherkin/endpoint/software.feature`、`docs/PROJECT-MAP.md`。
