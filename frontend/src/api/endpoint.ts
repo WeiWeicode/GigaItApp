@@ -447,6 +447,11 @@ export const SOFTWARE_API_ERRORS: Record<string, string> = {
   ITA_UPLOAD_STATE: '上傳紀錄的狀態已變更,請重新整理',
   ITA_UPLOAD_FILE_CHANGED: '上傳區的檔案在核可前被更換,已自動駁回',
   ITA_UPLOAD_NOT_FOUND: '找不到此上傳紀錄',
+  ITA_UPLOAD_FILE_NOT_FOUND: '上傳區找不到這個檔案(可能已被刪除)',
+  ITA_UPLOAD_FILE_IN_USE: '同一路徑有待核可、送簽中或已簽章的上傳,原始檔不能刪除',
+  ITA_UPLOAD_FILE_DELETED: '原始檔已刪除',
+  ITA_UPLOAD_NOT_FILE: '上傳區的這個路徑不是一般檔案,請由主機管理員處理',
+  ITA_UPLOAD_FILE_MISMATCH: '上傳區的檔案和這筆上傳不同(可能是之後放進來的),請從「上傳安裝檔 › 從上傳區登錄」選該檔案刪除',
 };
 
 /** 錯誤訊息:已知的管理 API 錯誤代碼補人話,其餘用 describeError */
@@ -618,6 +623,11 @@ export const uploadApi = {
   register: (fileName: string, notes?: string) => http.post<EndpointUpload>(`${base}/software/uploads/register`, { fileName, ...(notes ? { notes } : {}) }),
   approve: (uploadId: string) => http.post<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/approve`, {}),
   reject: (uploadId: string, reason: string) => http.post<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/reject`, { reason }),
+  /** 刪除已駁回上傳的上傳區原始檔(紀錄保留,記錄刪除人) */
+  deleteFile: (uploadId: string) => http.delete<EndpointUpload>(`${base}/software/uploads/${encodeURIComponent(uploadId)}/file`),
+  /** 刪除上傳區內未登錄的檔案(網路芳鄰放進來的、已駁回後仍在的) */
+  deleteIncoming: (fileName: string) =>
+    http.delete<{ fileName: string; partsRemoved: number; markedUploads: number }>(`${base}/software/uploads/incoming`, { query: { fileName } }),
 };
 
 export const batchApi = {

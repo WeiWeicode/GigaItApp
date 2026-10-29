@@ -460,6 +460,9 @@ export interface EndpointUpload {
   /** 軟體庫內重簽後檔案的 SHA-256(主機重算確認) */
   signedSha256: string | null;
   signedAt: string | null;
+  /** 刪除上傳區原始檔的人與時間(只有已駁回可刪;RustIt migration 0012);null = 原始檔還在上傳區 */
+  fileDeletedByEmp: string | null;
+  fileDeletedAt: string | null;
 }
 
 export interface EndpointIncomingFile {
