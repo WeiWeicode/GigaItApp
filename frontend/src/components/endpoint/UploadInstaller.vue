@@ -193,10 +193,10 @@ async function deleteIncoming() {
       <GButton v-if="busy && mode === 'upload'" variant="ghost" @click="cancelUpload">取消上傳</GButton>
       <GButton v-else variant="ghost" @click="open = false">關閉</GButton>
       <GButton v-if="mode === 'upload'" variant="primary" :loading="busy" :disabled="!validUpload" @click="submitUpload">上傳</GButton>
-      <GButton v-if="mode === 'incoming'" variant="ghost" icon="trash" :disabled="busy || !incomingForm.pick" @click="deleteIncoming">刪除檔案</GButton>
-      <GButton v-else variant="primary" :loading="busy" :disabled="!incomingForm.pick || incomingForm.notes.length > 1000" @click="submitIncoming"
-        >登錄</GButton
-      >
+      <template v-else>
+        <GButton variant="ghost" icon="trash" :disabled="busy || !incomingForm.pick" @click="deleteIncoming">刪除檔案</GButton>
+        <GButton variant="primary" :loading="busy" :disabled="!incomingForm.pick || incomingForm.notes.length > 1000" @click="submitIncoming">登錄</GButton>
+      </template>
     </template>
   </GModal>
 </template>
