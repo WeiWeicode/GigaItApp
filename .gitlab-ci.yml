@@ -2,17 +2,23 @@
 #   check        所有分支:後端型別檢查與測試、前端型別檢查
 #   deploy-test  develop:在主機 2 建置並更新 itapp-api(加入 Gateway 網路),前端發佈到 Gateway 的 /it/
 #   rbac-test    develop:以已部署的 Gateway 映像套用 deploy/gateway-rbac.yaml(it.* 選單權限、it-admin 角色)
+#   build-prod   main:在主機 2 建置 itapp-api、spa-it-admin 並推送 GitLab Registry(tag = commit SHA)
+#                主機 3(正式區)WSL 查不到外部 DNS,連不到 Docker Hub 與 npmjs,不能在主機上建置
+#   deploy-prod  main 手動:主機 3(prod-deploy)拉取上述映像檔,更新 itapp-api、發佈前端到 Gateway 的 /it/
+#   rbac-prod    main 手動:以正式區 Gateway 映像套用 deploy/gateway-rbac.yaml(it.* 選單權限、it-admin 角色)
 # 主機需有:${ITAPP_ENV_FILE}(範本 deploy/test.env.example)、ITAPP_SECRETS_DIR 內的機密檔;
 #           Gateway 已部署(giganexus-gw_default 網路、giganexus-gw_gw_www volume)
 # @giganexus/backend-sdk、@giganexus/web-kit 取自公司 GitLab npm Registry:Token(群組 Deploy Token,read_package_registry)
 #   放在主機機密檔 ${NPM_TOKEN_FILE}(擁有者 user、群組 gitlab-runner、440),以 GITLAB_NPM_TOKEN 提供給 npm 與 Docker 建置 secret
-stages: [check, deploy-test, rbac-test]
+stages: [check, deploy-test, rbac-test, build-prod, deploy-prod, rbac-prod]
 
 variables:
   ITAPP_ENV_FILE: /srv/giganexus/deploy/itapp.env
   GATEWAY_DIR: /srv/giganexus/shared/giga-api-gateway-bff
   GW_TEST_ENV_FILE: /srv/giganexus/deploy/test.env
   NPM_TOKEN_FILE: /srv/giganexus/deploy/secrets/gitlab_npm_token
+  GW_PROD_ENV_FILE: /srv/giganexus/deploy/prod.env
+  ITAPP_IMAGE_PREFIX_PROD: $CI_REGISTRY_IMAGE
 
 .runner: &runner
   tags: [windows-runner]
@@ -72,3 +78,54 @@ rbac-test:
     # 與測試區 Gateway 相同的映像(Gateway deploy-test 記錄);GATEWAY_DIR 為 Gateway 共用目錄(含 deploy/)
     - export IMAGE_TAG="$(cat "$(dirname "$GATEWAY_DIR")/gateway-image-tag")" REGISTRY=10.10.130.123:5050/giganexus/giga-api-gateway-bff
     - sh deploy/apply-gateway-rbac.sh test "$GW_TEST_ENV_FILE"
+
+build-prod:
+  <<: *runner
+  stage: build-prod
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - export IMAGE_TAG=$CI_COMMIT_SHA RELEASE_SHA=$CI_COMMIT_SHORT_SHA ITAPP_IMAGE_PREFIX="$ITAPP_IMAGE_PREFIX_PROD"
+    - export GITLAB_NPM_TOKEN="$(cat "$NPM_TOKEN_FILE")"
+    # 以主機 2 的 itapp.env 解析 compose(外部網路 / volume、機密路徑);上面 export 的變數優先,映像檔名稱與 tag 指向 Registry
+    - export COMPOSE_ENV_FILES="$ITAPP_ENV_FILE"
+    - IT="docker compose -f deploy/docker-compose.yml --profile publish"
+    - $IT build --pull itapp-api spa-it
+    - $IT push itapp-api spa-it
+
+deploy-prod:
+  stage: deploy-prod
+  tags: [prod-deploy]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+  environment: { name: production, url: https://giganexus.gigasolar.com.tw/it/ }
+  script:
+    - test -f "$ITAPP_ENV_FILE" || { echo "缺少 $ITAPP_ENV_FILE" >&2; exit 1; }
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - export IMAGE_TAG=$CI_COMMIT_SHA RELEASE_SHA=$CI_COMMIT_SHORT_SHA ITAPP_IMAGE_PREFIX="$ITAPP_IMAGE_PREFIX_PROD" COMPOSE_ENV_FILES="$ITAPP_ENV_FILE"
+    # 正式區不建置:compose 檔的 build secret npm_token 只需變數存在
+    - export GITLAB_NPM_TOKEN=unused
+    - IT="docker compose -f deploy/docker-compose.yml --profile publish"
+    - $IT pull itapp-api spa-it
+    # 1. 後端:更新並等待 healthcheck(/healthz)
+    - $IT up -d --no-build --wait itapp-api
+    # 2. 前端:發佈到 gw_www 的 it-admin(保留上一版供回滾:$IT run --rm spa-it rollback it-admin)
+    - $IT run --rm --no-build spa-it
+    # 3. 冒煙測試(經 Gateway Nginx)
+    - curl -skf -o /dev/null https://127.0.0.1/it/ && echo "OK   /it/"
+    - curl -sk -o /dev/null -w '%{http_code}\n' https://127.0.0.1/api/auth/me | grep -q 401 && echo "OK   /api/auth/me → 401(單一入口)"
+    - '$IT exec -T itapp-api node -e "fetch(\"http://127.0.0.1:51291/api/it/dashboard/overview\").then((r) => process.exit(r.status === 401 ? 0 : 1))" && echo "OK   itapp-api /api/it/* 無內部 Token → 401"'
+
+rbac-prod:
+  stage: rbac-prod
+  tags: [prod-deploy]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    # 與正式區 Gateway 相同的映像(Gateway deploy-prod 記錄);主機 3 的 GATEWAY_DIR 由 Gateway 共用目錄提供(含 deploy/)
+    - export IMAGE_TAG="$(cat "$(dirname "$GATEWAY_DIR")/gateway-image-tag")" REGISTRY=10.10.130.123:5050/giganexus/giga-api-gateway-bff
+    - sh deploy/apply-gateway-rbac.sh prod "$GW_PROD_ENV_FILE"

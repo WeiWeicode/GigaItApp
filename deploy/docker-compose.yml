@@ -12,7 +12,8 @@ name: giganexus-itapp
 
 services:
   itapp-api:
-    image: giganexus/itapp-api:${IMAGE_TAG:-dev}
+    # 測試區在主機上建置(本機名稱);正式區 ITAPP_IMAGE_PREFIX=<GitLab Registry>/giganexus/gigaitapp,拉取 main 建置的映像檔
+    image: ${ITAPP_IMAGE_PREFIX:-giganexus}/itapp-api:${IMAGE_TAG:-dev}
     build:
       context: ../backend
       secrets: [npm_token]
@@ -50,7 +51,7 @@ services:
         aliases: [itapp-api]
 
   spa-it:
-    image: giganexus/spa-it-admin:${IMAGE_TAG:-dev}
+    image: ${ITAPP_IMAGE_PREFIX:-giganexus}/spa-it-admin:${IMAGE_TAG:-dev}
     build:
       context: ../frontend
       secrets: [npm_token]
