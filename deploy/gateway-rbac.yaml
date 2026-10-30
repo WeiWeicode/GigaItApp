@@ -31,13 +31,15 @@ permissions:
   # 檔案管理(giga-file-service PRD §8,D16):file.* 由 file-api 自動註冊;尚未註冊時 includes 會略過,下次套用補上
   - { code: it.gw-file.read, name: 檔案管理, kind: menu, parent: it.group.gateway, sort: 40 }
   # 端點管理(RustIt ItAgentBack):endpoint.* 由 ItAgentBack 啟動時自動註冊 OpenAPI 建立,需先註冊再套用本檔(RustIt INTEGRATION-PLAN D9)
-  #   五個選單(GigaItApp ENDPOINT-MENU-PLAN §2):端點儀表板 / 電腦管理 / 軟體管理 / 資安政策 / Agent 管理。〔開發中〕Tab 做好時才登記 tab 代碼(§8-2)
+  #   七個選單(GigaItApp ENDPOINT-MENU-PLAN §2):端點儀表板 / 電腦管理 / 資產管理 / 軟體管理 / 資安政策 / Agent 管理 / 報表。〔開發中〕Tab 做好時才登記 tab 代碼(§8-2)
   #   既有環境的上層 / 名稱 / 排序不會被本檔覆寫,於「選單管理」手動調整(§3.2)
   - { code: it.endpoint-dashboard.read, name: 端點儀表板, kind: menu, parent: it.group.endpoint, sort: 10, includes: [endpoint.device.read] }
   - { code: it.endpoint-device.read, name: 電腦管理, kind: menu, parent: it.group.endpoint, sort: 20, includes: [endpoint.device.read] }
+  - { code: it.endpoint-asset.read, name: 資產管理, kind: menu, parent: it.group.endpoint, sort: 25, includes: [endpoint.device.read] }
   - { code: it.endpoint-software.read, name: 軟體管理, kind: menu, parent: it.group.endpoint, sort: 30, includes: [endpoint.device.read] }
   - { code: it.endpoint-policy.read, name: 資安政策, kind: menu, parent: it.group.endpoint, sort: 40, includes: [endpoint.device.read] }
   - { code: it.endpoint-agent.read, name: Agent 管理, kind: menu, parent: it.group.endpoint, sort: 50, includes: [endpoint.device.read] }
+  - { code: it.endpoint-report.read, name: 報表, kind: menu, parent: it.group.endpoint, sort: 60, includes: [endpoint.device.read] }
   - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50, includes: [gw.admin.user.read] }
   - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.group.system, sort: 60, includes: [gw.admin.rbac.read] }
   - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.group.system, sort: 65, includes: [gw.admin.rbac.read] }
@@ -139,9 +141,11 @@ roles:
       - it.gw-file.read
       - it.endpoint-dashboard.read
       - it.endpoint-device.read
+      - it.endpoint-asset.read
       - it.endpoint-software.read
       - it.endpoint-policy.read
       - it.endpoint-agent.read
+      - it.endpoint-report.read
       - it.sys-user.read
       - it.sys-role.read
       - it.sys-menu.read

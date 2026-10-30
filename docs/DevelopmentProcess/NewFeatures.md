@@ -2,6 +2,12 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-30 資產管理、報表選單與更多開發中 Tab(ENDPOINT-MENU-PLAN M1b)
+- 內容:需求方 2026-10-30 決定 RustIt 取代 SmartIT(功能對照 RustIt `docs/SMARTIT-FEATURE-BACKLOG.md`),回答「兩個都新增」「稽核列入但最後做」「舊資料不匯入」(計畫 §8-6)。側欄端點管理改七個選單:新增資產管理 `/endpoint/assets`(`it.endpoint-asset.read`,sort 25)與報表 `/endpoint/reports`(`it.endpoint-report.read`,sort 60),兩者 includes `endpoint.device.read`、上層 `it.group.endpoint`,加入 it-admin。新增開發中 Tab:資產管理 › 資產登錄、資產盤點、周邊設備、廠商與地點;報表 › 報表中心、報表訂閱;電腦管理 › 未安裝 Agent 電腦;軟體管理 › 禁用軟體、軟體使用率;資安政策 › 原則與套用對象、防火牆規則、外接網卡與無線網路、執行軟體控管、弱點分析(CVE)、稽核紀錄(說明需法務與隱私公告確認後才開發)。說明文字取自該文件 §2,不含 SmartIT 產品內容。新圖示 tag、clipboard-check、printer、map-pin、chart、monitor-off、brick-wall、shield-ban、bug。
+- 檔案:`frontend/src/router.ts`、`frontend/src/api/auth.ts`、`frontend/src/ui/icons.ts`、`frontend/src/ui/components/GTabs.vue`、`deploy/gateway-rbac.yaml`、`docs/ENDPOINT-MENU-PLAN.md`(§2、§4、§8-6)、`docs/PRD.md` FR-8.12、`docs/PROJECT-MAP.md`、`docs/Gherkin/endpoint/menu.feature`
+- 驗證:見 `FrontendCorrection.md` 同日紀錄。
+- 待辦:依賴 M2(!22),M2 先合併。合併後 CI `rbac-test` 首次登記兩個新選單即為正確上層與排序,不需在選單管理手動調整。
+
 ## 2026-10-30 電腦管理 › 待核可 Tab(ENDPOINT-MENU-PLAN M2)
 - 內容:「電腦管理」的「待核可」由開發中改為實作:`pages/endpoint/Batches.vue` 使用 `BatchApprovals.vue` 的新 `page` 模式,集中列出 `GET /api/endpoint/batches?state=pending_approval`(nextCursor「載入更多」),欄位:指令類型、內容、台數、建立人、建立時間、有效期限;點列看明細(參數、核可期限、目標電腦)。核可 / 駁回、權限(軟體批次 `it.endpoint-software.approve`、其他批次 `it.endpoint-device.reboot`)與「建立人不能核可」沿用原元件,清單下方另加文字說明。「軟體目錄與派送」上方的卡片(非 page 模式)欄位與行為不變。`gateway-rbac.yaml` 新增 tab `it.endpoint-batch.list`(上層 `it.endpoint-device.read`、sort 35、includes `endpoint.device.read`)並加入 it-admin;路由移除 `wip`,改為 Tab 權限 + `requires: [endpoint.device.read]`。
 - 檔案:`frontend/src/pages/endpoint/Batches.vue`(新)、`frontend/src/components/endpoint/BatchApprovals.vue`、`frontend/src/api/format.ts`(`untilText`)、`frontend/src/api/auth.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/PRD.md` FR-8.10 / 8.11、`docs/PROJECT-MAP.md`、`docs/Gherkin/endpoint/batches.feature`(新,@manual)、`menu.feature`、`docs/Gherkin/README.md`、`docs/ENDPOINT-MENU-PLAN.md`

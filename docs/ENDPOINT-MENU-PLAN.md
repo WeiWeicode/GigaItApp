@@ -21,16 +21,22 @@
 ├─ 端點儀表板   /endpoint/dashboard        新選單 it.endpoint-dashboard.read
 │    └ Tab:總覽〔開發中〕
 ├─ 電腦管理     /endpoint/devices          沿用 it.endpoint-device.read(名稱改「電腦管理」)
-│    └ Tab:電腦清單、指令紀錄、告警、待核可〔開發中〕、遠端協助〔開發中,RustDesk〕、報修單〔開發中〕
+│    └ Tab:電腦清單、指令紀錄、告警、待核可(M2)、遠端協助〔開發中,RustDesk〕、報修單〔開發中〕、未安裝 Agent 電腦〔開發中〕
+├─ 資產管理     /endpoint/assets           新選單 it.endpoint-asset.read(M1b)
+│    └ Tab:資產登錄〔開發中,財產編號 / 保管人 / 狀態 / 生命週期〕、資產盤點〔開發中〕、周邊設備〔開發中〕、廠商與地點〔開發中〕
 ├─ 軟體管理     /endpoint/software         新選單 it.endpoint-software.read
-│    └ Tab:軟體目錄與派送(現「軟體派送」)、上傳與簽章、已安裝軟體〔開發中〕、Windows 更新〔開發中,KB 移除〕、授權報表〔開發中〕
+│    └ Tab:軟體目錄與派送(現「軟體派送」)、上傳與簽章、已安裝軟體〔開發中〕、Windows 更新〔開發中,KB 移除〕、授權報表〔開發中〕、禁用軟體〔開發中〕、軟體使用率〔開發中〕
 ├─ 資安政策     /endpoint/policy           新選單 it.endpoint-policy.read
-│    └ Tab:USB 儲存控管〔開發中〕
-└─ Agent 管理   /endpoint/agent            新選單 it.endpoint-agent.read
-     └ Tab:Agent 版本(含發佈環)、使用者端程式〔開發中,P8〕、Agent 設定〔開發中〕
+│    └ Tab:USB 儲存控管、原則與套用對象、防火牆規則、外接網卡與無線網路、執行軟體控管、弱點分析(CVE)、稽核紀錄(最後做)〔皆開發中〕
+├─ Agent 管理   /endpoint/agent            新選單 it.endpoint-agent.read
+│    └ Tab:Agent 版本(含發佈環)、使用者端程式〔開發中,P8〕、Agent 設定〔開發中〕
+└─ 報表         /endpoint/reports          新選單 it.endpoint-report.read(M1b)
+     └ Tab:報表中心〔開發中〕、報表訂閱〔開發中〕
 ```
 
-**開發中 Tab 的做法**(需求方 2026-10-30 決定:做好時再登記):共用一個「開發中」元件(說明這個功能要做什麼、對應的設計文件 / 路線圖),路由 `meta.wip = true`、**不綁 tab 權限代碼**(有該選單即可看到),Tab 標籤加「開發中」標記;只有新選單需要登記 menu 代碼。功能真的做好時才登記 tab 代碼、授予 it-admin、移除 `wip`。只有開發中 Tab 的選單(端點儀表板、資安政策)也要出現在側欄。
+資產管理、報表與各開發中 Tab 的功能說明取自 RustIt `docs/SMARTIT-FEATURE-BACKLOG.md`(gitlab 分支 `docs/smartit-backlog`) §2、§3(M1b,§8-6)。
+
+**開發中 Tab 的做法**(需求方 2026-10-30 決定:做好時再登記):共用一個「開發中」元件(說明這個功能要做什麼、對應的設計文件 / 路線圖),路由 `meta.wip = true`、**不綁 tab 權限代碼**(有該選單即可看到),Tab 標籤加「開發中」標記;只有新選單需要登記 menu 代碼。功能真的做好時才登記 tab 代碼、授予 it-admin、移除 `wip`。只有開發中 Tab 的選單(端點儀表板、資產管理、資安政策、報表)也要出現在側欄。
 
 分類原則:**看「對什麼東西操作」**——電腦本身(清單、指令、告警)、電腦上的軟體(目錄、上傳、已安裝、更新)、監控程式本身(Agent / Watchdog 版本與發佈環)。儀表板放第一個,作為進入端點管理的落點。
 
@@ -106,6 +112,7 @@
 | 批 | 內容 | repo |
 | --- | --- | --- |
 | **M1** 選單拆分 ✅ | 新選單 / 路由 / redirect、yaml、`auth.ts`;頁面元件不改,只搬位置;〔開發中〕Tab(`pages/WipFeature.vue`);測試區「選單管理」手動調整與授權補洞(合併部署後由主討論串處理) | GigaItApp |
+| **M1b** 資產管理、報表選單與開發中 Tab ✅ | 新選單 `it.endpoint-asset.read`(sort 25)、`it.endpoint-report.read`(sort 60);電腦管理 / 軟體管理 / 資安政策補開發中 Tab(§8-6;分支 `feature/endpoint-menu-m1b`,依賴 M2) | GigaItApp |
 | **M2** 待核可 Tab ✅ | `Batches.vue`,沿用 `BatchApprovals.vue`(`page` 模式);Tab 代碼 `it.endpoint-batch.list`(分支 `feature/endpoint-batches-m2`) | GigaItApp |
 | **M3** 儀表板第一版 | RustIt `GET /v1/dashboard/summary`(指標列)+ 頁面(指標列、最近告警) | RustIt、GigaItApp |
 | **M4** 儀表板第二版、已安裝軟體 | 分佈、健康清單;`GET /v1/software/installed` + Tab | RustIt、GigaItApp |
@@ -140,3 +147,8 @@ M1、M2 只動 GigaItApp,可以先做;M3 起要 RustIt 新 API。
 3. M1 先做「簡單的分類」:選單拆分 + 開發中 Tab;待核可(M2)、儀表板內容(M3)之後再做。
 4. 既有 Tab 的上層搬移、改名、排序與授權補洞:合併部署後,由主討論串在需求方登入的瀏覽器操作「選單管理」,或直接呼叫 BFF 管理 API(寫入前仍逐次取得需求方同意)。不改 Gateway CLI。
 5. 儀表板指標待 M3 時再定。
+6. **RustIt 取代 SmartIT**(需求方 2026-10-30;功能對照見 RustIt `docs/SMARTIT-FEATURE-BACKLOG.md`(gitlab 分支 `docs/smartit-backlog`) §1–§3):
+   - 資產管理與報表**兩個選單都新增**(回答「兩個都新增 (Recommended)」):資產管理 sort 25(電腦管理與軟體管理之間)、報表 sort 60(最後)。
+   - 稽核類功能(檔案存取、網頁傳輸、即時通訊、螢幕擷取、列印紀錄)**列入但最後做**(回答「列入但最後做」),需法務與隱私公告確認後才開發。
+   - 舊 SmartIT 資料**不匯入**(回答「不匯入」);資產資料上線後重新登錄。
+   - 新增開發中 Tab:電腦管理「未安裝 Agent 電腦」;軟體管理「禁用軟體」「軟體使用率」;資安政策「原則與套用對象」「防火牆規則」「外接網卡與無線網路」「執行軟體控管」「弱點分析(CVE)」「稽核紀錄」;資產管理、報表的 Tab 全為開發中。與 M1 相同,開發中 Tab 做好時才登記 tab 代碼。
