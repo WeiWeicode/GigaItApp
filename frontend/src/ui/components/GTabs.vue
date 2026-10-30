@@ -38,7 +38,11 @@ const indicator = ref({ left: 0, width: 0, ready: false });
 async function measure() {
   await nextTick();
   const el = bar.value?.querySelector<HTMLElement>('.tab.active');
-  if (el) indicator.value = { left: el.offsetLeft, width: el.offsetWidth, ready: true };
+  if (!el || !bar.value) return;
+  indicator.value = { left: el.offsetLeft, width: el.offsetWidth, ready: true };
+  // Tab 多、窄螢幕時頁籤列會水平捲動:目前 Tab 在可視範圍外就捲過去(只捲頁籤列,不動整頁)
+  const b = bar.value;
+  if (el.offsetLeft < b.scrollLeft || el.offsetLeft + el.offsetWidth > b.scrollLeft + b.clientWidth) b.scrollLeft = el.offsetLeft - 8;
 }
 watch([activeKey, visible], measure);
 onMounted(() => {

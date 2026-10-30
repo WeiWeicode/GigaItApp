@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-30 資產管理、報表選單、開發中 Tab 與頁籤自動捲動(ENDPOINT-MENU-PLAN M1b)
+- 內容:`router.ts` 新增 `endpoint/assets`(4 個開發中 Tab)、`endpoint/reports`(2 個開發中 Tab),電腦管理 / 軟體管理 / 資安政策補開發中 Tab(`wipTab()`,不綁 Tab 權限);`auth.ts` `IT.endpointAsset` / `IT.endpointReport` 與 `MENU`;`icons.ts` 新圖示。資安政策有 7 個 Tab,窄螢幕時目前 Tab 落在頁籤列可視範圍外,`GTabs.measure()` 改為必要時把頁籤列 `scrollLeft` 捲到目前 Tab(只捲頁籤列,不動整頁)。
+- 檔案:`frontend/src/router.ts`、`api/auth.ts`、`ui/icons.ts`、`ui/components/GTabs.vue`
+- 驗證:`npm run typecheck`、`npm run build` 通過。瀏覽器(本機 5180 經 proxy 連測試區 Gateway,需求方已登入;`DEV_EXTRA_PERMS` 補 `it.endpoint-asset.read`、`it.endpoint-report.read`、`it.endpoint-batch.list`,只影響本機顯示;開發中頁不呼叫 API):側欄依序七個選單;資產管理 4 個、報表 2 個開發中 Tab;電腦管理末尾「未安裝 Agent 電腦」;軟體管理末尾「禁用軟體」「軟體使用率」;資安政策 7 個 Tab,「稽核紀錄」說明含「需法務與隱私公告確認後才開發」;375px 黑暗:`/endpoint/policy/vulnerabilities` 頁籤列自動捲到「弱點分析(CVE)」(scrollLeft 1032、目前 Tab 在可視範圍內),整頁 scrollWidth = 375。code-reviewer:無必修;採納「五個選單」舊字樣改七個、FR-8.12 排序、資產登錄說明移除「自訂欄位」(backlog 是放電腦詳情)。security-auditor:無 Critical / High / Medium(Low:新選單 includes endpoint.device.read 為需求方既定做法,授予非 it-admin 角色時注意)。
+
 ## 2026-10-30 待核可 Tab 與 BatchApprovals page 模式(ENDPOINT-MENU-PLAN M2)
 - 內容:`BatchApprovals.vue` 清單改為自管 cursor 載入(與 `Alerts.vue` 相同的 `load(more)` 寫法,取代 `useAsync`),新增 `page` prop:page 模式顯示「載入更多」、多一欄「建立時間」、期限欄改名「有效期限」、點列開明細(動作按鈕 `.stop`)、清單下方說明核可人不可是建立人;卡片模式欄位不變。明細對話框加核可期限。`Batches.vue` 以單一根節點包住元件。期限改用新 `untilText()`(見 BugFix 同日紀錄)。
 - 檔案:`frontend/src/components/endpoint/BatchApprovals.vue`、`pages/endpoint/Batches.vue`(新)、`api/format.ts`、`api/auth.ts`、`router.ts`

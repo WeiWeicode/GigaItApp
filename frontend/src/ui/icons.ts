@@ -124,6 +124,16 @@ export const ICONS: Record<string, Component> = {
   headset: L.Headset,
   wrench: L.Wrench,
   'app-window': L.AppWindow,
+  // 資產管理、報表、資安政策開發中 Tab(ENDPOINT-MENU-PLAN M1b)
+  tag: L.Tag,
+  'clipboard-check': L.ClipboardCheck,
+  printer: L.Printer,
+  'map-pin': L.MapPin,
+  chart: L.ChartColumn,
+  'monitor-off': L.MonitorOff,
+  'brick-wall': L.BrickWall,
+  'shield-ban': L.ShieldBan,
+  bug: L.Bug,
 };
 
 export const ICON_NAMES = Object.keys(ICONS).sort();
