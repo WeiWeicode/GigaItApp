@@ -86,6 +86,9 @@ permissions:
   #   等同也能下一般指令(與 it.endpoint-device.command 相同權限),只授予已有「下達一般指令」的角色
   - { code: it.endpoint-alert.list, name: 告警, kind: tab, parent: it.endpoint-device.read, sort: 30, includes: [endpoint.device.read] }
   - { code: it.endpoint-alert.resolve, name: 關閉告警, kind: button, parent: it.endpoint-alert.list, sort: 10, includes: [endpoint.command.basic] }
+  # 待核可(GigaItApp ENDPOINT-MENU-PLAN M2):集中列出待第二人核可的批次(GET /batches?state=pending_approval);
+  #   核可 / 駁回按鈕沿用 it.endpoint-software.approve(軟體批次)與 it.endpoint-device.reboot(重開機等其他批次),不另設按鈕節點
+  - { code: it.endpoint-batch.list, name: 待核可, kind: tab, parent: it.endpoint-device.read, sort: 35, includes: [endpoint.device.read] }
   # Agent 版本(RustIt P6:版本登錄 / 發佈環 / Watchdog 與 Agent 升級;ItAgentBack OpenAPI 於 P6-1 自動註冊,endpoint.software.manage 同批建立)。
   #   管理按鈕綁 endpoint.software.manage:主機另要求「可管理所有公司」的角色(環是全公司共用,P6-UPGRADE-DESIGN §9-5),只授予 IT 管理員
   - { code: it.endpoint-release.list, name: Agent 版本, kind: tab, parent: it.endpoint-agent.read, sort: 10, includes: [endpoint.device.read] }
@@ -178,6 +181,7 @@ roles:
       - it.endpoint-command.list
       - it.endpoint-alert.list
       - it.endpoint-alert.resolve
+      - it.endpoint-batch.list
       - it.endpoint-release.list
       - it.endpoint-release.manage
       - it.endpoint-software.list

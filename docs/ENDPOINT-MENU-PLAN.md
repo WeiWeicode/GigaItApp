@@ -106,7 +106,7 @@
 | 批 | 內容 | repo |
 | --- | --- | --- |
 | **M1** 選單拆分 ✅ | 新選單 / 路由 / redirect、yaml、`auth.ts`;頁面元件不改,只搬位置;〔開發中〕Tab(`pages/WipFeature.vue`);測試區「選單管理」手動調整與授權補洞(合併部署後由主討論串處理) | GigaItApp |
-| **M2** 待核可 Tab | `Batches.vue`,沿用 `BatchApprovals.vue` 的邏輯 | GigaItApp |
+| **M2** 待核可 Tab ✅ | `Batches.vue`,沿用 `BatchApprovals.vue`(`page` 模式);Tab 代碼 `it.endpoint-batch.list`(分支 `feature/endpoint-batches-m2`) | GigaItApp |
 | **M3** 儀表板第一版 | RustIt `GET /v1/dashboard/summary`(指標列)+ 頁面(指標列、最近告警) | RustIt、GigaItApp |
 | **M4** 儀表板第二版、已安裝軟體 | 分佈、健康清單;`GET /v1/software/installed` + Tab | RustIt、GigaItApp |
 | **M5** Windows 更新 Tab | 依 RustIt KB-UNINSTALL U4 | RustIt、GigaItApp |
