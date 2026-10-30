@@ -80,6 +80,8 @@ export const UI = {
   /** 告警(RustIt P5):清單 Tab、關閉告警按鈕 */
   alertList: 'it.endpoint-alert.list',
   alertResolve: 'it.endpoint-alert.resolve',
+  /** 待核可(ENDPOINT-MENU-PLAN M2):集中列出待核可批次的 Tab;核可 / 駁回沿用 swApprove、devReboot */
+  batchList: 'it.endpoint-batch.list',
   /** Agent 版本(RustIt P6):清單 Tab、登錄 / 發佈 / 撤回 / 設定發佈環目標版本按鈕 */
   releaseList: 'it.endpoint-release.list',
   releaseManage: 'it.endpoint-release.manage',

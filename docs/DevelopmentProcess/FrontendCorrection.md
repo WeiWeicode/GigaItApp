@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-30 待核可 Tab 與 BatchApprovals page 模式(ENDPOINT-MENU-PLAN M2)
+- 內容:`BatchApprovals.vue` 清單改為自管 cursor 載入(與 `Alerts.vue` 相同的 `load(more)` 寫法,取代 `useAsync`),新增 `page` prop:page 模式顯示「載入更多」、多一欄「建立時間」、期限欄改名「有效期限」、點列開明細(動作按鈕 `.stop`)、清單下方說明核可人不可是建立人;卡片模式欄位不變。明細對話框加核可期限。`Batches.vue` 以單一根節點包住元件。期限改用新 `untilText()`(見 BugFix 同日紀錄)。
+- 檔案:`frontend/src/components/endpoint/BatchApprovals.vue`、`pages/endpoint/Batches.vue`(新)、`api/format.ts`、`api/auth.ts`、`router.ts`
+- 驗證:`npm run typecheck`、`npm run build` 通過。瀏覽器:(1)測試區真實資料(本機 5180 經 proxy,需求方登入;`DEV_EXTRA_PERMS=it.endpoint-batch.list` 只影響本機顯示;只做唯讀 GET):「待核可」Tab 無開發中標記、`GET /api/endpoint/batches?state=pending_approval&limit=50` 200、測試區目前沒有待核可批次 → 顯示「沒有待核可的批次」與規則說明;「軟體目錄與派送」卡片仍 6 欄、無說明文字。(2)有資料的畫面用本機假 Gateway(scratchpad Node 小服務,假批次 4 筆分兩頁,資料虛構;未在測試區建立或核可任何批次):欄位與有效期限(「18 小時後到期」)、自己建立的批次標「我建立的」且「核可」停用(提示另一位 IT 核可)、按鈕為「撤回」;「載入更多」後 4 筆且按鈕消失;點列開明細(參數、核可期限、目標電腦 12 台分頁);375px 黑暗無整頁水平捲動(內容欄在窄螢幕換行較密,與原卡片相同)。未實際按核可 / 駁回(行為沿用原元件,未改)。code-reviewer:無必修;採納還原 Prettier 造成的無關排版、`untilText` 無效日期回「—」、欄位 key 註解、文件補「期限文字修正」「核可後回到第一頁」。security-auditor:無 Critical / High / Medium(yaml 未擴大 API 權限、無 v-html、cursor 經 URLSearchParams 編碼、核可權限判斷未變)。
+
 ## 2026-10-30 端點管理五個選單、開發中 Tab、舊網址 redirect(ENDPOINT-MENU-PLAN M1)
 - 內容:`router.ts` 端點管理拆成五個 `TabbedPage`(端點儀表板 / 電腦管理 / 軟體管理 / 資安政策 / Agent 管理),既有頁面元件只搬位置;`wipTab()` 產生開發中 Tab 子路由(`pages/WipFeature.vue`,props 傳說明與設計文件,`meta.wip`、不綁 Tab 權限);`firstTab()` 開發中 Tab 一律可看(側欄 `pageHasTab` 與「目前 Tab 沒權限時改到第一個可看的 Tab」同一邏輯);`GTabs` 的 `TabItem.wip` 顯示「開發中」`GBadge`;`auth.ts` `IT` 加 4 個選單代碼、`MENU` 端點群組改 5 個子項;舊網址 redirect 三筆。`vite.config.ts` 加 `DEV_EXTRA_PERMS`(逗號分隔,只在 dev server 補進 `/api/auth/me`,看測試區尚未登記的新選單;BFF 照樣檢查 API)。
 - 檔案:`frontend/src/router.ts`、`api/auth.ts`、`pages/WipFeature.vue`(新)、`ui/components/GTabs.vue`、`ui/icons.ts`、`vite.config.ts`

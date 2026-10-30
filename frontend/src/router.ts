@@ -232,7 +232,7 @@ const routes: RouteRecordRaw[] = [
             { label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList },
             { label: '指令紀錄', to: '/endpoint/devices/commands', icon: 'list', permission: UI.cmdList },
             { label: '告警', to: '/endpoint/devices/alerts', icon: 'bell', permission: UI.alertList },
-            { label: '待核可', to: '/endpoint/devices/batches', icon: 'clock', wip: true },
+            { label: '待核可', to: '/endpoint/devices/batches', icon: 'clock', permission: UI.batchList },
             { label: '遠端協助', to: '/endpoint/devices/remote', icon: 'headset', wip: true },
             { label: '報修單', to: '/endpoint/devices/tickets', icon: 'wrench', wip: true },
           ],
@@ -245,11 +245,11 @@ const routes: RouteRecordRaw[] = [
             component: () => import('./pages/endpoint/Alerts.vue'),
             meta: { tab: '告警', permission: UI.alertList, requires: [EP.deviceRead] },
           },
-          wipTab('batches', '待核可', {
-            summary: '集中列出等待第二人核可的批次(重新開機、軟體派送,之後的 KB 移除),在同一處核可或駁回;原本對話框內的入口保留。',
-            plan: ['資料來源 GET /api/endpoint/batches?state=pending_approval', '核可 / 駁回沿用既有按鈕權限(核可軟體派送批次、重新開機與核可重開機批次)'],
-            docs: ['GigaItApp docs/ENDPOINT-MENU-PLAN.md §2.2、§4 M2'],
-          }),
+          {
+            path: 'batches',
+            component: () => import('./pages/endpoint/Batches.vue'),
+            meta: { tab: '待核可', permission: UI.batchList, requires: [EP.deviceRead] },
+          },
           wipTab('remote', '遠端協助', {
             summary: '以 RustDesk 遠端協助使用者:自架 hbbs / hbbr、派送 RustDesk、密碼加密保存、一鍵連線並留下稽核紀錄;使用者端顯示「IT 正在連線」。',
             docs: ['RustIt docs/PLATFORM-PLAN.md §9 路線圖(RustDesk 遠端協助)、RustIt docs/PRD.md §6'],

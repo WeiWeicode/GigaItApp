@@ -16,6 +16,17 @@ export function fromNow(iso: string | null | undefined): string {
   return fmtTime(iso);
 }
 
+/** 期限 → 「3 小時後到期」;已過 → 「已到期」(fromNow 只處理過去時間,期限要用這個) */
+export function untilText(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const s = (new Date(iso).getTime() - Date.now()) / 1000;
+  if (Number.isNaN(s)) return '—';
+  if (s <= 0) return '已到期';
+  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))} 分鐘後到期`;
+  if (s < 86400) return `${Math.floor(s / 3600)} 小時後到期`;
+  return `${Math.floor(s / 86400)} 天後到期`;
+}
+
 /** 位元組 → GB / MB(記憶體、磁碟;1024 進位) */
 export function fmtBytes(n: number | null | undefined): string {
   if (n == null) return '—';
