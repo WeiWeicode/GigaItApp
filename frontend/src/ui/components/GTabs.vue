@@ -3,7 +3,7 @@
  * 頁籤:
  *   - 路由模式:items 帶 to,以 RouterLink 切換(頁面內 Tab 對應子路由,重新整理仍停在同一個 Tab)
  *   - 本地模式:items 帶 value,v-model 切換
- * item.permission 沒有權限時不顯示。
+ * item.permission 沒有權限時不顯示;item.wip 在標籤後顯示「開發中」標記(ENDPOINT-MENU-PLAN §2)。
  */
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -16,6 +16,8 @@ export interface TabItem {
   icon?: string;
   permission?: string;
   count?: number | string;
+  /** 開發中的佔位 Tab */
+  wip?: boolean;
 }
 
 const props = defineProps<{ items: TabItem[]; modelValue?: string }>();
@@ -54,6 +56,7 @@ onMounted(() => {
         <GIcon v-if="t.icon" :name="t.icon" :size="16" />
         {{ t.label }}
         <span v-if="t.count !== undefined" class="count">{{ t.count }}</span>
+        <GBadge v-if="t.wip" tone="warning" class="wip">開發中</GBadge>
       </RouterLink>
       <button
         v-else
@@ -67,6 +70,7 @@ onMounted(() => {
         <GIcon v-if="t.icon" :name="t.icon" :size="16" />
         {{ t.label }}
         <span v-if="t.count !== undefined" class="count">{{ t.count }}</span>
+        <GBadge v-if="t.wip" tone="warning" class="wip">開發中</GBadge>
       </button>
     </template>
   </nav>
@@ -142,5 +146,10 @@ onMounted(() => {
   text-align: center;
   background: var(--glass-soft);
   border: 1px solid var(--line);
+}
+/* 權重高於 GBadge 自己的 .g-badge,打包後 CSS 順序不影響 */
+.tab .wip {
+  height: 18px;
+  padding: 0 6px;
 }
 </style>

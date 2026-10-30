@@ -2,6 +2,12 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-30 端點管理選單拆分與開發中 Tab(ENDPOINT-MENU-PLAN M1)
+- 內容:依需求方 2026-10-30 決定(`docs/ENDPOINT-MENU-PLAN.md` §8),側欄「端點管理」由單一選單(6 個 Tab)拆成五個選單:端點儀表板 `/endpoint/dashboard`、電腦管理 `/endpoint/devices`(沿用 `it.endpoint-device.read`,名稱改「電腦管理」)、軟體管理 `/endpoint/software`、資安政策 `/endpoint/policy`、Agent 管理 `/endpoint/agent`。既有頁面元件不改,只搬路由(軟體目錄與派送 / 上傳與簽章 → 軟體管理,Agent 版本 → Agent 管理);舊網址 `/endpoint/devices/software`、`/software-uploads`、`/releases` redirect 到新位置(保留 query)。路線圖功能以〔開發中〕Tab 佔位:共用 `pages/WipFeature.vue`(功能說明、預計內容、設計文件;不呼叫 API),路由 `meta.wip`、不綁 Tab 權限代碼,`GTabs` 顯示「開發中」標記;`firstTab()` 把開發中 Tab 算成可看,只有開發中 Tab 的選單(端點儀表板、資安政策)也出現在側欄。`gateway-rbac.yaml`:新增 menu `it.endpoint-dashboard.read` / `-software.read` / `-policy.read` / `-agent.read`(includes `endpoint.device.read`,sort 10–50),`it.endpoint-software.list|upload` 上層改 `it.endpoint-software.read`、`it.endpoint-release.list` 改 `it.endpoint-agent.read`,`it.endpoint-device.read` 改名「電腦管理」、`it.endpoint-software.list` 改名「軟體目錄與派送」,it-admin 加 4 個選單;既有 tab / 按鈕代碼不變(新環境首次登記用,既有環境需在選單管理手動調整,§3.2)。新圖示 construction、usb、headset、wrench、app-window。
+- 檔案:`frontend/src/router.ts`、`frontend/src/api/auth.ts`、`frontend/src/pages/WipFeature.vue`(新)、`frontend/src/ui/components/GTabs.vue`、`frontend/src/ui/icons.ts`、`frontend/vite.config.ts`(`DEV_EXTRA_PERMS`)、`deploy/gateway-rbac.yaml`、`docs/PRD.md` FR-8.1 / 8.7–8.10、`docs/PROJECT-MAP.md`、`docs/Gherkin/endpoint/menu.feature`(新,@manual)、`software.feature`、`releases.feature`、`docs/Gherkin/README.md`、`docs/ENDPOINT-MENU-PLAN.md`
+- 驗證:見 `FrontendCorrection.md` 同日紀錄。
+- 待辦:合併 develop 後 CI `rbac-test` 只新增 4 個選單節點;既有 Tab 上層、名稱、排序與授權補洞由主討論串在「選單管理」手動處理(MR 描述附清單)。之後正式區同樣處理。
+
 ## 2026-10-30 端點管理選單重新分類規劃(草案)
 - 內容:新增 `docs/ENDPOINT-MENU-PLAN.md`:端點管理由單一選單(6 個 Tab)拆成端點儀表板 / 電腦管理 / 軟體管理 / Agent 管理;沿用既有 Tab / 按鈕代碼只改上層(避免角色授權失效),新增 3 個選單代碼;說明 CI `apply` 不覆寫上層、需在選單管理手動調整與授權補洞;儀表板與已安裝軟體需 RustIt 新彙總 API;分批 M1–M5,§8 五項待決
 - 檔案:`docs/ENDPOINT-MENU-PLAN.md`

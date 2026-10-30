@@ -54,8 +54,17 @@ function endpointLocalProxy(): Record<string, ProxyOptions> {
   return { '/api/endpoint': { target: ENDPOINT_LOCAL, changeOrigin: true, rewrite: (p) => p.replace(/^\/api\/endpoint/, '/v1') } };
 }
 
-/** 本機服務(OBSERVE_LOCAL、ENDPOINT_LOCAL)需要的權限,補進測試區 BFF 回傳的 /api/auth/me;沒有設定時不攔截 */
-const LOCAL_PERMS = [...(OBSERVE_LOCAL ? OBSERVE_PERMS : []), ...(ENDPOINT_LOCAL ? ENDPOINT_PERMS : [])];
+/**
+ * DEV_EXTRA_PERMS=代碼1,代碼2(逗號分隔):測試區尚未登記的新選單 / Tab 代碼,先補進本機 /api/auth/me 看畫面
+ * (例:端點管理選單拆分的 it.endpoint-dashboard.read 等,ENDPOINT-MENU-PLAN M1)。只影響本機前端顯示,BFF 照樣以真實權限檢查 API。
+ */
+const DEV_EXTRA_PERMS = (process.env.DEV_EXTRA_PERMS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+/** 本機服務(OBSERVE_LOCAL、ENDPOINT_LOCAL)與 DEV_EXTRA_PERMS 需要的權限,補進測試區 BFF 回傳的 /api/auth/me;沒有設定時不攔截 */
+const LOCAL_PERMS = [...(OBSERVE_LOCAL ? OBSERVE_PERMS : []), ...(ENDPOINT_LOCAL ? ENDPOINT_PERMS : []), ...DEV_EXTRA_PERMS];
 function localPermsProxy(): Record<string, ProxyOptions> {
   if (!LOCAL_PERMS.length) return {};
   return {

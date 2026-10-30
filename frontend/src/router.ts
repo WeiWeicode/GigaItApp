@@ -25,8 +25,15 @@ declare module 'vue-router' {
     icon?: string;
     eyebrow?: string;
     tab?: string;
-    tabs?: { label: string; to: string; icon?: string; permission?: string }[];
+    tabs?: { label: string; to: string; icon?: string; permission?: string; wip?: boolean }[];
+    /** 開發中的佔位 Tab:不綁 Tab 權限代碼,有該選單即可看到(ENDPOINT-MENU-PLAN §2) */
+    wip?: boolean;
   }
+}
+
+/** 開發中 Tab 的子路由:共用 WipFeature 佔位頁,內容由 props 傳入;功能做好時換成正式頁面並登記 Tab 代碼 */
+function wipTab(path: string, tab: string, props: { summary: string; plan?: string[]; docs?: string[] }): RouteRecordRaw {
+  return { path, component: () => import('./pages/WipFeature.vue'), props, meta: { tab, wip: true } };
 }
 
 const routes: RouteRecordRaw[] = [
@@ -189,12 +196,35 @@ const routes: RouteRecordRaw[] = [
           },
         ],
       },
+      // 端點管理(ENDPOINT-MENU-PLAN §2、§3.3):端點儀表板 / 電腦管理 / 軟體管理 / 資安政策 / Agent 管理;〔開發中〕Tab 用 wipTab()
+      {
+        path: 'endpoint/dashboard',
+        component: TabbedPage,
+        meta: {
+          permission: IT.endpointDashboard,
+          title: '端點儀表板',
+          eyebrow: 'Endpoint',
+          description: '端點電腦的整體概況:在線狀態、告警、待核可與派送結果',
+          icon: 'gauge',
+          tabs: [{ label: '總覽', to: '/endpoint/dashboard', icon: 'activity', wip: true }],
+        },
+        children: [
+          wipTab('', '總覽', {
+            summary: '進入端點管理的落點:一眼看出電腦總數、在線 / 離線、未結告警、待核可批次與 24 小時內失敗的指令,並列出需要處理的電腦。',
+            plan: [
+              '第一版:指標列 + 最近 10 筆未結告警(需 RustIt 新增 GET /v1/dashboard/summary,依公司範圍過濾、快取 60 秒)',
+              '第二版:健康清單(磁碟不足、記憶體長期偏高、超過 7 天未回報)、作業系統與 Agent 版本分佈、近 7 天派送成功 / 失敗',
+            ],
+            docs: ['GigaItApp docs/ENDPOINT-MENU-PLAN.md §2.1、§4 M3–M4'],
+          }),
+        ],
+      },
       {
         path: 'endpoint/devices',
         component: TabbedPage,
         meta: {
           permission: IT.endpointDevice,
-          title: '電腦清單',
+          title: '電腦管理',
           eyebrow: 'Endpoint',
           description: '經 Gateway BFF 取得的 Agent 基本資料;資料權限以 Gateway 為準',
           icon: 'monitor',
@@ -202,9 +232,9 @@ const routes: RouteRecordRaw[] = [
             { label: '電腦清單', to: '/endpoint/devices', icon: 'monitor', permission: UI.devList },
             { label: '指令紀錄', to: '/endpoint/devices/commands', icon: 'list', permission: UI.cmdList },
             { label: '告警', to: '/endpoint/devices/alerts', icon: 'bell', permission: UI.alertList },
-            { label: 'Agent 版本', to: '/endpoint/devices/releases', icon: 'package', permission: UI.releaseList },
-            { label: '軟體派送', to: '/endpoint/devices/software', icon: 'send', permission: UI.swList },
-            { label: '上傳與簽章', to: '/endpoint/devices/software-uploads', icon: 'shield', permission: UI.swUpload },
+            { label: '待核可', to: '/endpoint/devices/batches', icon: 'clock', wip: true },
+            { label: '遠端協助', to: '/endpoint/devices/remote', icon: 'headset', wip: true },
+            { label: '報修單', to: '/endpoint/devices/tickets', icon: 'wrench', wip: true },
           ],
         },
         children: [
@@ -215,23 +245,117 @@ const routes: RouteRecordRaw[] = [
             component: () => import('./pages/endpoint/Alerts.vue'),
             meta: { tab: '告警', permission: UI.alertList, requires: [EP.deviceRead] },
           },
+          wipTab('batches', '待核可', {
+            summary: '集中列出等待第二人核可的批次(重新開機、軟體派送,之後的 KB 移除),在同一處核可或駁回;原本對話框內的入口保留。',
+            plan: ['資料來源 GET /api/endpoint/batches?state=pending_approval', '核可 / 駁回沿用既有按鈕權限(核可軟體派送批次、重新開機與核可重開機批次)'],
+            docs: ['GigaItApp docs/ENDPOINT-MENU-PLAN.md §2.2、§4 M2'],
+          }),
+          wipTab('remote', '遠端協助', {
+            summary: '以 RustDesk 遠端協助使用者:自架 hbbs / hbbr、派送 RustDesk、密碼加密保存、一鍵連線並留下稽核紀錄;使用者端顯示「IT 正在連線」。',
+            docs: ['RustIt docs/PLATFORM-PLAN.md §9 路線圖(RustDesk 遠端協助)、RustIt docs/PRD.md §6'],
+          }),
+          wipTab('tickets', '報修單', {
+            summary: '處理使用者從使用者端程式或入口網送出的報修單;送單時自動帶入電腦資訊與截圖。',
+            docs: ['RustIt docs/PLATFORM-PLAN.md §4.8(P8-3 報修入口)、§9 路線圖(報修單後端)、RustIt docs/PRD.md §4.1'],
+          }),
+        ],
+      },
+      {
+        path: 'endpoint/software',
+        component: TabbedPage,
+        meta: {
+          permission: IT.endpointSoftware,
+          title: '軟體管理',
+          eyebrow: 'Endpoint',
+          description: '軟體目錄、上傳與簽章、派送,以及各電腦已安裝的軟體與 Windows 更新',
+          icon: 'package',
+          tabs: [
+            { label: '軟體目錄與派送', to: '/endpoint/software', icon: 'send', permission: UI.swList },
+            { label: '上傳與簽章', to: '/endpoint/software/uploads', icon: 'shield', permission: UI.swUpload },
+            { label: '已安裝軟體', to: '/endpoint/software/installed', icon: 'boxes', wip: true },
+            { label: 'Windows 更新', to: '/endpoint/software/updates', icon: 'download', wip: true },
+            { label: '授權報表', to: '/endpoint/software/licenses', icon: 'key', wip: true },
+          ],
+        },
+        children: [
           {
-            path: 'releases',
-            component: () => import('./pages/endpoint/Releases.vue'),
-            meta: { tab: 'Agent 版本', permission: UI.releaseList, requires: [EP.deviceRead] },
-          },
-          {
-            path: 'software',
+            path: '',
             component: () => import('./pages/endpoint/Software.vue'),
-            meta: { tab: '軟體派送', permission: UI.swList, requires: [EP.deviceRead] },
+            meta: { tab: '軟體目錄與派送', permission: UI.swList, requires: [EP.deviceRead] },
           },
           {
-            path: 'software-uploads',
+            path: 'uploads',
             component: () => import('./pages/endpoint/SoftwareUploads.vue'),
             meta: { tab: '上傳與簽章', permission: UI.swUpload, requires: [EP.softwareManage] },
           },
+          wipTab('installed', '已安裝軟體', {
+            summary: '全公司已安裝軟體彙總:軟體名稱、版本數、安裝台數,點開看哪些電腦有裝(目前電腦清單只能用軟體名稱篩選)。',
+            plan: ['需 RustIt 新增彙總 API GET /v1/software/installed'],
+            docs: ['GigaItApp docs/ENDPOINT-MENU-PLAN.md §2.3、§4 M4'],
+          }),
+          wipTab('updates', 'Windows 更新', {
+            summary: '批次移除 Windows 更新(KB):輸入 KB 編號 → 查出哪些電腦有安裝 → 建立批次移除;單台入口在電腦詳情「安全」Tab。',
+            docs: ['RustIt docs/KB-UNINSTALL-DESIGN.md U4', 'GigaItApp docs/ENDPOINT-MENU-PLAN.md §2.3、§4 M5'],
+          }),
+          wipTab('licenses', '授權報表', {
+            summary: '依已安裝軟體統計授權使用量,並提供資產總表、硬體變更、安全狀態等報表,可匯出 Excel。',
+            docs: ['RustIt docs/PLATFORM-PLAN.md §9 路線圖(報表)、RustIt docs/PRD.md §4.3'],
+          }),
         ],
       },
+      {
+        path: 'endpoint/policy',
+        component: TabbedPage,
+        meta: {
+          permission: IT.endpointPolicy,
+          title: '資安政策',
+          eyebrow: 'Endpoint',
+          description: '下發到端點電腦的控管政策',
+          icon: 'shield',
+          tabs: [{ label: 'USB 儲存控管', to: '/endpoint/policy', icon: 'usb', wip: true }],
+        },
+        children: [
+          wipTab('', 'USB 儲存控管', {
+            summary: 'USB 儲存裝置控管:下發策略(policy.apply 指令)、白名單、違規事件。目前 Agent 只記錄 USB 插拔事件(電腦詳情「事件」Tab),不封鎖。',
+            docs: ['RustIt docs/PLATFORM-PLAN.md §9 路線圖(USB 儲存控管)、RustIt docs/PRD.md §5.2'],
+          }),
+        ],
+      },
+      {
+        path: 'endpoint/agent',
+        component: TabbedPage,
+        meta: {
+          permission: IT.endpointAgent,
+          title: 'Agent 管理',
+          eyebrow: 'Endpoint',
+          description: '端點監控程式(Agent / Watchdog)與使用者端程式的版本、發佈環與設定',
+          icon: 'cpu',
+          tabs: [
+            { label: 'Agent 版本', to: '/endpoint/agent', icon: 'package', permission: UI.releaseList },
+            { label: '使用者端程式', to: '/endpoint/agent/desktop', icon: 'app-window', wip: true },
+            { label: 'Agent 設定', to: '/endpoint/agent/settings', icon: 'settings', wip: true },
+          ],
+        },
+        children: [
+          {
+            path: '',
+            component: () => import('./pages/endpoint/Releases.vue'),
+            meta: { tab: 'Agent 版本', permission: UI.releaseList, requires: [EP.deviceRead] },
+          },
+          wipTab('desktop', '使用者端程式', {
+            summary: '使用者端程式(托盤、通知、我的電腦、嵌入 Gateway 網頁應用)的版本與發佈;與監控 MSI 各自發版。',
+            docs: ['RustIt docs/PLATFORM-PLAN.md §4.8(P8)'],
+          }),
+          wipTab('settings', 'Agent 設定', {
+            summary: '檢視主機下發給 Agent 的設定(回報間隔、USB 事件開關等)與信任的簽章者清單。',
+            docs: ['GigaItApp docs/ENDPOINT-MENU-PLAN.md §2.4', 'RustIt docs/PLATFORM-PLAN.md §6(AgentSettings)'],
+          }),
+        ],
+      },
+      // 舊網址(拆分前的 Tab;書籤、群組貼過的連結)保留一個版本週期(ENDPOINT-MENU-PLAN §3.3)
+      { path: 'endpoint/devices/software', redirect: (to) => ({ path: '/endpoint/software', query: to.query, hash: to.hash }) },
+      { path: 'endpoint/devices/software-uploads', redirect: (to) => ({ path: '/endpoint/software/uploads', query: to.query, hash: to.hash }) },
+      { path: 'endpoint/devices/releases', redirect: (to) => ({ path: '/endpoint/agent', query: to.query, hash: to.hash }) },
       {
         path: 'system/users',
         component: TabbedPage,
@@ -333,12 +457,13 @@ export const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 });
 
-type TabMeta = { to: string; permission?: string };
-/** 功能頁中第一個有權限的 Tab(Tab 權限 ∩ 該 Tab 子路由需要的讀取權限);沒有 Tab 定義時回頁面本身 */
+type TabMeta = { to: string; permission?: string; wip?: boolean };
+/** 功能頁中第一個有權限的 Tab(Tab 權限 ∩ 該 Tab 子路由需要的讀取權限;開發中 Tab 一律可看);沒有 Tab 定義時回頁面本身 */
 function firstTab(page: RouteRecordRaw): string | null {
   const tabs = (page.meta?.tabs as TabMeta[] | undefined) ?? [];
   if (!tabs.length) return `/${page.path}`;
   for (const t of tabs) {
+    if (t.wip) return t.to;
     if (t.permission && !can(t.permission)) continue;
     const child = (page.children ?? []).find((c) => `/${page.path}${c.path ? `/${c.path}` : ''}` === t.to);
     if (!child || canAll(child.meta?.requires)) return t.to;

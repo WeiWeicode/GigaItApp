@@ -31,7 +31,13 @@ permissions:
   # 檔案管理(giga-file-service PRD §8,D16):file.* 由 file-api 自動註冊;尚未註冊時 includes 會略過,下次套用補上
   - { code: it.gw-file.read, name: 檔案管理, kind: menu, parent: it.group.gateway, sort: 40 }
   # 端點管理(RustIt ItAgentBack):endpoint.* 由 ItAgentBack 啟動時自動註冊 OpenAPI 建立,需先註冊再套用本檔(RustIt INTEGRATION-PLAN D9)
-  - { code: it.endpoint-device.read, name: 電腦清單, kind: menu, parent: it.group.endpoint, sort: 40, includes: [endpoint.device.read] }
+  #   五個選單(GigaItApp ENDPOINT-MENU-PLAN §2):端點儀表板 / 電腦管理 / 軟體管理 / 資安政策 / Agent 管理。〔開發中〕Tab 做好時才登記 tab 代碼(§8-2)
+  #   既有環境的上層 / 名稱 / 排序不會被本檔覆寫,於「選單管理」手動調整(§3.2)
+  - { code: it.endpoint-dashboard.read, name: 端點儀表板, kind: menu, parent: it.group.endpoint, sort: 10, includes: [endpoint.device.read] }
+  - { code: it.endpoint-device.read, name: 電腦管理, kind: menu, parent: it.group.endpoint, sort: 20, includes: [endpoint.device.read] }
+  - { code: it.endpoint-software.read, name: 軟體管理, kind: menu, parent: it.group.endpoint, sort: 30, includes: [endpoint.device.read] }
+  - { code: it.endpoint-policy.read, name: 資安政策, kind: menu, parent: it.group.endpoint, sort: 40, includes: [endpoint.device.read] }
+  - { code: it.endpoint-agent.read, name: Agent 管理, kind: menu, parent: it.group.endpoint, sort: 50, includes: [endpoint.device.read] }
   - { code: it.sys-user.read, name: 人員與部門, kind: menu, parent: it.group.system, sort: 50, includes: [gw.admin.user.read] }
   - { code: it.sys-role.read, name: 權限設定, kind: menu, parent: it.group.system, sort: 60, includes: [gw.admin.rbac.read] }
   - { code: it.sys-menu.read, name: 選單管理, kind: menu, parent: it.group.system, sort: 65, includes: [gw.admin.rbac.read] }
@@ -82,18 +88,18 @@ permissions:
   - { code: it.endpoint-alert.resolve, name: 關閉告警, kind: button, parent: it.endpoint-alert.list, sort: 10, includes: [endpoint.command.basic] }
   # Agent 版本(RustIt P6:版本登錄 / 發佈環 / Watchdog 與 Agent 升級;ItAgentBack OpenAPI 於 P6-1 自動註冊,endpoint.software.manage 同批建立)。
   #   管理按鈕綁 endpoint.software.manage:主機另要求「可管理所有公司」的角色(環是全公司共用,P6-UPGRADE-DESIGN §9-5),只授予 IT 管理員
-  - { code: it.endpoint-release.list, name: Agent 版本, kind: tab, parent: it.endpoint-device.read, sort: 40, includes: [endpoint.device.read] }
+  - { code: it.endpoint-release.list, name: Agent 版本, kind: tab, parent: it.endpoint-agent.read, sort: 10, includes: [endpoint.device.read] }
   - { code: it.endpoint-release.manage, name: 版本與發佈環管理, kind: button, parent: it.endpoint-release.list, sort: 10, includes: [endpoint.software.manage] }
   # 軟體派送(RustIt P7:軟體目錄、派送、第二人核可、重新開機;ItAgentBack OpenAPI v56 起發佈,endpoint.software.* / endpoint.command.admin 已存在)。
   #   目錄管理與核可軟體批次綁 endpoint.software.manage(主機另要求可管理所有公司的角色,登錄 / 發佈 / 撤回);派送與重新開機綁 endpoint.command.admin。
   #   核可非軟體批次(system.reboot)走 /approve-command,權限 endpoint.command.admin,隨「重新開機」節點授予。核可人不得是建立人(主機檢查)
-  - { code: it.endpoint-software.list, name: 軟體派送, kind: tab, parent: it.endpoint-device.read, sort: 50, includes: [endpoint.device.read] }
+  - { code: it.endpoint-software.list, name: 軟體目錄與派送, kind: tab, parent: it.endpoint-software.read, sort: 10, includes: [endpoint.device.read] }
   - { code: it.endpoint-software.manage, name: 軟體目錄管理(登錄、修改、測試完成、發佈、撤回), kind: button, parent: it.endpoint-software.list, sort: 10, includes: [endpoint.software.manage] }
   - { code: it.endpoint-software.deploy, name: 派送軟體(安裝、移除), kind: button, parent: it.endpoint-software.list, sort: 20, includes: [endpoint.command.admin] }
   - { code: it.endpoint-software.approve, name: 核可 / 駁回軟體派送批次, kind: button, parent: it.endpoint-software.list, sort: 30, includes: [endpoint.software.manage] }
   # 上傳與簽章(RustIt S1-4;ItAgentBack /v1/software/uploads*,權限 endpoint.software.manage,主機另要求可管理所有公司;核可人 ≠ 上傳者由主機檢查)。
   #   工作站確認路由 endpoint.software.sign-check 是 API Key,不授予使用者
-  - { code: it.endpoint-software.upload, name: 上傳與簽章, kind: tab, parent: it.endpoint-device.read, sort: 60, includes: [endpoint.software.manage] }
+  - { code: it.endpoint-software.upload, name: 上傳與簽章, kind: tab, parent: it.endpoint-software.read, sort: 20, includes: [endpoint.software.manage] }
   - { code: it.endpoint-device.reboot, name: 重新開機與核可重開機批次, kind: button, parent: it.endpoint-device.list, sort: 30, includes: [endpoint.command.admin] }
   - { code: it.sys-user.users, name: 人員, kind: tab, parent: it.sys-user.read, sort: 10, includes: [gw.admin.user.read] }
   - { code: it.sys-user.roles, name: 調整個別角色, kind: button, parent: it.sys-user.users, sort: 10, includes: [gw.admin.user.write] }
@@ -128,7 +134,11 @@ roles:
       - it.gw-rbac.read
       - it.gw-observe.read
       - it.gw-file.read
+      - it.endpoint-dashboard.read
       - it.endpoint-device.read
+      - it.endpoint-software.read
+      - it.endpoint-policy.read
+      - it.endpoint-agent.read
       - it.sys-user.read
       - it.sys-role.read
       - it.sys-menu.read
