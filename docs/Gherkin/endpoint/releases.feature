@@ -14,8 +14,8 @@
     @manual
     場景: 沒有 Tab 權限看不到「Agent 版本」
       假如 使用者沒有 it.endpoint-release.list
-      當 開啟「電腦清單」
-      那麼 Tab 只有「電腦清單」「指令紀錄」「告警」,直接輸入 /endpoint/devices/releases 被導回
+      當 開啟「Agent 管理」
+      那麼 Tab 只有開發中的「使用者端程式」「Agent 設定」,直接輸入 /endpoint/agent 被導到「使用者端程式」(ENDPOINT-MENU-PLAN M1)
 
     @manual
     場景: 只有唯讀權限看不到管理按鈕

@@ -118,6 +118,12 @@ export const ICONS: Record<string, Component> = {
   merge: L.GitMerge,
   archive: L.Archive,
   ban: L.Ban,
+  // 端點管理選單拆分(ENDPOINT-MENU-PLAN M1):開發中標記、資安政策、遠端協助、報修、使用者端程式
+  construction: L.Construction,
+  usb: L.Usb,
+  headset: L.Headset,
+  wrench: L.Wrench,
+  'app-window': L.AppWindow,
 };
 
 export const ICON_NAMES = Object.keys(ICONS).sort();

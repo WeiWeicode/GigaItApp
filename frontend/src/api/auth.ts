@@ -26,7 +26,12 @@ export const IT = {
   gwRbac: 'it.gw-rbac.read',
   gwObserve: 'it.gw-observe.read',
   gwFile: 'it.gw-file.read',
+  /** 端點管理五個選單(ENDPOINT-MENU-PLAN §2);it.endpoint-device.read 沿用代碼、名稱改「電腦管理」 */
+  endpointDashboard: 'it.endpoint-dashboard.read',
   endpointDevice: 'it.endpoint-device.read',
+  endpointSoftware: 'it.endpoint-software.read',
+  endpointPolicy: 'it.endpoint-policy.read',
+  endpointAgent: 'it.endpoint-agent.read',
   sysUser: 'it.sys-user.read',
   sysRole: 'it.sys-role.read',
   sysMenu: 'it.sys-menu.read',
@@ -245,7 +250,14 @@ const MENU: readonly MenuGroup[] = [
     code: 'it.group.endpoint',
     title: '端點管理',
     icon: 'monitor',
-    children: [{ key: 'devices', title: '電腦清單', path: '/endpoint/devices', permission: IT.endpointDevice, requires: [EP.deviceRead] }],
+    // 端點儀表板、資安政策目前只有開發中 Tab:pageHasTab 把開發中 Tab 算成可看,有選單即顯示(ENDPOINT-MENU-PLAN §8-2)
+    children: [
+      { key: 'ep-dashboard', title: '端點儀表板', path: '/endpoint/dashboard', permission: IT.endpointDashboard, requires: [EP.deviceRead] },
+      { key: 'devices', title: '電腦管理', path: '/endpoint/devices', permission: IT.endpointDevice, requires: [EP.deviceRead] },
+      { key: 'ep-software', title: '軟體管理', path: '/endpoint/software', permission: IT.endpointSoftware, requires: [EP.deviceRead] },
+      { key: 'ep-policy', title: '資安政策', path: '/endpoint/policy', permission: IT.endpointPolicy, requires: [EP.deviceRead] },
+      { key: 'ep-agent', title: 'Agent 管理', path: '/endpoint/agent', permission: IT.endpointAgent, requires: [EP.deviceRead] },
+    ],
   },
   {
     key: 'system',
