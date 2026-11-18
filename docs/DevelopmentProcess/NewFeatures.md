@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-11-18 人員明細:註冊 / 登入紀錄
+- 內容:正式區問題 #2(需求方決定方案 C)。人員明細新增「註冊 / 登入紀錄」區塊,選區間(30 / 90 / 365 天)按「查詢」才載入 `GET /api/admin/users/:id/auth-logs`(BFF 新 API,`gw.admin.user.read`,以 user_id 查),分頁 10 筆;事件沿用 `AUTH_EVENT`,原因代碼以新 `authReasonLabel()` 翻成中文(already_*、name_mismatch、hire_date_mismatch、virtual_account、ad_account:網域、「錯誤代碼: 說明」等),原文放在 title。換人 / 改區間時以請求序號丟棄較早的結果
+- 檔案:`frontend/src/api/admin.ts`(`users.authLogs`)、`frontend/src/api/format.ts`、`frontend/src/pages/system/Users.vue`
+- 驗證:`npm run typecheck`、`npm run build` 通過。依賴 BFF `feature/register-exists-and-auth-log`;瀏覽器步驟在 BFF 上測試區後執行:人員 → 點 V112001 → 註冊 / 登入紀錄選「最近 90 天」→ 查詢 → 看到「註冊被拒 / 已有啟用中的本機帳號」等紀錄
+
 ## 2026-10-30 資產管理、報表選單與更多開發中 Tab(ENDPOINT-MENU-PLAN M1b)
 - 內容:需求方 2026-10-30 決定 RustIt 取代 SmartIT(功能對照 RustIt `docs/SMARTIT-FEATURE-BACKLOG.md`),回答「兩個都新增」「稽核列入但最後做」「舊資料不匯入」(計畫 §8-6)。側欄端點管理改七個選單:新增資產管理 `/endpoint/assets`(`it.endpoint-asset.read`,sort 25)與報表 `/endpoint/reports`(`it.endpoint-report.read`,sort 60),兩者 includes `endpoint.device.read`、上層 `it.group.endpoint`,加入 it-admin。新增開發中 Tab:資產管理 › 資產登錄、資產盤點、周邊設備、廠商與地點;報表 › 報表中心、報表訂閱;電腦管理 › 未安裝 Agent 電腦;軟體管理 › 禁用軟體、軟體使用率;資安政策 › 原則與套用對象、防火牆規則、外接網卡與無線網路、執行軟體控管、弱點分析(CVE)、稽核紀錄(說明需法務與隱私公告確認後才開發)。說明文字取自該文件 §2,不含 SmartIT 產品內容。新圖示 tag、clipboard-check、printer、map-pin、chart、monitor-off、brick-wall、shield-ban、bug。
 - 檔案:`frontend/src/router.ts`、`frontend/src/api/auth.ts`、`frontend/src/ui/icons.ts`、`frontend/src/ui/components/GTabs.vue`、`deploy/gateway-rbac.yaml`、`docs/ENDPOINT-MENU-PLAN.md`(§2、§4、§8-6)、`docs/PRD.md` FR-8.12、`docs/PROJECT-MAP.md`、`docs/Gherkin/endpoint/menu.feature`

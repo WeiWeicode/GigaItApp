@@ -3,14 +3,15 @@
  * 人員(Gateway 使用者,Gateway PRD §8.7、P2-3):GET /api/admin/users(後端搜尋、篩選、分頁)、明細、停用 / 啟用、強制登出、個別指派角色、
  * 本機帳號建立 / 重置密碼(POST /api/admin/local-accounts/:id/reset-password,需 gw.admin.local.write)。
  * 人員資料由 BPM / LOS 每小時同步(W3-4.6b);本頁不新增人員(本機帳號由入口網自行註冊,或在此由 IT 建立)。
+ * 註冊 / 登入紀錄:GET /api/admin/users/:id/auth-logs(gw.admin.user.read),在明細中按「查詢」才載入,原因代碼翻成中文。
  * 寫入需 gw.admin.user.write;個別指派的角色所含權限須是操作人本身具備的,否則 BFF 回 403(防止提權)。
  */
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { can, GW, UI, useAuth } from '@/api/auth';
-import { rbac, users, type LocalPasswordResult, type UserDetail, type UserRow } from '@/api/admin';
+import { rbac, users, type LocalPasswordResult, type UserAuthLogRow, type UserDetail, type UserRow } from '@/api/admin';
 import { describeError } from '@/api/http';
-import { fmtTime, fromNow } from '@/api/format';
+import { AUTH_EVENT, authReasonLabel, fmtTime, fromNow } from '@/api/format';
 import { useAsync } from '@/composables/useAsync';
 import { usePaged } from '@/composables/usePaged';
 import { confirm, toast } from '@/ui';
@@ -52,6 +53,7 @@ const detailOpen = computed({ get: () => !!detail.value, set: (v) => !v && ((det
 const busy = ref(false);
 async function openDetail(u: UserRow) {
   busy.value = true;
+  resetLogs();
   try {
     detail.value = await users.get(u.userId);
   } catch (e) {
@@ -88,6 +90,50 @@ async function revoke(u: UserDetail) {
     toast.success('已強制登出');
   } catch (e) {
     toast.fromError(e);
+  }
+}
+
+// ---- 註冊 / 登入紀錄(依工號;按「查詢」才載入) ----
+const LOG_PAGE_SIZE = 10;
+const LOG_RANGES = [
+  { label: '最近 30 天', value: '30' },
+  { label: '最近 90 天', value: '90' },
+  { label: '最近 1 年', value: '365' },
+];
+const logs = reactive({
+  loaded: false,
+  loading: false,
+  days: '30',
+  page: 1,
+  total: 0,
+  items: [] as UserAuthLogRow[],
+  error: null as string | null,
+});
+const logPages = computed(() => Math.max(1, Math.ceil(logs.total / LOG_PAGE_SIZE)));
+/** 請求序號:換人、重開明細、改區間後,較早送出的查詢結果一律丟棄 */
+let logSeq = 0;
+function resetLogs() {
+  logSeq++;
+  Object.assign(logs, { loaded: false, loading: false, page: 1, total: 0, items: [], error: null });
+}
+watch(
+  () => logs.days,
+  () => resetLogs(),
+);
+async function loadLogs(u: UserDetail, page = 1) {
+  const seq = ++logSeq;
+  logs.loading = true;
+  logs.error = null;
+  try {
+    const from = new Date(Date.now() - Number(logs.days) * 86_400_000).toISOString();
+    // 明細一定有 user_id;不傳工號,避免全數字工號被當成 user_id
+    const r = await users.authLogs(u.userId, { from, page, pageSize: LOG_PAGE_SIZE });
+    if (seq !== logSeq) return;
+    Object.assign(logs, { loaded: true, page, total: r.total, items: r.items });
+  } catch (e) {
+    if (seq === logSeq) logs.error = describeError(e);
+  } finally {
+    if (seq === logSeq) logs.loading = false;
   }
 }
 
@@ -311,6 +357,35 @@ async function saveRoles(u: UserDetail) {
             </div>
           </template>
         </div>
+
+        <div class="box stack" style="--gap: 10px">
+          <div class="row" style="--gap: 8px">
+            <p class="faint xs strong" style="margin: 0">註冊 / 登入紀錄</p>
+            <span class="spacer" />
+            <GSelect v-model="logs.days" :options="LOG_RANGES" aria-label="查詢區間" />
+            <GButton size="sm" variant="ghost" icon="search" :loading="logs.loading" @click="loadLogs(detail)">查詢</GButton>
+          </div>
+          <GAlert v-if="logs.error" tone="danger">{{ logs.error }}</GAlert>
+          <p v-else-if="!logs.loaded" class="faint small" style="margin: 0">查看此工號的註冊、登入、密碼變更紀錄與被拒原因(同仁回報無法註冊 / 登入時使用)。</p>
+          <p v-else-if="!logs.items.length" class="faint small" style="margin: 0">此區間沒有紀錄</p>
+          <template v-else>
+            <ul class="logs">
+              <li v-for="l in logs.items" :key="l.logId">
+                <span class="faint xs nowrap">{{ fmtTime(l.occurredAt) }}</span>
+                <GBadge :tone="AUTH_EVENT[l.event]?.tone ?? 'neutral'" dot>{{ AUTH_EVENT[l.event]?.label ?? l.event }}</GBadge>
+                <span class="small" :title="l.reason ?? ''">{{ authReasonLabel(l.reason) }}</span>
+                <span class="faint xs mono" :title="l.userAgent ?? ''">{{ l.ip ?? '' }}</span>
+              </li>
+            </ul>
+            <div class="row" style="--gap: 8px">
+              <span class="faint xs">共 {{ logs.total }} 筆</span>
+              <span class="spacer" />
+              <GButton size="sm" variant="ghost" :disabled="logs.page <= 1 || logs.loading" @click="loadLogs(detail, logs.page - 1)">上一頁</GButton>
+              <span class="faint xs">{{ logs.page }} / {{ logPages }}</span>
+              <GButton size="sm" variant="ghost" :disabled="logs.page >= logPages || logs.loading" @click="loadLogs(detail, logs.page + 1)">下一頁</GButton>
+            </div>
+          </template>
+        </div>
       </div>
       <template #footer>
         <GButton
@@ -418,6 +493,19 @@ async function saveRoles(u: UserDetail) {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: center;
+}
+.logs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.logs li {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 8px;
   align-items: center;
 }
 .chip {

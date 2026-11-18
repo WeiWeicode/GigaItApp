@@ -443,6 +443,9 @@ export interface LocalPasswordResult {
   temporaryPassword?: string;
 }
 
+/** 使用者明細的註冊 / 登入紀錄(不含帳號欄位) */
+export type UserAuthLogRow = Omit<AuthLogRow, 'username' | 'userId'>;
+
 export const users = {
   list: (query: { q?: string; companyId?: number; deptCode?: string; disabled?: boolean; authType?: string; page: number; pageSize: number }) =>
     http.get<Paged<UserRow>>('/api/admin/users', { query: query as Query }),
@@ -454,6 +457,12 @@ export const users = {
   setLocalPassword: (id: string | number, password?: string) =>
     http.post<LocalPasswordResult>(`/api/admin/local-accounts/${id}/reset-password`, password ? { password } : {}),
   effective: (id: string | number) => http.get<EffectivePermissions>(`/api/admin/users/${id}/effective-permissions`),
+  /** 註冊 / 登入紀錄(gw.auth_log;gw.admin.user.read):id 為 user_id 或工號,新到舊;未指定區間時 BFF 預設最近 30 天 */
+  authLogs: (id: string | number, query: { from?: string; to?: string; page: number; pageSize: number }) =>
+    http.get<Paged<UserAuthLogRow> & { employeeNo: string; userId: number | null; from: string; to: string | null }>(
+      `/api/admin/users/${encodeURIComponent(String(id))}/auth-logs`,
+      { query },
+    ),
   companies: () => http.get<{ items: Company[] }>('/api/admin/companies'),
 };
 

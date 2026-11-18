@@ -42,6 +42,21 @@ export function describeError(e: unknown): string {
       : '';
     return `${e.message}${fields ? `(${fields})` : ''}${e.requestId ? `(requestId ${e.requestId.slice(0, 12)})` : ''}`;
   }
-  if (e instanceof TypeError) return '無法連線伺服器,請確認網路';
+  if (isNetworkError(e)) return '無法連線伺服器,請確認網路';
+  // 畫面程式錯誤(例如 x.trim is not a function):不要誤導成網路問題,詳細內容留在 console 供回報
+  if (e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError || e instanceof SyntaxError) {
+    console.error(e);
+    return '畫面發生錯誤,請回報 IT';
+  }
   return e instanceof Error ? e.message : String(e);
+}
+
+/**
+ * fetch 本身失敗(斷線、DNS、被擋):web-kit 原樣丟出瀏覽器的 TypeError,
+ * 訊息依瀏覽器不同(Chrome「Failed to fetch」、Firefox「NetworkError when attempting to fetch resource.」、
+ * Safari「Load failed」「The Internet connection appears to be offline.」「The network connection was lost.」)。
+ * 只有這幾種才算網路問題;程式錯誤的 TypeError(如 x.trim is not a function)不算。
+ */
+export function isNetworkError(e: unknown): boolean {
+  return e instanceof TypeError && /failed to fetch|networkerror|load failed|network request failed|internet connection|network connection/i.test(e.message);
 }
