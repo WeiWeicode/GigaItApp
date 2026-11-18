@@ -2,6 +2,16 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-11-18 選單管理改排序後「儲存失敗 / 無法連線伺服器」
+- 內容:正式區問題 #1。排序欄位 `<GInput type="number">` 經 v-model 變成 number,`form.sort.trim()` 丟 TypeError,請求沒送出;`describeError` 又把所有 TypeError 說成「無法連線伺服器」。改為 `String(form.sort ?? '').trim()`;`describeError` 只把 fetch 網路失敗(瀏覽器的 Failed to fetch / NetworkError / Load failed 等,新增 `isNetworkError`)說成無法連線,其他程式錯誤(TypeError、ReferenceError 等)顯示「畫面發生錯誤,請回報 IT」並 `console.error`。其他 `type="number"` 欄位(Routes、Upstreams、通知設定)都用 `Number()` / truthy 判斷,不受影響
+- 檔案:`frontend/src/pages/system/MenuManage.vue`、`frontend/src/api/http.ts`
+- 驗證:`npm run typecheck`、`npm run build` 通過。瀏覽器步驟(測試區合併後):選單管理 → 編輯任一選單 → 排序改數字 → 儲存 → 顯示「已儲存」、側欄順序改變;Nginx 日誌有 `PATCH /api/admin/permissions/<code>`
+
+## 2026-10-30 待核可批次的期限一律顯示「剛剛到期」
+- 內容:`BatchApprovals.vue` 期限欄用 `fromNow(approvalExpiresAt)`,但 `fromNow` 只處理過去時間,未來的核可期限都落在「剛剛」→ 顯示「剛剛到期」。新增 `api/format.ts` 的 `untilText()`(N 分鐘 / 小時 / 天後到期;已過顯示「已到期」),「軟體目錄與派送」卡片與「待核可」Tab 都改用。
+- 檔案:`frontend/src/api/format.ts`、`frontend/src/components/endpoint/BatchApprovals.vue`
+- 驗證:本機假 Gateway 的批次(期限 16–18 小時後)顯示「18 小時後到期」等;typecheck / build 通過
+
 ## 2026-10-29 deploy-prod 發佈前端失敗:compose run 沒有 --no-build
 - 內容:正式區第一次 `deploy-prod`(pipeline #566,job 1648)itapp-api 已更新且 healthy,但 `$IT run --rm --no-build spa-it` 回 `unknown flag: --no-build`(主機 3 Docker Compose v5.6,`run` 只有 `--build` / `--pull`)。改為 `run --rm --pull never spa-it`:映像已由前一步拉取,`run` 不加 `--build` 不會建置
 - 檔案:`.gitlab-ci.yml`

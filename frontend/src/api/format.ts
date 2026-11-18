@@ -16,6 +16,17 @@ export function fromNow(iso: string | null | undefined): string {
   return fmtTime(iso);
 }
 
+/** 期限 → 「3 小時後到期」;已過 → 「已到期」(fromNow 只處理過去時間,期限要用這個) */
+export function untilText(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const s = (new Date(iso).getTime() - Date.now()) / 1000;
+  if (Number.isNaN(s)) return '—';
+  if (s <= 0) return '已到期';
+  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))} 分鐘後到期`;
+  if (s < 86400) return `${Math.floor(s / 3600)} 小時後到期`;
+  return `${Math.floor(s / 86400)} 天後到期`;
+}
+
 /** 位元組 → GB / MB(記憶體、磁碟;1024 進位) */
 export function fmtBytes(n: number | null | undefined): string {
   if (n == null) return '—';
@@ -105,6 +116,46 @@ export const ACTION_LABEL: Record<string, string> = {
   'notify.announcement.remind': '提醒未讀',
   'notify.settings.update': '修改通知設定',
 };
+
+/** 註冊被拒與其他 auth_log 原因代碼(Gateway local-account.ts / login.ts) */
+const AUTH_REASON: Record<string, string> = {
+  invalid_employee_no: '工號格式錯誤',
+  already_active: '已有啟用中的本機帳號(請直接登入或忘記密碼)',
+  already_locked: '本機帳號已鎖定(請用忘記密碼或由 IT 解鎖)',
+  already_pending_verify: '已有帳號待啟用(Email 驗證或 IT 代建的啟用連結尚未完成)',
+  already_pending_approval: '已申請,等待 IT 審核',
+  already_disabled: '本機帳號已停用',
+  virtual_account: '兼任帳號,請用主要工號',
+  not_active: '人事資料非在職',
+  name_mismatch: '姓名與人事資料不符',
+  hire_date_mismatch: '到職日與人事資料不符',
+  self_jobdate: '以到職日驗證後啟用',
+  must_change_password: '須變更密碼',
+  expired: '連結已過期',
+  missing: '連結不存在',
+  reused: '連結重複使用',
+};
+/** 登入失敗原因開頭的錯誤代碼(「代碼: 說明」) */
+const AUTH_REASON_CODE: Record<string, string> = {
+  INVALID_CREDENTIALS: '帳號或密碼錯誤',
+  ACCOUNT_NOT_REGISTERED: '尚未註冊',
+  ACCOUNT_LOCKED: '帳號已鎖定',
+  ACCOUNT_DISABLED: '帳號已停用',
+  COMPANY_NOT_OPEN: '所屬公司尚未開放',
+  AD_PASSWORD_EXPIRED: 'AD 密碼已過期',
+  UPSTREAM_UNAVAILABLE: '驗證服務無法連線',
+};
+
+/** auth_log.reason 翻成中文;認不得的原樣顯示(原文另以 title 提供) */
+export function authReasonLabel(reason: string | null | undefined): string {
+  if (!reason) return '—';
+  if (AUTH_REASON[reason]) return AUTH_REASON[reason];
+  const ad = /^ad_account:(.+)$/.exec(reason);
+  if (ad) return `已有 AD 帳號(${ad[1]}),請以 AD 登入`;
+  const coded = /^([A-Z_]+): (.*)$/.exec(reason);
+  if (coded && AUTH_REASON_CODE[coded[1]!]) return `${AUTH_REASON_CODE[coded[1]!]}(${coded[2]})`;
+  return reason;
+}
 
 /** 登入紀錄事件(gw.auth_log.event) */
 export const AUTH_EVENT: Record<string, { label: string; tone: string }> = {

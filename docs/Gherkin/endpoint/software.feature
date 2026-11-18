@@ -14,8 +14,8 @@
     @manual
     場景: 沒有 Tab 權限看不到「軟體派送」
       假如 使用者沒有 it.endpoint-software.list
-      當 開啟「電腦清單」
-      那麼 Tab 沒有「軟體派送」,直接輸入 /endpoint/devices/software 被導回
+      當 開啟「軟體管理」
+      那麼 Tab 沒有「軟體目錄與派送」,直接輸入 /endpoint/software 被導到同頁第一個可看的 Tab(ENDPOINT-MENU-PLAN M1)
 
     @manual
     場景: 只有唯讀權限看不到動作按鈕

@@ -2,6 +2,34 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-11-18 人員明細:註冊 / 登入紀錄
+- 內容:正式區問題 #2(需求方決定方案 C)。人員明細新增「註冊 / 登入紀錄」區塊,選區間(30 / 90 / 365 天)按「查詢」才載入 `GET /api/admin/users/:id/auth-logs`(BFF 新 API,`gw.admin.user.read`,以 user_id 查),分頁 10 筆;事件沿用 `AUTH_EVENT`,原因代碼以新 `authReasonLabel()` 翻成中文(already_*、name_mismatch、hire_date_mismatch、virtual_account、ad_account:網域、「錯誤代碼: 說明」等),原文放在 title。換人 / 改區間時以請求序號丟棄較早的結果
+- 檔案:`frontend/src/api/admin.ts`(`users.authLogs`)、`frontend/src/api/format.ts`、`frontend/src/pages/system/Users.vue`
+- 驗證:`npm run typecheck`、`npm run build` 通過。依賴 BFF `feature/register-exists-and-auth-log`;瀏覽器步驟在 BFF 上測試區後執行:人員 → 點 V112001 → 註冊 / 登入紀錄選「最近 90 天」→ 查詢 → 看到「註冊被拒 / 已有啟用中的本機帳號」等紀錄
+
+## 2026-10-30 資產管理、報表選單與更多開發中 Tab(ENDPOINT-MENU-PLAN M1b)
+- 內容:需求方 2026-10-30 決定 RustIt 取代 SmartIT(功能對照 RustIt `docs/SMARTIT-FEATURE-BACKLOG.md`),回答「兩個都新增」「稽核列入但最後做」「舊資料不匯入」(計畫 §8-6)。側欄端點管理改七個選單:新增資產管理 `/endpoint/assets`(`it.endpoint-asset.read`,sort 25)與報表 `/endpoint/reports`(`it.endpoint-report.read`,sort 60),兩者 includes `endpoint.device.read`、上層 `it.group.endpoint`,加入 it-admin。新增開發中 Tab:資產管理 › 資產登錄、資產盤點、周邊設備、廠商與地點;報表 › 報表中心、報表訂閱;電腦管理 › 未安裝 Agent 電腦;軟體管理 › 禁用軟體、軟體使用率;資安政策 › 原則與套用對象、防火牆規則、外接網卡與無線網路、執行軟體控管、弱點分析(CVE)、稽核紀錄(說明需法務與隱私公告確認後才開發)。說明文字取自該文件 §2,不含 SmartIT 產品內容。新圖示 tag、clipboard-check、printer、map-pin、chart、monitor-off、brick-wall、shield-ban、bug。
+- 檔案:`frontend/src/router.ts`、`frontend/src/api/auth.ts`、`frontend/src/ui/icons.ts`、`frontend/src/ui/components/GTabs.vue`、`deploy/gateway-rbac.yaml`、`docs/ENDPOINT-MENU-PLAN.md`(§2、§4、§8-6)、`docs/PRD.md` FR-8.12、`docs/PROJECT-MAP.md`、`docs/Gherkin/endpoint/menu.feature`
+- 驗證:見 `FrontendCorrection.md` 同日紀錄。
+- 待辦:依賴 M2(!22),M2 先合併。合併後 CI `rbac-test` 首次登記兩個新選單即為正確上層與排序,不需在選單管理手動調整。
+
+## 2026-10-30 電腦管理 › 待核可 Tab(ENDPOINT-MENU-PLAN M2)
+- 內容:「電腦管理」的「待核可」由開發中改為實作:`pages/endpoint/Batches.vue` 使用 `BatchApprovals.vue` 的新 `page` 模式,集中列出 `GET /api/endpoint/batches?state=pending_approval`(nextCursor「載入更多」),欄位:指令類型、內容、台數、建立人、建立時間、有效期限;點列看明細(參數、核可期限、目標電腦)。核可 / 駁回、權限(軟體批次 `it.endpoint-software.approve`、其他批次 `it.endpoint-device.reboot`)與「建立人不能核可」沿用原元件,清單下方另加文字說明。「軟體目錄與派送」上方的卡片(非 page 模式)欄位與行為不變。`gateway-rbac.yaml` 新增 tab `it.endpoint-batch.list`(上層 `it.endpoint-device.read`、sort 35、includes `endpoint.device.read`)並加入 it-admin;路由移除 `wip`,改為 Tab 權限 + `requires: [endpoint.device.read]`。
+- 檔案:`frontend/src/pages/endpoint/Batches.vue`(新)、`frontend/src/components/endpoint/BatchApprovals.vue`、`frontend/src/api/format.ts`(`untilText`)、`frontend/src/api/auth.ts`、`frontend/src/router.ts`、`deploy/gateway-rbac.yaml`、`docs/PRD.md` FR-8.10 / 8.11、`docs/PROJECT-MAP.md`、`docs/Gherkin/endpoint/batches.feature`(新,@manual)、`menu.feature`、`docs/Gherkin/README.md`、`docs/ENDPOINT-MENU-PLAN.md`
+- 驗證:見 `FrontendCorrection.md` 同日紀錄。
+- 待辦:合併 develop 後 CI `rbac-test` 首次登記 `it.endpoint-batch.list`(上層正確,不需手動調整);非 it-admin 角色要看到此 Tab 需另行授予(主討論串)。
+
+## 2026-10-30 端點管理選單拆分與開發中 Tab(ENDPOINT-MENU-PLAN M1)
+- 內容:依需求方 2026-10-30 決定(`docs/ENDPOINT-MENU-PLAN.md` §8),側欄「端點管理」由單一選單(6 個 Tab)拆成五個選單:端點儀表板 `/endpoint/dashboard`、電腦管理 `/endpoint/devices`(沿用 `it.endpoint-device.read`,名稱改「電腦管理」)、軟體管理 `/endpoint/software`、資安政策 `/endpoint/policy`、Agent 管理 `/endpoint/agent`。既有頁面元件不改,只搬路由(軟體目錄與派送 / 上傳與簽章 → 軟體管理,Agent 版本 → Agent 管理);舊網址 `/endpoint/devices/software`、`/software-uploads`、`/releases` redirect 到新位置(保留 query)。路線圖功能以〔開發中〕Tab 佔位:共用 `pages/WipFeature.vue`(功能說明、預計內容、設計文件;不呼叫 API),路由 `meta.wip`、不綁 Tab 權限代碼,`GTabs` 顯示「開發中」標記;`firstTab()` 把開發中 Tab 算成可看,只有開發中 Tab 的選單(端點儀表板、資安政策)也出現在側欄。`gateway-rbac.yaml`:新增 menu `it.endpoint-dashboard.read` / `-software.read` / `-policy.read` / `-agent.read`(includes `endpoint.device.read`,sort 10–50),`it.endpoint-software.list|upload` 上層改 `it.endpoint-software.read`、`it.endpoint-release.list` 改 `it.endpoint-agent.read`,`it.endpoint-device.read` 改名「電腦管理」、`it.endpoint-software.list` 改名「軟體目錄與派送」,it-admin 加 4 個選單;既有 tab / 按鈕代碼不變(新環境首次登記用,既有環境需在選單管理手動調整,§3.2)。新圖示 construction、usb、headset、wrench、app-window。
+- 檔案:`frontend/src/router.ts`、`frontend/src/api/auth.ts`、`frontend/src/pages/WipFeature.vue`(新)、`frontend/src/ui/components/GTabs.vue`、`frontend/src/ui/icons.ts`、`frontend/vite.config.ts`(`DEV_EXTRA_PERMS`)、`deploy/gateway-rbac.yaml`、`docs/PRD.md` FR-8.1 / 8.7–8.10、`docs/PROJECT-MAP.md`、`docs/Gherkin/endpoint/menu.feature`(新,@manual)、`software.feature`、`releases.feature`、`docs/Gherkin/README.md`、`docs/ENDPOINT-MENU-PLAN.md`
+- 驗證:見 `FrontendCorrection.md` 同日紀錄。
+- 待辦:合併 develop 後 CI `rbac-test` 只新增 4 個選單節點;既有 Tab 上層、名稱、排序與授權補洞由主討論串在「選單管理」手動處理(MR 描述附清單)。之後正式區同樣處理。
+
+## 2026-10-30 端點管理選單重新分類規劃(草案)
+- 內容:新增 `docs/ENDPOINT-MENU-PLAN.md`:端點管理由單一選單(6 個 Tab)拆成端點儀表板 / 電腦管理 / 軟體管理 / Agent 管理;沿用既有 Tab / 按鈕代碼只改上層(避免角色授權失效),新增 3 個選單代碼;說明 CI `apply` 不覆寫上層、需在選單管理手動調整與授權補洞;儀表板與已安裝軟體需 RustIt 新彙總 API;分批 M1–M5,§8 五項待決
+- 檔案:`docs/ENDPOINT-MENU-PLAN.md`
+- 驗證:文件,無程式變更
+
 ## 2026-10-21 Agent 版本頁與電腦升級狀態(RustIt P6-5)
 - 內容:配合 RustIt P6(`docs/P6-UPGRADE-DESIGN.md` §1、§2、§7;P6-1 API 已在測試區,OpenAPI 已發佈)。「電腦清單」新增第 4 個 Tab「Agent 版本」:**發佈環**(pilot / it / all × Agent / Watchdog 的目標版本與進度,設定目標版本:pilot 可設草稿、it / all 只列已發佈、pilot 未滿 24 小時回 409 時確認後帶 `force` 重送)與**版本清單**(登錄:從版本檔目錄挑未登錄的檔案、填預期簽章者 SHA-1 指紋;發佈;撤回:確認後主機清除以此版本為目標的環)。電腦詳情「健康與 Agent」Tab 新增「版本與升級」:所屬環(可改)、Agent / Watchdog 目前與目標版本(「指定」= agent.upgrade 強制)、升級狀態與最後錯誤、立即升級(`agent.upgrade`,admin-commands)。權限:Tab `it.endpoint-release.list`(∧ `endpoint.device.read`)、管理按鈕 `it.endpoint-release.manage`(∧ `endpoint.software.manage`)、詳情的環與立即升級沿用 `it.endpoint-device.admin` ∧ `endpoint.command.admin`。`gateway-rbac.yaml` 新增兩個節點並加進 `it-admin`(**includes 的 endpoint.software.manage 需 ItAgentBack 已註冊;尚未套用到測試區,見下方待辦**)。
 - 檔案:`frontend/src/pages/endpoint/Releases.vue`(新)、`frontend/src/components/endpoint/{ReleaseRegister,RingTarget,DeviceUpgrade}.vue`(新)、`DeviceHealth.vue`、`frontend/src/api/{endpoint,types,auth}.ts`、`frontend/src/router.ts`、`frontend/vite.config.ts`(本機 `ENDPOINT_LOCAL` 補的權限)、`deploy/gateway-rbac.yaml`、`docs/Gherkin/endpoint/releases.feature`(新,@manual)、`docs/PRD.md`(FR-8.7)、`docs/PROJECT-MAP.md`

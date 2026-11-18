@@ -2,6 +2,11 @@
 
 > 新紀錄加在最上方;格式見 `AGENT.md` §11。
 
+## 2026-10-29 gateway-routes.yaml 補正式區上游位址
+- 內容:正式區 Gateway 沒有 `itapp-api` 的上游與 `/api/it/*` 路由,`/api/it/dashboard/overview` 回 404。upstream `itapp-api` 補 `targets.prod: [http://itapp-api:51291]`(正式區同樣以容器名稱經 Gateway Docker 網路連入);已以 `apply` 套用到正式區並發佈
+- 檔案:`deploy/gateway-routes.yaml`
+- 驗證:見 MR 說明(正式區套用、發佈後經 Nginx 呼叫 `/api/it/dashboard/overview` 未登入回 401)
+
 ## 2026-10-29 新增正式區部署 build-prod / deploy-prod / rbac-prod
 - 內容:`main` 原本沒有正式區部署。正式區主機 3 的 WSL 查不到外部 DNS(Docker Hub、npmjs 都不通),不能像測試區在主機上建置,改為:① `build-prod`(`main`,主機 2)以主機 2 的 `itapp.env` 解析 compose,建置 `itapp-api`、`spa-it-admin` 並推送 `$CI_REGISTRY_IMAGE`(tag = commit SHA);② `deploy-prod`(`main` 手動,tag `prod-deploy`)拉取映像、`up --no-build --wait itapp-api`、`run --no-build spa-it` 發佈 /it/,冒煙測試同測試區;③ `rbac-prod`(`main` 手動)以正式區 Gateway 映像套用 `deploy/gateway-rbac.yaml`。compose 的映像名稱改為 `${ITAPP_IMAGE_PREFIX:-giganexus}/...`,測試區不設定、行為不變。正式區 `itapp.env` 維持 `BFF_MODE=mock`(§6),資料仍為 `DATA_DIR/itapp.json` 單一實例(§7.5 改接資料庫前的過渡)
 - 檔案:`.gitlab-ci.yml`、`deploy/docker-compose.yml`、`AGENT.md`

@@ -146,7 +146,9 @@ function openEdit(p: Permission) {
 async function submit() {
   saving.value = true;
   try {
-    const sort = form.sort.trim() === '' ? null : Number(form.sort);
+    // type="number" 的 GInput 經 v-model 會變成 number,要同時處理字串與數字
+    const sortText = String(form.sort ?? '').trim();
+    const sort = sortText === '' ? null : Number(sortText);
     const description = form.description.trim() || null;
     const icon = showIcon.value ? form.icon || null : null;
     if (modal.value === 'add') {

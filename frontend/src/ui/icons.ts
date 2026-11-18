@@ -118,6 +118,22 @@ export const ICONS: Record<string, Component> = {
   merge: L.GitMerge,
   archive: L.Archive,
   ban: L.Ban,
+  // 端點管理選單拆分(ENDPOINT-MENU-PLAN M1):開發中標記、資安政策、遠端協助、報修、使用者端程式
+  construction: L.Construction,
+  usb: L.Usb,
+  headset: L.Headset,
+  wrench: L.Wrench,
+  'app-window': L.AppWindow,
+  // 資產管理、報表、資安政策開發中 Tab(ENDPOINT-MENU-PLAN M1b)
+  tag: L.Tag,
+  'clipboard-check': L.ClipboardCheck,
+  printer: L.Printer,
+  'map-pin': L.MapPin,
+  chart: L.ChartColumn,
+  'monitor-off': L.MonitorOff,
+  'brick-wall': L.BrickWall,
+  'shield-ban': L.ShieldBan,
+  bug: L.Bug,
 };
 
 export const ICON_NAMES = Object.keys(ICONS).sort();

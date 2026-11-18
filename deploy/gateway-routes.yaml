@@ -4,7 +4,7 @@
 #
 # 套用後路由為草稿,於 GigaItApp「服務與路由 › 發佈版本」(或 Gateway CLI publish)發佈後生效;
 # 也可直接在「服務與路由」畫面新增 / 修改(效果相同,畫面修改後請同步此檔)。
-# BFF 以容器名稱 itapp-api:51291 連入(同一個 Gateway Docker 網路);正式區於 2026-12 建置時補 targets.prod。
+# BFF 以容器名稱 itapp-api:51291 連入(同一個 Gateway Docker 網路;測試區、正式區相同)。
 
 upstreams:
   - code: itapp-api
@@ -15,6 +15,7 @@ upstreams:
     healthCheckPath: /healthz
     targets:
       test: [http://itapp-api:51291]
+      prod: [http://itapp-api:51291]
 
 routes:
   - routeCode: it.dashboard.overview
